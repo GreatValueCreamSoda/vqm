@@ -17,12 +17,12 @@ namespace vqm {
 // or 4:4:4 modes convert both images, even matching YUV, so input formats may
 // differ and change across the sequence. PQ and HLG inputs are not supported.
 struct VmafV1Config {
-    Size size;
+    Size size;  // source geometry
     // Required source format for Native mode; ignored in explicit modes.
     ImageFormat input_format;
     // CAMBI's encoded sample bit depth; 0 uses the native input bit depth or
-    // 16 when converting. Values 6..16 are supported. Input and encoded
-    // geometry must match; encode-size overrides are not supported.
+    // 16 when converting. Values 6..16 are supported. CAMBI uses the feature
+    // geometry selected by fit.
     std::uint32_t encoded_bit_depth = 0;
     std::size_t gpu_resident_images = 2;
     bool streaming_inputs = true;
@@ -30,6 +30,9 @@ struct VmafV1Config {
     MemoryPolicy memory_policy = MemoryPolicy::Automatic;
     VmafChromaSampling chroma_sampling = VmafChromaSampling::Native;
     float background = 0.5f;  // encoded RGB background for alpha compositing
+    // Scaling uses the standard 1920x1080 model canvas. Padding uses its 16:9
+    // aspect ratio.
+    VmafFitMode fit = VmafFitMode::Native;
 };
 struct VmafV1Frame {
     std::uint64_t index = 0;

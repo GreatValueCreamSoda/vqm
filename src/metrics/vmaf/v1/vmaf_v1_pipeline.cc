@@ -150,12 +150,12 @@ constexpr std::size_t RequiredPushBytes() {
     return std::max(
         {VmafAdm3::PushBytes(), VmafCambi::PushBytes(), VmafSpeed::PushBytes(),
          VmafMotion::PushBytes(), VmafLumaConverter::PushBytes(),
-         VmafSdrConverter::PushBytes()}
+         VmafSdrConverter::PushBytes(), VmafResizer::PushBytes()}
     );
 }
 
 void ValidateDispatchLimits(
-    Size size, Size chroma_size, const VmafCambiPlan& cambi,
+    Size source_size, Size size, Size chroma_size, const VmafCambiPlan& cambi,
     const VkPhysicalDeviceLimits& limits
 ) {
     // SpEED covariance emits 1250 groups for each of its two channels, and
@@ -167,10 +167,12 @@ void ValidateDispatchLimits(
     const auto cambi_partials =
         VmafCambiPool::PartialCount(cambi.max_scale_pixels);
     const auto groups_x =
-        std::max<std::size_t>({Groups(size.width, 16), 2500, speed_partials,
+        std::max<std::size_t>({Groups(source_size.width, 16),
+                               Groups(size.width, 16), 2500, speed_partials,
                                cambi_partials});
     const auto groups_y =
-        std::max<std::uint32_t>({Groups(size.height, 8),
+        std::max<std::uint32_t>({Groups(source_size.height, 16),
+                                 Groups(size.height, 8),
                                  Groups(cambi.max_scale_size.height, 8), 5});
     // The 256x1 and 16x16 shaders are always used. The optional 512-wide
     // SpEED eigen shader is selected only when the device supports it.
@@ -193,6 +195,49 @@ void ValidateDispatchLimits(
     }
 }
 
+constexpr Size kModelCanvas{1920, 1080};
+using FramePlanes = std::array<std::array<std::uint32_t, 3>, 2>;
+
+std::size_t CheckedPixels(Size size) {
+    if (size.width < 17 || size.height < 17 ||
+        size.width > std::numeric_limits<std::uint32_t>::max() / size.height)
+        throw std::invalid_argument("vmaf v1: invalid image geometry");
+    const std::size_t pixels = size.width * size.height;
+    if (pixels > std::numeric_limits<std::uint32_t>::max() / 64u)
+        throw std::invalid_argument(
+            "vmaf v1: geometry exceeds arena addressing"
+        );
+    return pixels;
+}
+
+Size SubsampledSize(Size size, unsigned width_shift, unsigned height_shift) {
+    const auto width_bias = (std::size_t{1} << width_shift) - 1;
+    const auto height_bias = (std::size_t{1} << height_shift) - 1;
+    return {(size.width + width_bias) >> width_shift,
+            (size.height + height_bias) >> height_shift};
+}
+
+struct PlaneFit {
+    Size source, canvas;
+    VmafFitGeometry geometry;
+
+    [[nodiscard]] Size HorizontalSize() const {
+        return {geometry.content.width, source.height};
+    }
+    [[nodiscard]] std::uint64_t ScratchWords() const {
+        return geometry.content.width == source.width
+                   ? 0
+                   : static_cast<std::uint64_t>(geometry.content.width) *
+                         source.height;
+    }
+};
+
+struct FrameFit {
+    PlaneFit luma, chroma;
+    FramePlanes source{};
+    std::uint32_t scratch = 0;
+};
+
 struct Layout {
     std::array<std::uint32_t, 2> source{}, desc{};
     std::vector<std::uint32_t> resident;
@@ -201,7 +246,9 @@ struct Layout {
     VmafCambiBuffers cambi{};
     VmafMotionBuffers motion{};
     Size base_size{};
+    Size feature_size{};
     Size chroma_size{};
+    std::optional<FrameFit> fit;
     VmafCambiPlan cambi_plan{};
     std::uint32_t depth = 0;
     bool native_input = false;
@@ -211,8 +258,13 @@ struct Layout {
     std::size_t readback = 0;
 
     explicit Layout(const VmafV1Config& config) {
-        const auto size = config.size;
-        base_size = size;
+        base_size = config.size;
+        const auto source_pixels = CheckedPixels(base_size);
+        const auto geometry =
+            PlanVmafGeometry(base_size, kModelCanvas, config.fit);
+        feature_size = geometry.canvas;
+        const auto size = feature_size;
+        const auto pixels = CheckedPixels(size);
         const auto& fmt = config.input_format;
         if (config.chroma_sampling != VmafChromaSampling::Native &&
             config.chroma_sampling != VmafChromaSampling::Yuv420 &&
@@ -222,7 +274,7 @@ struct Layout {
             config.chroma_sampling == VmafChromaSampling::Native;
         if (native_mode) {
             ValidateVmafSdrFormat(fmt);
-            ValidateImage(fmt, size, "vmaf v1 input format");
+            ValidateImage(fmt, base_size, "vmaf v1 input format");
         }
         if (!std::isfinite(config.background) || config.background < 0.0f ||
             config.background > 1.0f)
@@ -230,21 +282,13 @@ struct Layout {
         if (config.encoded_bit_depth > 16 ||
             (config.encoded_bit_depth > 0 && config.encoded_bit_depth < 6))
             throw std::invalid_argument("vmaf v1: invalid encoded bit depth");
-        if (size.width < 17 || size.height < 17 ||
-            size.width > std::numeric_limits<std::uint32_t>::max() / size.height)
-            throw std::invalid_argument("vmaf v1: invalid image geometry");
         if (native_mode &&
             (fmt.subsample_w > 2 || fmt.subsample_h > 2 ||
-             size.width % (std::size_t{1} << fmt.subsample_w) != 0 ||
-             size.height % (std::size_t{1} << fmt.subsample_h) != 0))
+             base_size.width % (std::size_t{1} << fmt.subsample_w) != 0 ||
+             base_size.height % (std::size_t{1} << fmt.subsample_h) != 0))
             throw std::invalid_argument("vmaf v1: invalid subsampling geometry");
         if (config.gpu_resident_images > kResidentIndexMask)
             throw std::invalid_argument("vmaf v1: too many resident images");
-        const std::size_t pixels = size.width * size.height;
-        if (pixels > std::numeric_limits<std::uint32_t>::max() / 64u)
-            throw std::invalid_argument(
-                "vmaf v1: geometry exceeds arena addressing"
-            );
         const bool native_yuv = native_mode && fmt.family == ColorFamily::Yuv &&
                                 IsVmafNativeInput(fmt);
         std::uint8_t subsample_w = 1;
@@ -260,12 +304,20 @@ struct Layout {
         native_input = native_yuv;
         chroma420 = subsample_w == 1 && subsample_h == 1;
         depth = native_input ? VmafLumaDepth(fmt) : 16;
-        // Generic 4:2:0 includes the last chroma sample at odd edges.
-        chroma_size =
-            !native_input && chroma420
-                ? Size{size.width / 2 + size.width % 2,
-                       size.height / 2 + size.height % 2}
-                : Size{size.width >> subsample_w, size.height >> subsample_h};
+        const auto source_chroma =
+            SubsampledSize(base_size, subsample_w, subsample_h);
+        chroma_size = SubsampledSize(size, subsample_w, subsample_h);
+        if (base_size != size) {
+            fit.emplace();
+            fit->luma = {base_size, size, geometry.fit};
+            // Project the luma rectangle onto the coded chroma grid. Keep the
+            // final chroma sample when a fitted edge has an odd luma extent.
+            fit->chroma = {
+                source_chroma,
+                chroma_size,
+                {SubsampledSize(geometry.fit.content, subsample_w, subsample_h),
+                 geometry.fit.x >> subsample_w, geometry.fit.y >> subsample_h}};
+        }
         const std::size_t chroma = chroma_size.width * chroma_size.height;
         const std::size_t speed_scratch =
             VmafSpeedFilter::ScratchWords(chroma_size);
@@ -285,14 +337,24 @@ struct Layout {
             return at;
         };
         if (config.streaming_inputs) {
-            source[0] = add(4 * pixels);
-            source[1] = add(4 * pixels);
+            source[0] = add(4 * source_pixels);
+            source[1] = add(4 * source_pixels);
         }
         desc[0] = add(kSourceDescWords);
         desc[1] = add(kSourceDescWords);
         resident.reserve(config.gpu_resident_images);
         for (std::size_t i = 0; i < config.gpu_resident_images; ++i)
-            resident.push_back(add(4 * pixels));
+            resident.push_back(add(4 * source_pixels));
+        if (fit) {
+            const auto chroma_pixels =
+                source_chroma.width * source_chroma.height;
+            for (auto& image : fit->source)
+                image = {add(source_pixels), add(chroma_pixels),
+                         add(chroma_pixels)};
+            fit->scratch = add(
+                std::max(fit->luma.ScratchWords(), fit->chroma.ScratchWords())
+            );
+        }
         adm.reference[0] = add(pixels);
         adm.distorted[0] = add(pixels);
         Size level = size;
@@ -344,7 +406,7 @@ struct Layout {
         motion.partials = add(VmafMotion::PartialCount(size));
         total = static_cast<std::uint32_t>(cursor);
         staging = PlanStagingSources(
-            pixels, config.streaming_inputs, config.gpu_resident_images
+            source_pixels, config.streaming_inputs, config.gpu_resident_images
         );
         readback = staging.reserved_floats + 2 * kSourceDescWords;
     }
@@ -353,7 +415,7 @@ struct Layout {
         const VulkanContext& context
     ) const {
         ValidateDispatchLimits(
-            base_size, chroma_size, cambi_plan, context.limits
+            base_size, feature_size, chroma_size, cambi_plan, context.limits
         );
         const auto arena_bytes = Bytes(total);
         if (arena_bytes > context.limits.maxStorageBufferRange) {
@@ -402,6 +464,7 @@ struct VmafV1Pipeline::Impl {
         runtime.CreateDescriptors(0, memory.arena_bytes);
         luma.emplace(runtime);
         if (!layout.native_input) sdr.emplace(runtime);
+        if (layout.fit) resizer.emplace(runtime);
         adm.emplace(runtime);
         speed.emplace(runtime);
         cambi.emplace(runtime);
@@ -452,6 +515,62 @@ struct VmafV1Pipeline::Impl {
             runtime.ReleaseResident(slot);
         });
     }
+    void RecordInputPlanes(
+        const std::array<const ImageFormat*, 2>& formats,
+        const FramePlanes& planes
+    ) {
+        if (layout.native_input) {
+            for (std::uint32_t plane = 0; plane < 3; ++plane)
+                for (std::size_t image = 0; image < planes.size(); ++image)
+                    luma->RecordPlane(
+                        image, layout.desc[image], planes[image][plane],
+                        config.size, *formats[image], plane
+                    );
+            return;
+        }
+        for (std::size_t image = 0; image < planes.size(); ++image) {
+            const auto& [y, cb, cr] = planes[image];
+            sdr->Record(
+                image, layout.desc[image], y, cb, cr, config.size,
+                *formats[image], layout.chroma420, true, config.background
+            );
+        }
+    }
+    void RecordPlaneFit(
+        std::uint32_t source, std::uint32_t destination, const PlaneFit& plane,
+        float pad
+    ) {
+        const auto horizontal = plane.HorizontalSize();
+        if (horizontal.width != plane.source.width) {
+            const auto scratch = layout.fit->scratch;
+            resizer->RecordHorizontal(source, scratch, plane.source, horizontal);
+            runtime.ComputeBarrier();
+            source = scratch;
+        }
+        resizer->RecordVertical(
+            source, destination, horizontal, plane.geometry, plane.canvas, pad,
+            true
+        );
+        // The same scratch is reused for every plane.
+        runtime.ComputeBarrier();
+    }
+    void RecordFit(const FramePlanes& output) {
+        const auto& fit = *layout.fit;
+        const float black =
+            layout.native_input && config.input_format.range == PixelRange::Full
+                ? -128.0f
+                : -112.0f;
+        runtime.ComputeBarrier();
+        for (std::size_t image = 0; image < output.size(); ++image) {
+            RecordPlaneFit(
+                fit.source[image][0], output[image][0], fit.luma, black
+            );
+            for (std::size_t plane = 1; plane < 3; ++plane)
+                RecordPlaneFit(
+                    fit.source[image][plane], output[image][plane], fit.chroma, 0
+                );
+        }
+    }
     std::optional<::vqm::VmafV1Frame> Run(
         const std::array<VulkanRuntime::Source, 2>& sources,
         const VulkanSubmitSync* sync = nullptr
@@ -465,44 +584,20 @@ struct VmafV1Pipeline::Impl {
 #ifdef VQM_STAGE_TIMING
         runtime.OpenStage(Stage::VmafV1Luma);
 #endif
-        if (layout.native_input) {
-            luma->Record(
-                0, layout.desc[0], layout.adm.reference[0], config.size,
-                *formats[0]
-            );
-            luma->Record(
-                1, layout.desc[1], layout.adm.distorted[0], config.size,
-                *formats[1]
-            );
-            for (std::uint32_t plane = 1; plane <= 2; ++plane) {
-                luma->RecordPlane(
-                    0, layout.desc[0], layout.speed.reference[plane - 1],
-                    config.size, *formats[0], plane
-                );
-                luma->RecordPlane(
-                    1, layout.desc[1], layout.speed.distorted[plane - 1],
-                    config.size, *formats[1], plane
-                );
-            }
-        } else {
-            sdr->Record(
-                0, layout.desc[0], layout.adm.reference[0],
-                layout.speed.reference[0], layout.speed.reference[1],
-                config.size, *formats[0], layout.chroma420, true,
-                config.background
-            );
-            sdr->Record(
-                1, layout.desc[1], layout.adm.distorted[0],
-                layout.speed.distorted[0], layout.speed.distorted[1],
-                config.size, *formats[1], layout.chroma420, true,
-                config.background
-            );
-        }
+        const FramePlanes feature_planes{
+            std::array{layout.adm.reference[0], layout.speed.reference[0],
+                       layout.speed.reference[1]},
+            std::array{layout.adm.distorted[0], layout.speed.distorted[0],
+                       layout.speed.distorted[1]}};
+        RecordInputPlanes(
+            formats, layout.fit ? layout.fit->source : feature_planes
+        );
+        if (layout.fit) RecordFit(feature_planes);
 #ifdef VQM_STAGE_TIMING
         runtime.CloseStage();
         runtime.OpenStage(Stage::VmafV1Adm);
 #endif
-        adm->Record(config.size, layout.adm);
+        adm->Record(layout.feature_size, layout.adm);
 #ifdef VQM_STAGE_TIMING
         runtime.CloseStage();
         runtime.OpenStage(Stage::VmafV1Speed);
@@ -512,14 +607,18 @@ struct VmafV1Pipeline::Impl {
         runtime.CloseStage();
         runtime.OpenStage(Stage::VmafV1Cambi);
 #endif
+        const auto encoded_depth = config.encoded_bit_depth != 0
+                                       ? config.encoded_bit_depth
+                                       : layout.depth;
+        const auto display_depth = layout.fit ? 16u : layout.depth;
         cambi->Record(
-            config.size, layout.depth, config.encoded_bit_depth, layout.cambi
+            layout.feature_size, display_depth, encoded_depth, layout.cambi
         );
 #ifdef VQM_STAGE_TIMING
         runtime.CloseStage();
         runtime.OpenStage(Stage::VmafV1Motion);
 #endif
-        motion->Record(config.size, layout.motion, previous);
+        motion->Record(layout.feature_size, layout.motion, previous);
 #ifdef VQM_STAGE_TIMING
         runtime.CloseStage();
 #endif
@@ -564,6 +663,7 @@ struct VmafV1Pipeline::Impl {
     VulkanRuntime runtime;
     std::optional<VmafLumaConverter> luma;
     std::optional<VmafSdrConverter> sdr;
+    std::optional<VmafResizer> resizer;
     std::optional<VmafAdm3> adm;
     std::optional<VmafSpeed> speed;
     std::optional<VmafCambi> cambi;

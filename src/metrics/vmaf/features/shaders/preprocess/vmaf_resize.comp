@@ -3,7 +3,7 @@
 // VMAF: Copyright (c) Netflix, Inc. BSD-2-Clause-Patent;
 // see licenses/NETFLIX-VMAF-LICENSE.
 //
-// Separable coded-luma resampler for VmafFitMode::FitAndPad. Catmull-Rom
+// Separable coded-plane resampler for VmafFitMode::FitAndPad. Catmull-Rom
 // bicubic upscaling and Lanczos3 downscaling with widened antialiasing
 // support. The vertical pass also writes the black canvas around the content.
 
@@ -26,6 +26,7 @@ layout(push_constant) uniform Push {
     uint resample_filter;
     uint vertical;
     float pad;
+    uint quantize_16bit;
 }
 pc;
 
@@ -93,7 +94,14 @@ void main() {
     }
     const uint local_x = p.x - pc.content_x;
     const uint local_y = p.y - pc.content_y;
-    arena[pc.destination + destination] = sample_axis(
+    float value = sample_axis(
         pc.source + local_x, pc.source_width, pc.source_height, local_y
     );
+    // CAMBI consumes exact integer codes. Round once after both axes and
+    // clamp filter overshoot to the representable display-side code range.
+    if (pc.quantize_16bit != 0u) {
+        const float code = roundEven((value + 128.0) * 256.0);
+        value = clamp(code, 0.0, 65535.0) * (1.0 / 256.0) - 128.0;
+    }
+    arena[pc.destination + destination] = value;
 }

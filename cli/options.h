@@ -21,6 +21,8 @@ struct Options {
     bool verbose = false;
     bool half_planes = false;
     bool nvdec = false;
+    bool vmaf_scale = false;
+    bool vmaf_pad = false;
     std::vector<Metric> metrics{Metric::Ssimulacra2};
     tool::CvvdpOptions cvvdp;
     float hf_asymmetry = 1.0f;

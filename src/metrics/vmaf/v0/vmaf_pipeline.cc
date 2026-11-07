@@ -185,12 +185,10 @@ struct Layout {
     VmafMotionBuffers motion{};
     Size base_size{};
     Size target_size{};
-    Size content_size{};
-    std::uint32_t content_x = 0;
-    std::uint32_t content_y = 0;
+    VmafFitGeometry geometry{};
     std::array<std::uint32_t, 2> luma{};
     std::uint32_t resize_scratch = 0;
-    bool fit = false;
+    bool resize = false;
     bool horizontal_resize = false;
     bool temporal_weighting = false;
     std::uint32_t total = 0;
@@ -201,18 +199,16 @@ struct Layout {
         : temporal_weighting(config.temporal_weighting) {
         const Size source_size = config.size;
         base_size = source_size;
-        if (config.model_size.width == 0 && config.model_size.height != 0)
-            throw std::invalid_argument("vmaf: incomplete model_size");
-        if (config.model_size.height == 0 && config.model_size.width != 0)
+        if ((config.model_size.width == 0) != (config.model_size.height == 0))
             throw std::invalid_argument("vmaf: incomplete model_size");
         const Size model_canvas = ModelCanvas(config.model);
-        if (config.fit != VmafFitMode::Native &&
-            config.fit != VmafFitMode::FitAndPad)
-            throw std::invalid_argument("vmaf: invalid fit mode");
-        target_size = config.fit == VmafFitMode::FitAndPad
-                          ? (config.model_size.width == 0 ? model_canvas
-                                                          : config.model_size)
-                          : source_size;
+        const auto planned = PlanVmafGeometry(
+            source_size,
+            config.model_size.width == 0 ? model_canvas : config.model_size,
+            config.fit
+        );
+        target_size = planned.canvas;
+        geometry = planned.fit;
         if (config.chroma_sampling != VmafChromaSampling::Native &&
             config.chroma_sampling != VmafChromaSampling::Yuv420 &&
             config.chroma_sampling != VmafChromaSampling::Yuv444)
@@ -241,16 +237,8 @@ struct Layout {
             throw std::invalid_argument(
                 "vmaf: image geometry exceeds arena addressing"
             );
-        if (config.fit == VmafFitMode::FitAndPad) {
-            const auto geometry = FitVmafInto(source_size, target_size);
-            content_size = geometry.content;
-            content_x = geometry.x;
-            content_y = geometry.y;
-        } else {
-            content_size = target_size;
-        }
-        fit = config.fit == VmafFitMode::FitAndPad && source_size != target_size;
-        horizontal_resize = fit && content_size.width != source_size.width;
+        resize = source_size != target_size;
+        horizontal_resize = geometry.content.width != source_size.width;
         std::uint64_t cursor = 0;
         auto add = [&](std::uint64_t count) {
             if (count > std::numeric_limits<std::uint32_t>::max() - cursor)
@@ -270,12 +258,12 @@ struct Layout {
         resident.reserve(config.gpu_resident_images);
         for (std::size_t i = 0; i < config.gpu_resident_images; ++i)
             resident.push_back(add(4 * source_pixels));
-        if (fit) {
+        if (resize) {
             luma[0] = add(source_pixels);
             luma[1] = add(source_pixels);
             if (horizontal_resize) {
                 const std::uint64_t scratch =
-                    static_cast<std::uint64_t>(content_size.width) *
+                    static_cast<std::uint64_t>(geometry.content.width) *
                     source_size.height;
                 resize_scratch = add(scratch);
             }
@@ -317,7 +305,7 @@ struct Layout {
             motion.blurred = add(target_pixels);
             motion.partials = add(VmafMotion::PartialCount(target_size));
         }
-        if (!fit) {
+        if (!resize) {
             luma[0] = vif.reference[0];
             luma[1] = vif.distorted[0];
         }
@@ -392,7 +380,7 @@ struct VmafPipeline::Impl {
         );
         adm.emplace(runtime, pipeline_config.neg);
         if (pipeline_config.temporal_weighting) motion.emplace(runtime);
-        if (layout.fit) resizer.emplace(runtime);
+        if (layout.resize) resizer.emplace(runtime);
         resident.Resize(pipeline_config.gpu_resident_images);
     }
 
@@ -470,7 +458,7 @@ struct VmafPipeline::Impl {
         runtime.BeginCommandBuffer();
         const auto formats = runtime.PublishSources(sources);
         const bool native = UsesNativeCoding(*formats[0], *formats[1]);
-        const bool half_vif_source = native && !layout.fit &&
+        const bool half_vif_source = native && !layout.resize &&
                                      VmafLumaDepth(*formats[0]) <= 12u &&
                                      VmafLumaDepth(*formats[1]) <= 12u;
 #ifdef VQM_STAGE_TIMING
@@ -493,12 +481,10 @@ struct VmafPipeline::Impl {
                 *formats[1], false, false, config.background
             );
         }
-        if (layout.fit) {
+        if (layout.resize) {
             runtime.ComputeBarrier();
-            const Size vertical_source{layout.content_size.width,
+            const Size vertical_source{layout.geometry.content.width,
                                        layout.base_size.height};
-            const VmafFitGeometry geometry{layout.content_size, layout.content_x,
-                                           layout.content_y};
             for (std::size_t image = 0; image < 2; ++image) {
                 std::uint32_t source = layout.luma[image];
                 if (layout.horizontal_resize) {
@@ -513,7 +499,7 @@ struct VmafPipeline::Impl {
                                                       ? layout.vif.reference[0]
                                                       : layout.vif.distorted[0];
                 resizer->RecordVertical(
-                    source, destination, vertical_source, geometry,
+                    source, destination, vertical_source, layout.geometry,
                     layout.target_size, BlackCode(*formats[image], native)
                 );
                 runtime.ComputeBarrier();

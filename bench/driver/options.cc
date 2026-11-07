@@ -362,10 +362,6 @@ bool ParseArgs(
         error = "--vmaf-no-temporal requires a VMAF metric";
         return false;
     }
-    if ((options.metric == Metric::VmafV1) && options.vmaf_fit != "native") {
-        error = "--vmaf-fit is not implemented for VMAF v1";
-        return false;
-    }
     if ((options.metric == Metric::VmafV1) &&
         (options.vmaf_model != "1080" || options.vmaf_neg ||
          options.vmaf_transform || !options.vmaf_temporal)) {

@@ -13,6 +13,7 @@
 
 #include <vulkan/vulkan.h>
 
+#include "vmaf.h"
 #include "vqm_image.h"
 
 namespace vqm::internal {
@@ -112,8 +113,7 @@ private:
 
 // Fit-and-pad resampling
 
-// A source scaled to fit a target canvas, before the remaining canvas is
-// padded. `x` and `y` are the top-left content position in the target.
+// Content dimensions and top-left position within the feature canvas.
 struct VmafFitGeometry {
     Size content{};
     std::uint32_t x = 0;
@@ -124,11 +124,21 @@ struct VmafFitGeometry {
 // aspect ratio, and center the result. The content is never cropped.
 [[nodiscard]] VmafFitGeometry FitVmafInto(Size source, Size target);
 
-// Separable luma resampler for the FitAndPad path. It reads and writes coded
-// luma in VmafLumaConverter's FP32 code domain. Horizontal output has the
-// content width and the source height; vertical output has the target canvas
-// and writes `pad` outside the content rectangle. Upscaling uses Catmull-Rom
-// bicubic and downscaling uses Lanczos3 with a widened antialiasing support.
+struct VmafFrameGeometry {
+    Size canvas;
+    VmafFitGeometry fit;
+};
+
+[[nodiscard]] VmafFrameGeometry PlanVmafGeometry(
+    Size source, Size model, VmafFitMode mode
+);
+
+// Separable plane resampler for the geometry paths. It reads and writes
+// centered FP32 codes from VmafLumaConverter or VmafSdrConverter. Horizontal
+// output has the content width and source height. Vertical output has the target
+// canvas and writes `pad` outside the content rectangle. Upscaling uses
+// Catmull-Rom bicubic and downscaling uses Lanczos3 with a widened antialiasing
+// support.
 class VmafResizer {
 public:
     explicit VmafResizer(VulkanRuntime& runtime);
@@ -137,7 +147,7 @@ public:
     VmafResizer& operator=(const VmafResizer&) = delete;
 
     [[nodiscard]] static constexpr std::size_t PushBytes() noexcept {
-        return 13 * sizeof(std::uint32_t);
+        return 14 * sizeof(std::uint32_t);
     }
 
     // Output is tightly packed at content.width x source.height.
@@ -147,10 +157,12 @@ public:
     );
 
     // `source_size` is content.width x original source height. Destination is
-    // the target canvas and is tightly packed at target_size.width.
+    // the target canvas and is tightly packed at target_size.width. Set
+    // quantize_16bit for exact 16-bit storage codes in the centered domain.
     void RecordVertical(
         std::uint32_t source, std::uint32_t destination, Size source_size,
-        VmafFitGeometry geometry, Size target_size, float pad
+        VmafFitGeometry geometry, Size target_size, float pad,
+        bool quantize_16bit = false
     );
 
 private:

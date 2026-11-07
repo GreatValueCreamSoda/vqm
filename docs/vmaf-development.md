@@ -77,8 +77,7 @@ stages every plane, including mixed coded inputs and later coded inputs in a
 sequence that started in the conversion domain. V1's
 `encoded_bit_depth` defaults to the native input bit depth, or 16 for converted
 inputs. Values 6–16 specify the original encode bit depth for CAMBI's
-anti-dithering. Input and encoded geometry must match; encode-size overrides
-are not yet implemented.
+anti-dithering. CAMBI uses the luma canvas selected by `fit`.
 
 V1 needs each chroma plane to be at least 80×80. Its CAMBI path requires at
 least one luma dimension of 216 pixels or more and all five scales to fit the
@@ -149,22 +148,22 @@ intervals. Plain `b` resamples the training data and `rb` bootstraps prediction
 residues. The upstream guide recommends `b`.
 [Pinned confidence interval guide](https://github.com/Netflix/vmaf/blob/4611e47a7330cd342498dcc130e1008efbeab6e4/resource/doc/conf_interval.md)
 
-`VmafConfig::fit` selects how the input geometry relates to the model canvas.
-`VmafFitMode::Native` is the default and keeps the existing behavior: the
-input is the feature geometry, so the caller controls any resampling.
-`VmafFitMode::FitAndPad` scales each input uniformly to the largest size that
-fits inside `VmafConfig::model_size`, centers it, and fills the remaining
-canvas with the source's legal black code. A zero `model_size` uses the
-selected model's canvas: 1920×1080 or 3840×2160. A 4:3 source therefore keeps
-its aspect ratio and gains side bars; a 2.39:1 source gains top and bottom
-bars. The input and model canvases must both be at least 17 pixels in each
-dimension. If the source already equals the model canvas, the fit path is
-skipped and the native path is used.
+`VmafConfig::fit` and `VmafV1Config::fit` select the feature geometry.
+`VmafFitMode::Native` is the default and uses the input dimensions.
+`Fit` scales the content to fit inside the model canvas, preserving aspect
+ratio. `Pad` centers the content in the smallest enclosing 16:9 canvas with
+integer dimensions at source scale. `FitAndPad` combines scaling and padding
+to the model canvas. The canvas is 1920×1080 for both standard models and
+3840×2160 for the v0 4K model. `VmafConfig::model_size` overrides the v0
+canvas for `Fit` and `FitAndPad`.
 
-FitAndPad operates on coded luma, before VIF, ADM2 and motion. It is not a
-color transform and does not change the input's range or matrix. The padded
-area is part of the feature image: edges at the content boundary contribute to
-the local filters, just as letterboxed pixels would in a pre-padded input.
+V1 applies the geometry to luma and chroma. Padding uses black luma and
+neutral chroma. With a geometry change, CAMBI uses 16-bit display luma
+and retains the original or explicitly configured encoded bit depth.
+
+V0 applies geometry changes to luma in the input's coded range and matrix
+before VIF, ADM2 and motion. Edges at the content boundary contribute to the
+local filters just as they would in a pre-padded input.
 
 ## Shared implementation
 
@@ -335,7 +334,7 @@ and complete progressive Y4M sequences:
 
 ```sh
 ./build/vqm --metric vmaf-v0 original.y4m distorted.y4m
-./build/vqm --metric vmaf-v1 --json original.y4m distorted.y4m
+./build/vqm --metric vmaf-v0,vmaf-v1 --vmaf-scale --vmaf-pad original.y4m distorted.y4m
 ./build/vqm --metric vmaf-v0 --json --pairs-file pairs.tsv \
   --iterations 5 --warmup 1
 ```
@@ -344,8 +343,10 @@ Each TSV row is `sample ID<TAB>original path<TAB>distorted path`. JSON contains 
 arithmetic-mean clip score and every emitted frame in index order, with its score
 and feature array. The v0 feature order is ADM2, motion2 and VIF scales
 0–3; v1 uses CAMBI, SpEED chroma UV, ADM3 and motion3. The CLI flushes the final
-pending frame before reporting a clip. Native coded input geometry and format
-are preserved, with the shared `--input-*` color overrides available.
+pending frame before reporting a clip. `--vmaf-scale` scales content within
+1920×1080, and `--vmaf-pad` adds bars to make the frame 16:9. For a
+960×720 input, scaling gives 1440×1080, padding gives 1280×720, and both
+flags give 1920×1080. The shared `--input-*` color overrides apply in all modes.
 
 `--iterations` and `--warmup` repeat whole clips with reset history. Core timing
 includes the final flush and pooling; decode is reported separately. Hosted
@@ -355,9 +356,10 @@ video validation uses this same executable:
 .venv/bin/python -m validation.temporal.run --profile smoke --metrics vmaf-v0,vmaf-v1
 ```
 
-The runner compares complete clip scores against pinned original-implementation
-records. The registered profile requires ranking agreement and reports numerical
-differences. Add `--gate-mode both` to require the numerical limits too.
+The runner scores at the prepared input dimensions to match the pinned
+original-implementation records. The registered profile requires ranking
+agreement and reports numerical differences. Add `--gate-mode both` to require
+the numerical limits too.
 [Frozen corpus and full qualification workflow](temporal-validation.md)
 
 ## Repeated-pair benchmark
@@ -366,7 +368,9 @@ differences. Add `--gate-mode both` to require the numerical limits too.
 advances the sequence by reusing that pair, including the first frame of a Y4M
 file. Its resident and streaming stage measurements describe that workload.
 Use its `--vmaf-chroma native`, `--vmaf-chroma 420`, or `--vmaf-chroma 444` options
-to select the input path described above.
+to select the input path described above. The repeated-pair benchmark defaults
+to native geometry. Use `--vmaf-fit pad` to time the fitted path for either
+VMAF version.
 
 ```sh
 ./build/vqm_bench --metric vmaf-v1 --vmaf-chroma 420 \

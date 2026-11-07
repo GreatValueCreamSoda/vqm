@@ -97,6 +97,15 @@ class VideoCliArguments(unittest.TestCase):
                 self.assertIn("--metric", result.stderr)
                 self.assertEqual(result.stdout, "")
 
+    def test_rejects_vmaf_geometry_options_without_vmaf(self) -> None:
+        """Require a selected VMAF metric when scaling or padding."""
+        for flag in ("--vmaf-scale", "--vmaf-pad"):
+            with self.subTest(flag=flag):
+                result = _run("--metric", "cvvdp", flag, "a", "b")
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertIn(flag, result.stderr)
+                self.assertEqual(result.stdout, "")
+
     def test_pair_list_requires_machine_output_and_unique_ids(self) -> None:
         """Validate complete TSV records before opening any clip or GPU."""
         with tempfile.TemporaryDirectory() as temporary:
@@ -177,6 +186,36 @@ class VideoCliGpu(unittest.TestCase):
                 self.assertEqual(report["frames"], expected["frames"])
                 self.assertEqual(report["score"], expected["score"])
                 self.assertEqual(report["frame_results"], expected["frame_results"])
+
+    def test_vmaf_scale_and_pad_are_independent_for_both_versions(self) -> None:
+        """Exercise native, scale, pad, and combined modes on a 4:3 clip."""
+        _require_gpu()
+        root = Path(self.enterContext(tempfile.TemporaryDirectory()))
+        original, distorted = root / "a.y4m", root / "b.y4m"
+        _write_y4m(original, width=640, height=480)
+        _write_y4m(distorted, width=640, height=480, distorted=True)
+        metrics = ("vmaf-v0", "vmaf-v1")
+        features = {metric: set() for metric in metrics}
+        modes = (
+            (), ("--vmaf-scale", ), ("--vmaf-pad", ), ("--vmaf-scale", "--vmaf-pad")
+        )
+        for flags in modes:
+            result = _run(
+                "--json", "--metric", ",".join(metrics), *flags, original, distorted
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            reports = [json.loads(line) for line in result.stdout.splitlines()]
+            self.assertEqual([report["metric"] for report in reports], list(metrics))
+            for report in reports:
+                self.assertTrue(math.isfinite(report["score"]))
+                frames = report["frame_results"]
+                self.assertEqual([frame["index"] for frame in frames], [0, 1, 2])
+                features[report["metric"]].add(
+                    tuple(tuple(frame["features"]) for frame in frames)
+                )
+        for metric, results in features.items():
+            with self.subTest(metric=metric):
+                self.assertEqual(len(results), len(modes))
 
     def test_psnr_hvs_pools_frame_errors_before_db_conversion(self) -> None:
         """Zero-error frames contribute to the clip mean without dominating it."""

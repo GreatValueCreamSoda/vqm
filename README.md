@@ -113,6 +113,10 @@ every Y4M frame in order, with matching geometry, rational frame rates and frame
 counts. SSIMULACRA 2, Butteraugli, and VMAF average their frame scores.
 PSNR-HVS averages weighted frame errors before converting to dB. CVVDP returns
 its whole-clip JOD after temporal distortion pooling.
+Both VMAF variants use the input dimensions by default. `--vmaf-scale` scales
+the content to fit within 1920×1080 while preserving its aspect ratio.
+`--vmaf-pad` adds black bars to reach 16:9 at the current scale. Use both
+flags to scale and pad to the full model canvas.
 PNG and JPEG are interpreted as sRGB with BT.709 primaries; the CLI also offers
 input color overrides and a `--raw` mode. Run `./build/vqm --help` for the
 options. For SSIMULACRA 2 and Butteraugli images with alpha, the CLI evaluates
@@ -235,11 +239,12 @@ API evaluates one configured alpha background; `ComputeWorstBackground` in
 the motion look-ahead described in [VMAF development](docs/vmaf-development.md).
 `VmafConfig::model` selects the 1080 or 4K predictor; `neg` and `transform`
 toggle the feature-gain and phone-score options, and `fit`/`model_size` select
-the native or fit-and-pad geometry. `temporal_weighting = false` is a derived
+the evaluation geometry. `temporal_weighting = false` is a derived
 mode for content where motion2 is misleading: it forces motion2 to zero, skips
 the motion passes, and scores every frame immediately.
 `VmafV1Pipeline` in `vmaf_v1.h` provides the standard v1 model with its own
-frame-boundary behavior. Set `VmafV1Config::chroma_sampling` to
+frame-boundary behavior. Its `fit` setting can scale or pad luma and chroma.
+Set `VmafV1Config::chroma_sampling` to
 `VmafChromaSampling::Yuv420` or `Yuv444` to convert SDR inputs to a common
 BT.709 representation, including mixed source formats; the default `Native`
 mode preserves compatible coded YUV. The benchmark exposes the same selection

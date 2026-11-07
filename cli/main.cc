@@ -94,7 +94,7 @@ std::string Usage(std::string_view program) {
 Usage: {} [--metric METRIC[,METRIC...]] [--raw|--json] [--verbose]
           [--half-planes] [--nvdec] [--iterations N] [--warmup N]
           [--chroma-filter KERNEL] [--intensity-target NITS]
-          [--hf-asymmetry F]
+          [--hf-asymmetry F] [--vmaf-scale] [--vmaf-pad]
           [--cvvdp-display standard-4k|standard-fhd|standard-hdr] [--cvvdp-ppd N]
           [--cvvdp-peak NITS] [--cvvdp-contrast RATIO] [--cvvdp-ambient LUX]
           [--input-matrix M] [--input-transfer T] [--input-primaries P] [--input-range R]
@@ -127,7 +127,11 @@ also prints its distance_p3 aggregate.
 --intensity-target and --hf-asymmetry configure Butteraugli's libjxl parameters
 (defaults 80 nits and 1.0).
 CVVDP prints JOD (10 for identical, higher is better; negative values are valid).
-VMAF v0.6.1 and v1 use their native input geometry and coded input formats.
+VMAF v0.6.1 and v1 default to the original input dimensions.
+--vmaf-scale fits the content within 1920x1080 without stretching or adding
+bars. --vmaf-pad adds black bars to reach 16:9 at the current scale.
+Together they fit and pad to 1920x1080. For example, 960x720 becomes 1440x1080
+with scaling, 1280x720 with padding, or 1920x1080 with both.
 SSIMULACRA 2, Butteraugli and VMAF average their frame scores.
 CVVDP uses the original standard_4k display by default. Physical display/viewing
 options are independent of image geometry. CVVDP reads all frames of progressive
@@ -232,6 +236,10 @@ ParseResult ParseOptions(std::span<const std::string_view> args) {
                 return ParseError{"--metric needs a value"};
             if (auto error = ParseMetricList(args[++i], metrics))
                 return std::move(*error);
+        } else if (arg == "--vmaf-scale") {
+            options.vmaf_scale = true;
+        } else if (arg == "--vmaf-pad") {
+            options.vmaf_pad = true;
         } else if (tool::IsCvvdpOption(arg)) {
             if (i + 1 >= args.size())
                 return ParseError{std::format("{} needs a value", arg)};
@@ -291,6 +299,10 @@ ParseResult ParseOptions(std::span<const std::string_view> args) {
         }
     }
     if (!metrics.empty()) options.metrics = std::move(metrics);
+    if ((options.vmaf_scale || options.vmaf_pad) &&
+        !HasMetric(options.metrics, Metric::VmafV0) &&
+        !HasMetric(options.metrics, Metric::VmafV1))
+        return ParseError{"--vmaf-scale and --vmaf-pad require a VMAF metric"};
     if (options.cvvdp.specified && !HasMetric(options.metrics, Metric::Cvvdp))
         return ParseError{"--cvvdp-* options require --metric cvvdp"};
     if (options.half_planes && !HasMetric(options.metrics, Metric::Ssimulacra2))

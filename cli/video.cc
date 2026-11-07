@@ -260,6 +260,12 @@ std::unique_ptr<Pipeline> MakePipeline(
     return std::make_unique<Pipeline>(config);
 }
 
+VmafFitMode VmafFit(const Options& options) {
+    if (options.vmaf_scale)
+        return options.vmaf_pad ? VmafFitMode::FitAndPad : VmafFitMode::Fit;
+    return options.vmaf_pad ? VmafFitMode::Pad : VmafFitMode::Native;
+}
+
 // One geometry, format domain and frame rate per cached pipeline. Push consumes
 // the current sources synchronously and retains its own temporal history.
 class Scorer {
@@ -282,9 +288,11 @@ public:
             butter_ = MakePipeline<ButteraugliPipeline>(config, device);
         } else if (metric == Metric::VmafV0) {
             VmafConfig config{.size = key.size};
+            config.fit = VmafFit(options);
             v0_ = MakePipeline<VmafPipeline>(config, device);
         } else if (metric == Metric::VmafV1) {
             VmafV1Config config{.size = key.size, .input_format = key.original};
+            config.fit = VmafFit(options);
             v1_ = MakePipeline<VmafV1Pipeline>(config, device);
         } else if (metric == Metric::PsnrHvs) {
             PsnrHvsConfig config{.size = key.size};

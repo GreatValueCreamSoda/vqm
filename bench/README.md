@@ -46,7 +46,9 @@ reports the median-core-time iteration, its separate decode time and the
 frame count. CVVDP reports whole-clip JOD. Other metrics include ordered
 frame results. Use `vqm_bench --cvvdp-video` for CVVDP stage timing when
 needed. The ordinary `vqm_bench` VMAF and PSNR-HVS arms use the first Y4M
-frame as a repeated-pair workload.
+frame as a repeated-pair workload. Use `--vmaf-scale` and `--vmaf-pad` in the
+normal CLI to control VMAF geometry independently. The repeated-pair benchmark
+uses `--vmaf-fit pad` for the combined operation.
 
 Run `.venv/bin/python -m validation.temporal.run --profile smoke` for a
 short reference-agreement check or use `--profile qualification` for the full

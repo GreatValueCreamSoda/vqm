@@ -8,6 +8,7 @@
 #include <vector>
 #include "input.h"
 #include "support.h"
+#include "temporal_test_support.h"
 #include "vmaf_v1.h"
 #include "vmaf_sdr_fixtures.h"
 #include "vqm_memory.h"
@@ -15,6 +16,7 @@
 namespace {
 using namespace vqm;
 constexpr Size kV1Size{512, 384};
+constexpr Size kModelCanvas{1920, 1080};
 struct V1Oracle {
     double cambi, speed, adm3, motion3, score;
 };
@@ -43,10 +45,13 @@ std::uint16_t Sample(
     }
     return static_cast<std::uint16_t>(std::clamp(value, 0, 1023));
 }
-Image MakeFrame(const ImageFormat& format, std::size_t frame, bool distorted) {
-    Image result{kV1Size, format, {}};
-    result.data.resize(RequiredBytes(format, kV1Size));
-    const auto planes = vqm::internal::PlaneLayout(format, kV1Size);
+Image MakeFrame(
+    const ImageFormat& format, std::size_t frame, bool distorted,
+    Size size = kV1Size
+) {
+    Image result{size, format, {}};
+    result.data.resize(RequiredBytes(format, size));
+    const auto planes = vqm::internal::PlaneLayout(format, size);
     for (unsigned plane = 0; plane < 3; ++plane) {
         for (std::size_t y = 0; y < planes[plane].height; ++y) {
             for (std::size_t x = 0; x < planes[plane].width; ++x) {
@@ -57,6 +62,34 @@ Image MakeFrame(const ImageFormat& format, std::size_t frame, bool distorted) {
                     result.data.data() + offset, &sample, sizeof(sample)
                 );
             }
+        }
+    }
+    return result;
+}
+
+Image PillarboxV1Frame(const Image& source) {
+    Image result{kModelCanvas, source.format, {}};
+    result.data.resize(RequiredBytes(source.format, kModelCanvas));
+    const auto source_planes =
+        vqm::internal::PlaneLayout(source.format, source.size);
+    const auto target_planes =
+        vqm::internal::PlaneLayout(source.format, kModelCanvas);
+    for (std::size_t plane = 0; plane < 3; ++plane) {
+        const auto& input = source_planes[plane];
+        const auto& output = target_planes[plane];
+        const std::vector<std::uint16_t> bar(
+            plane == 0 ? 240u : 120u, plane == 0 ? 64u : 512u
+        );
+        const auto bar_bytes = bar.size() * sizeof(bar[0]);
+        const auto input_bytes = input.width * sizeof(bar[0]);
+        const auto output_bytes = output.width * sizeof(bar[0]);
+        for (std::size_t y = 0; y < input.height; ++y) {
+            const auto* from =
+                source.data.data() + input.offset + y * input_bytes;
+            auto* to = result.data.data() + output.offset + y * output_bytes;
+            std::memcpy(to, bar.data(), bar_bytes);
+            std::memcpy(to + bar_bytes, from, input_bytes);
+            std::memcpy(to + bar_bytes + input_bytes, bar.data(), bar_bytes);
         }
     }
     return result;
@@ -136,6 +169,54 @@ VQM_TEST(TestVmafV1PipelineReferenceSequences) {
     RunVideo(subsampled, format, kOracle420Single, false);
     subsampled.Reset();
     RunVideo(subsampled, format, kOracle420Video, true);
+}
+
+VQM_TEST(TestVmafV1FitAndPadMatchesPadded420Canvas) {
+    if (!vqm::test::GpuAvailable()) return;
+    using vqm::test::temporal::Pair;
+    using vqm::test::temporal::RunClip;
+    // Same-height 4:3 input fits without interpolation. Its independently
+    // padded reference has 240 luma and 120 chroma samples on each side.
+    constexpr Size source_size{1440, 1080};
+    ImageFormat format;
+    format.type = PixelType::Word;
+    format.depth = 10;
+    format.family = ColorFamily::Yuv;
+    format.matrix = MatrixCoefficients::Bt709;
+    format.range = PixelRange::Limited;
+    format.subsample_w = 1;
+    format.subsample_h = 1;
+    const std::array pairs{Pair{MakeFrame(format, 0, false, source_size),
+                                MakeFrame(format, 0, true, source_size)},
+                           Pair{MakeFrame(format, 1, false, source_size),
+                                MakeFrame(format, 1, true, source_size)}};
+    const std::array canvases{Pair{PillarboxV1Frame(pairs[0].original),
+                                   PillarboxV1Frame(pairs[0].distorted)},
+                              Pair{PillarboxV1Frame(pairs[1].original),
+                                   PillarboxV1Frame(pairs[1].distorted)}};
+    VmafV1Config config;
+    config.size = source_size;
+    config.input_format = format;
+    config.gpu_resident_images = 0;
+    config.fit = VmafFitMode::FitAndPad;
+    VmafV1Pipeline fitted(config);
+    config.size = kModelCanvas;
+    config.fit = VmafFitMode::Native;
+    VmafV1Pipeline native(config);
+    const auto actual = RunClip<VmafV1Frame>(fitted, pairs);
+    const auto expected = RunClip<VmafV1Frame>(native, canvases);
+    CHECK(actual.size() == pairs.size());
+    CHECK(expected.size() == canvases.size());
+    if (actual.size() != pairs.size() || expected.size() != canvases.size())
+        return;
+    for (std::size_t i = 0; i < actual.size(); ++i) {
+        CHECK(actual[i].index == expected[i].index);
+        CHECK_NEAR(actual[i].cambi, expected[i].cambi, 1e-6);
+        CHECK_NEAR(actual[i].speed_chroma_uv, expected[i].speed_chroma_uv, 1e-6);
+        CHECK_NEAR(actual[i].adm3, expected[i].adm3, 1e-6);
+        CHECK_NEAR(actual[i].motion3, expected[i].motion3, 1e-6);
+        CHECK_NEAR(actual[i].score, expected[i].score, 1e-6);
+    }
 }
 
 VQM_TEST(TestVmafV1StagedMemoryPreservesTemporalSequence) {

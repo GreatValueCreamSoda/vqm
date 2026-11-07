@@ -34,11 +34,11 @@ Config VmafBenchmarkConfig(
         options.vmaf_chroma == "420"   ? vqm::VmafChromaSampling::Yuv420
         : options.vmaf_chroma == "444" ? vqm::VmafChromaSampling::Yuv444
                                        : vqm::VmafChromaSampling::Native;
+    config.fit = options.vmaf_fit == "pad" ? vqm::VmafFitMode::FitAndPad
+                                           : vqm::VmafFitMode::Native;
     if constexpr (std::is_same_v<Config, vqm::VmafConfig>) {
         config.model = options.vmaf_model == "4k" ? vqm::VmafModel::Standard4K
                                                   : vqm::VmafModel::Standard1080;
-        config.fit = options.vmaf_fit == "pad" ? vqm::VmafFitMode::FitAndPad
-                                               : vqm::VmafFitMode::Native;
         config.neg = options.vmaf_neg;
         config.transform = options.vmaf_transform;
         config.temporal_weighting = options.vmaf_temporal;

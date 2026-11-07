@@ -8,6 +8,7 @@
 #include <cmath>
 #include <cstdint>
 #include <cstring>
+#include <limits>
 #include <optional>
 #include <utility>
 
@@ -312,6 +313,34 @@ VQM_TEST(TestVmafFitGeometry) {
     check({854, 480}, {1920, 1080}, {1920, 1079}, 0, 0);
     check({64, 48}, {128, 128}, {128, 96}, 0, 16);
     check({100, 100}, {128, 128}, {128, 128}, 0, 0);
+}
+
+VQM_TEST(TestVmafGeometryModes) {
+    using vqm::internal::PlanVmafGeometry;
+    constexpr Size source{640, 480}, model{1920, 1080};
+    const auto check = [&](VmafFitMode mode, Size canvas, Size content,
+                           std::uint32_t x, std::uint32_t y) {
+        const auto geometry = PlanVmafGeometry(source, model, mode);
+        CHECK(geometry.canvas == canvas);
+        CHECK(geometry.fit.content == content);
+        CHECK(geometry.fit.x == x);
+        CHECK(geometry.fit.y == y);
+    };
+    check(VmafFitMode::Native, source, source, 0, 0);
+    check(VmafFitMode::Fit, {1440, 1080}, {1440, 1080}, 0, 0);
+    check(VmafFitMode::Pad, {864, 486}, source, 112, 3);
+    check(VmafFitMode::FitAndPad, model, {1440, 1080}, 240, 0);
+    const auto wide = PlanVmafGeometry({1921, 1080}, model, VmafFitMode::Pad);
+    CHECK((wide.canvas == Size{1936, 1089}));
+    CHECK(wide.fit.x == 7);
+    CHECK(wide.fit.y == 4);
+    CHECK_THROWS_AS(
+        PlanVmafGeometry(
+            {std::numeric_limits<std::uint32_t>::max(), 1}, model,
+            VmafFitMode::Pad
+        ),
+        std::invalid_argument
+    );
 }
 
 VQM_TEST(TestVmafFitAndPadMatchesPaddedCanvas) {

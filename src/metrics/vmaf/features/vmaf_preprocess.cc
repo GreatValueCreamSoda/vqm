@@ -246,8 +246,16 @@ struct VmafResizePush {
     std::uint32_t resample_filter;
     std::uint32_t vertical;
     float pad;
+    std::uint32_t quantize_16bit;
 };
 static_assert(sizeof(VmafResizePush) == VmafResizer::PushBytes());
+
+void CheckFitSize(Size size) {
+    constexpr auto max_dimension = std::numeric_limits<std::uint32_t>::max();
+    if (size.width == 0 || size.height == 0 || size.width > max_dimension ||
+        size.height > max_dimension)
+        throw std::invalid_argument("vmaf resize: invalid fit geometry");
+}
 
 void CheckResizePlane(std::uint32_t offset, Size size) {
     if (size.width == 0 || size.height == 0 ||
@@ -266,9 +274,8 @@ void CheckResizePlane(std::uint32_t offset, Size size) {
 }  // namespace
 
 VmafFitGeometry FitVmafInto(Size source, Size target) {
-    if (source.width == 0 || source.height == 0 || target.width == 0 ||
-        target.height == 0)
-        throw std::invalid_argument("vmaf resize: zero geometry");
+    CheckFitSize(source);
+    CheckFitSize(target);
 
     const std::uint64_t sw = source.width, sh = source.height;
     const std::uint64_t tw = target.width, th = target.height;
@@ -285,6 +292,41 @@ VmafFitGeometry FitVmafInto(Size source, Size target) {
     return {{static_cast<std::size_t>(width), static_cast<std::size_t>(height)},
             static_cast<std::uint32_t>((tw - width) / 2u),
             static_cast<std::uint32_t>((th - height) / 2u)};
+}
+
+VmafFrameGeometry PlanVmafGeometry(Size source, Size model, VmafFitMode mode) {
+    switch (mode) {
+        case VmafFitMode::Native:
+            CheckFitSize(source);
+            return {source, {source, 0, 0}};
+        case VmafFitMode::Fit: {
+            const Size content = FitVmafInto(source, model).content;
+            return {content, {content, 0, 0}};
+        }
+        case VmafFitMode::FitAndPad:
+            return {model, FitVmafInto(source, model)};
+        case VmafFitMode::Pad: {
+            CheckFitSize(source);
+            const auto multiple = std::max(
+                (static_cast<std::uint64_t>(source.width) + 15u) / 16u,
+                (static_cast<std::uint64_t>(source.height) + 8u) / 9u
+            );
+            if (multiple > std::numeric_limits<std::uint32_t>::max() / 16u)
+                throw std::invalid_argument(
+                    "vmaf resize: 16:9 canvas overflows"
+                );
+            const Size canvas{static_cast<std::size_t>(multiple * 16u),
+                              static_cast<std::size_t>(multiple * 9u)};
+            return {
+                canvas,
+                {source,
+                 static_cast<std::uint32_t>((canvas.width - source.width) / 2),
+                 static_cast<std::uint32_t>(
+                     (canvas.height - source.height) / 2
+                 )}};
+        }
+    }
+    throw std::invalid_argument("vmaf: invalid fit mode");
 }
 
 VmafResizer::VmafResizer(VulkanRuntime& runtime)
@@ -315,7 +357,8 @@ void VmafResizer::RecordHorizontal(
                               static_cast<std::uint32_t>(content_size.height),
                               filter,
                               0,
-                              0.0f};
+                              0.0f,
+                              0};
     runtime_.Dispatch(
         pipeline_, &push, sizeof(push), Groups(content_size.width, 16),
         Groups(source_size.height, 16), 1
@@ -324,7 +367,7 @@ void VmafResizer::RecordHorizontal(
 
 void VmafResizer::RecordVertical(
     std::uint32_t source, std::uint32_t destination, Size source_size,
-    VmafFitGeometry geometry, Size target_size, float pad
+    VmafFitGeometry geometry, Size target_size, float pad, bool quantize_16bit
 ) {
     if (geometry.content.width != source_size.width ||
         geometry.content.height == 0 || geometry.content.width == 0)
@@ -348,7 +391,8 @@ void VmafResizer::RecordVertical(
         static_cast<std::uint32_t>(geometry.content.height),
         filter,
         1,
-        pad};
+        pad,
+        quantize_16bit ? 1u : 0u};
     runtime_.Dispatch(
         pipeline_, &push, sizeof(push), Groups(target_size.width, 16),
         Groups(target_size.height, 16), 1

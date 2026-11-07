@@ -25,11 +25,11 @@ enum class VmafChromaSampling : std::uint8_t { Native, Yuv420, Yuv444 };
 // NEG and the phone transform are feature/score options, not separate tables.
 enum class VmafModel : std::uint8_t { Standard1080, Standard4K };
 
-// Native keeps the input geometry, as VMAF has always done here. FitAndPad
-// scales each input uniformly to fit inside model_size, centers it, and fills
-// the remaining canvas with the source's black code. VMAF v0 reads luma only,
-// so the fit and padding are applied to luma.
-enum class VmafFitMode : std::uint8_t { Native, FitAndPad };
+// Native keeps the input geometry. Fit scales the input uniformly to the
+// model bounds. Pad centers the input on the smallest enclosing 16:9 canvas.
+// FitAndPad scales to the model bounds and centers the result on that canvas.
+// VMAF v0 applies both operations to coded luma.
+enum class VmafFitMode : std::uint8_t { Native, FitAndPad, Fit, Pad };
 
 // The float VMAF v0.6.1 model. Supports SDR planar inputs accepted by VQM.
 // Native coded integer YUV/grey is used directly; other inputs and explicit
@@ -40,7 +40,7 @@ struct VmafConfig {
     Size size;  // source geometry; the feature canvas in Native mode
     VmafModel model = VmafModel::Standard1080;
     VmafFitMode fit = VmafFitMode::Native;
-    // FitAndPad canvas override. Zero uses the selected model's native canvas.
+    // Fit and FitAndPad bounds. Zero uses the selected model's native canvas.
     Size model_size = {};
     std::size_t gpu_resident_images = 2;
     bool streaming_inputs = true;
