@@ -10,8 +10,8 @@ namespace vqm::cli {
 [[nodiscard]] bool HasY4mInput(const Options& options);
 
 // Handle compressed video before the legacy still-image loader. Returns false
-// for other inputs, including all inputs in a build without NVDEC.
-[[nodiscard]] bool TryRunNvdecPair(const Options& options);
+// for other inputs, including all inputs in a build without BestSource.
+[[nodiscard]] bool TryRunBestSourcePair(const Options& options);
 
 // Process complete ordered inputs, with one result per pair and metric.
 // A failed pair throws before any of its results are printed.

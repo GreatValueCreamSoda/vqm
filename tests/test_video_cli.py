@@ -75,6 +75,18 @@ def _plane(width: int, height: int, offset: int, plane: int, distorted: bool) ->
 class VideoCliArguments(unittest.TestCase):
     """Reject malformed batch, timing and repetition inputs before GPU work."""
 
+    def test_rejects_invalid_frame_range_options(self) -> None:
+        """Validate frame range arguments before opening inputs."""
+        cases = (
+            ("--start-frame", "-1"), ("--frame-count", "0"), ("--start-frame", "1.5"),
+            ("--frame-count", "9223372036854775808")
+        )
+        for flags in cases:
+            with self.subTest(flags=flags):
+                result = _run(*flags, "a", "b")
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertEqual(result.stdout, "")
+
     def test_rejects_invalid_repetition_and_output_options(self) -> None:
         """Keep iteration counts unsigned and output modes unambiguous."""
         cases = (

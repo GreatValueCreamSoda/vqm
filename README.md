@@ -66,7 +66,7 @@ For end-to-end reference correlation across the five established metrics, use th
 Pass the original first and the distorted rendition second. Use matching
 dimensions and align video frames to the same content, frame rate and frame
 count. The CLI reads PNG, JPEG and progressive Y4M, plus compressed clips with
-[NVIDIA hardware decoding](#nvidia-hardware-decoding).
+[BestSource indexed hardware decoding](#bestsource-indexed-hardware-decoding).
 
 ```sh
 ./build/vqm original.png distorted.png
@@ -271,37 +271,41 @@ combined core time. `--warmup` runs untimed clips first.
 
 [Complete video and batch examples](docs/temporal-validation.md#score-a-complete-video)
 
-### NVIDIA hardware decoding
+### BestSource indexed hardware decoding
 
-On Linux, the build enables NVDEC automatically when it finds the CUDA Toolkit
-(11.8 or newer) and FFmpeg development libraries (6.1 or newer). Use
-`-DVQM_ENABLE_NVDEC=OFF` to build without the NVIDIA backend or its dependencies.
-`-DVQM_ENABLE_NVDEC=ON` requires the backend at configure time. At runtime,
-NVDEC needs a compatible NVIDIA driver, NVDEC-enabled FFmpeg, and a Turing or
-newer GPU with NVDEC and Vulkan opaque FD interop.
+On Linux, build with `-DVQM_ENABLE_BESTSOURCE=ON` to enable compressed video
+input. The CLI detects compressed video pairs by their contents and decodes
+them with BestSource. The backend requires a GPU-enabled [BestSource R23](https://github.com/vapoursynth/bestsource/tree/R23)
+library and a compatible FFmpeg build with Vulkan Video, libavutil 61.6 or
+newer and the Vulkan UUID device selector. When building BestSource as a
+standalone library, use Meson's `-Denable_plugin=false -Denable_gpu=enabled`.
+Make the dependencies visible to `pkg-config` and the runtime linker. Pass
+the BestSource `src` directory from the same revision as the library because
+its GPU export header is distributed in the source tree.
 
 ```sh
-cmake --preset release -B build-nvdec
-cmake --build build-nvdec --parallel 8
-./build-nvdec/vqm --metric vmaf-v1 --json original.mp4 distorted.mp4
+cmake --preset release -B build-bestsource \
+  -DVQM_ENABLE_BESTSOURCE=ON \
+  -DVQM_BESTSOURCE_GPU_INCLUDE_DIR=/path/to/bestsource/src
+cmake --build build-bestsource --parallel 8
+./build-bestsource/vqm --start-frame 174 --frame-count 24 \
+  --metric vmaf-v1 --json original.mp4 distorted.mp4
 ```
 
-Compressed video pairs select NVDEC automatically when built in. The
-`--nvdec` option explicitly requires compressed video inputs. NVDEC works with
-all six metrics and with `--pairs-file`, `--iterations` and `--warmup`. It
-reads compressed clips in presentation order and requires
-progressive, constant-rate inputs with matching dimensions, rational frame
-rates and frame counts. Supported surfaces are 8-, 10- and 12-bit YUV 4:2:0,
-4:2:2 and 4:4:4 where the codec, GPU and selected metric support them. The
-CLI uses decoded color metadata and accepts the same `--input-*` overrides
-as Y4M. Unsupported decoding and changes to geometry or format within a clip
-are errors.
+`--start-frame` is zero-based and applies to both inputs. It defaults to zero.
+`--frame-count` sets the exact number of frames to score and must fit in both
+clips. With no count, both inputs must end together. Metric history starts at
+the first selected frame, and per-frame output indexes are relative to that
+frame. BestSource builds and caches the frame index as needed. It can
+temporarily download candidate frames while verifying a seek. Once selected,
+frames are packed and scored in Vulkan device memory.
 
-FFmpeg demuxes compressed packets on the CPU. NVDEC decodes pixels on the
-GPU, a CUDA kernel packs them into shared device memory, and Vulkan reads
-that memory to compute the metrics. The CLI reads back score data. Decoded
-frames stay on the GPU, including during layout conversion. The core library
-has no FFmpeg or CUDA dependency.
+The backend requires the same physical GPU for decoding and scoring, Vulkan
+opaque FD memory and semaphore sharing, and hardware support for the input
+codec. It accepts local progressive, constant-rate 8-, 10- and 12-bit YUV
+4:2:0 and 4:2:2 clips, subject to each metric's format requirements. The CLI
+uses decoded color metadata and accepts the same `--input-*` overrides as Y4M.
+This backend is CLI-only and requires hardware decoding at runtime.
 
 ## C++ library
 

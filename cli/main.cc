@@ -93,7 +93,8 @@ std::string Usage(std::string_view program) {
     return std::format(
         R"help(VQM - SSIMULACRA 2.1 / Butteraugli / VMAF / ColorVideoVDP / PSNR-HVS (Vulkan)
 Usage: {} [--metric METRIC[,METRIC...]] [--raw|--json] [--verbose]
-          [--half-planes] [--nvdec] [--iterations N] [--warmup N]
+          [--half-planes] [--iterations N] [--warmup N]
+          [--start-frame N] [--frame-count N]
           [--chroma-filter KERNEL] [--intensity-target NITS]
           [--hf-asymmetry F] [--vmaf-scale] [--vmaf-pad]
           [--vmaf-model 1080|4k] [--vmaf-neg] [--vmaf-transform]
@@ -172,11 +173,14 @@ Each metric also checks its own input requirements.
 PNG and JPEG use sRGB with BT.709 primaries. Y4M defaults to the bt470bg matrix,
 bt709 transfer and primaries, and limited range. Use --input-range full for
 full-range Y4M because the XCOLORRANGE header extension is ignored.
-Builds with NVDEC automatically decode compressed video inputs on an NVIDIA GPU
-and keep decoded frames on that GPU for scoring. --nvdec requires both inputs
-to be compressed videos. The clips must be progressive and have matching
-dimensions and frame rates. Configure with -DVQM_ENABLE_NVDEC=OFF to build
-without NVDEC.
+Build with -DVQM_ENABLE_BESTSOURCE=ON to decode compressed video pairs using
+BestSource and Vulkan Video. Both clips must be progressive and have matching
+dimensions and frame rates. Decoded frames stay on the GPU for scoring.
+--start-frame sets the zero-based first frame for both clips (default 0).
+--frame-count sets the number of frames scored (default through end of clip).
+These range flags apply to compressed video pairs. Indexed seeks can temporarily
+transfer verification frames to host memory. Scoring starts with fresh metric
+history.
 
 --half-planes stores SSIMULACRA 2 intermediate planes as 16-bit floats and can
 change scores. It requires device support for 16-bit storage.
@@ -222,8 +226,23 @@ ParseResult ParseOptions(std::span<const std::string_view> args) {
             options.json = true;
         } else if (arg == "--verbose" || arg == "-v") {
             options.verbose = true;
-        } else if (arg == "--nvdec") {
-            options.nvdec = true;
+        } else if (arg == "--start-frame" || arg == "--frame-count") {
+            if (i + 1 >= args.size())
+                return ParseError{std::format("{} needs a value", arg)};
+            const auto value = args[++i];
+            std::int64_t number = 0;
+            const auto parsed = std::from_chars(
+                value.data(), value.data() + value.size(), number
+            );
+            if (parsed.ec != std::errc{} ||
+                parsed.ptr != value.data() + value.size() || number < 0 ||
+                (arg == "--frame-count" && number == 0))
+                return ParseError{
+                    std::format("invalid value for {}: '{}'", arg, value)};
+            if (arg == "--start-frame")
+                options.start_frame = number;
+            else
+                options.frame_count = number;
         } else if (arg == "--pairs-file") {
             if (i + 1 >= args.size())
                 return ParseError{"--pairs-file needs a value"};
@@ -468,15 +487,16 @@ int RunCliMain(int argc, char** argv) try {
     const vqm::cli::Options& options = std::get<vqm::cli::Options>(result);
     const auto metric = options.metrics.front();
 
-    if (options.metrics.size() > 1 || options.nvdec || options.json ||
-        options.verbose || metric == vqm::cli::Metric::Cvvdp ||
+    if (options.metrics.size() > 1 || options.start_frame ||
+        options.frame_count || options.json || options.verbose ||
+        metric == vqm::cli::Metric::Cvvdp ||
         metric == vqm::cli::Metric::PsnrHvs ||
         metric == vqm::cli::Metric::VmafV0 ||
         metric == vqm::cli::Metric::VmafV1 || options.iterations != 1 ||
         options.warmup != 0)
         return vqm::cli::RunSequences(options);
 
-    if (vqm::cli::TryRunNvdecPair(options)) return 0;
+    if (vqm::cli::TryRunBestSourcePair(options)) return 0;
 
     std::string error;
     std::optional<vqm::Image> original =

@@ -34,7 +34,7 @@ syntax. Use the equivalent paths and commands for your environment.
   `src/vulkan/` owns metric-independent device, memory, input, and dispatch
   machinery. Shared GLSL lives in `src/vulkan/shaders/`. Benchmark timing lives
   in `src/timing.{h,cc}`.
-- `cli/` owns the command line and optional NVDEC decoding.
+- `cli/` owns the command line and optional BestSource decoding.
   `tools/image_io/` supplies image and Y4M decoding for the CLI, benchmarks,
   and tests. The installed core remains independent of these decoders.
 - `tests/` contains the local harness and integration tests. Keep numerical
@@ -99,11 +99,11 @@ ctest --preset release
 ```
 
 Use `vqm`, `vqm_bench`, and `vqm_test` in current workflows. A core build needs
-no reference checkout or corpus. Use `-DVQM_ENABLE_NVDEC=OFF` for a CLI build
-without CUDA or FFmpeg library dependencies. See
-[NVDEC prerequisites](README.md#nvidia-hardware-decoding) for the optional
-Linux backend. Use the [sanitizer preset](CONTRIBUTING.md#build-and-test) on
-supported toolchains for memory-sensitive changes.
+no reference checkout or corpus. The default CLI build needs no BestSource
+or FFmpeg libraries. See
+[BestSource prerequisites](README.md#bestsource-indexed-hardware-decoding) for
+the optional Linux backend. Use the [sanitizer preset](CONTRIBUTING.md#build-and-test)
+on supported toolchains for memory-sensitive changes.
 
 Run `python3 tools/check_quality.py` with clang-format 23 for maintained C++,
 headers, CUDA source, and shaders. Add `--lint` for production C++ changes.
@@ -263,10 +263,11 @@ stage median by at least 2% while meeting the correctness gates.
 - Use CVVDP's epsilon-adjusted norm. Report whole-clip JOD after finalization
   and keep frames of one clip on the same sequence worker.
   See [CVVDP contracts](docs/cvvdp.md).
-- Keep NVDEC optional and CLI-local. Decoded pixels stay on the same device
-  through CUDA packing and Vulkan scoring. Preserve frame order, format,
-  timing, and ownership across that handoff. Keep the existing Y4M path and
-  the decoder-free installed core.
+- Keep BestSource optional and CLI-local. Selected decoded pixels stay on
+  the same GPU through Vulkan packing and scoring. BestSource can temporarily
+  read back candidates while verifying seeks. Preserve frame order, format,
+  timing, and ownership across the handoff. Keep the existing Y4M path and the
+  decoder-free installed core.
 
 Respect upstream licenses and record provenance by pinned revision, file,
 and mechanism where applicable. Keep Vship sources read-only and use its

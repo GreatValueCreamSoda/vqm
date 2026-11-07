@@ -15,7 +15,7 @@ record.
 | Topic | Research records |
 | --- | --- |
 | Benchmark workflow and qualification | [Fresh clone video benchmark](system/fresh-video-benchmark.md), [five-metric reference correlation](system/all-metric-reference-correlation.md), [ranking policy transition](../../docs/design/ranking-default-gates.md) |
-| NVIDIA video input | [NVDEC CLI qualification and frame-transfer trace](system/nvdec-cli-qualification.md) |
+| Historical NVIDIA video input | [NVDEC CLI qualification and frame-transfer trace](system/nvdec-cli-qualification.md) |
 | SSIMULACRA 2 and shared Vulkan infrastructure | [Vship comparison](system/vship-notes.md), [resident ring workload](system/resident-ring.md), [shared memory](system/shared-memory.md), [other system studies](system/) |
 | Butteraugli | [Reference drift and JPEG ICC investigation](system/butteraugli-drift.md), [memory layout](system/butter-memory.md) |
 | VMAF | [Speed investigation](vmaf/vmaf-speed-investigation.md), [FP16](vmaf/vmaf-fp16.md), [cooperative matrices](vmaf/vmaf-cooperative-matrix.md), [SpEED parallelism](vmaf/vmaf-speed-parallelism.md), [CAMBI headroom](vmaf/vmaf-v1-headroom.md), [supporting reviews](vmaf/research/README.md) |

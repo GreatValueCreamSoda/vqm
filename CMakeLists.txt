@@ -11,8 +11,7 @@ if(PROJECT_IS_TOP_LEVEL AND NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYP
 endif()
 
 option(VQM_BUILD_CLI "Build the example CLI" ${PROJECT_IS_TOP_LEVEL})
-set(VQM_ENABLE_NVDEC AUTO CACHE STRING "NVIDIA hardware video decoding in the Linux CLI (AUTO, ON, OFF)")
-set_property(CACHE VQM_ENABLE_NVDEC PROPERTY STRINGS AUTO ON OFF)
+option(VQM_ENABLE_BESTSOURCE "Enable the Linux BestSource Vulkan Video CLI backend" OFF)
 option(VQM_BUILD_BENCH "Build benchmark tools (needs libpng/libjpeg)" ${VQM_BUILD_CLI})
 option(VQM_BUILD_TESTS "Build the test suite" ${PROJECT_IS_TOP_LEVEL})
 option(VQM_WARNINGS_AS_ERRORS "Treat compiler warnings as errors" OFF)
@@ -512,14 +511,14 @@ if(VQM_BUILD_TESTS AND BUILD_TESTING)
                 "VQM_TEST_BINARY=$<TARGET_FILE:vqm_test>"
                 "${Python3_EXECUTABLE}" -m unittest discover -s tests
                 -p test_video_cli.py -v)
-      if(TARGET vqm_cli_nvdec)
-        add_test(NAME nvdec_cli
+      if(VQM_ENABLE_BESTSOURCE)
+        add_test(NAME bestsource_cli
           COMMAND "${CMAKE_COMMAND}" -E env
                   "VQM_CLI_BINARY=$<TARGET_FILE:vqm>"
                   "VQM_TEST_BINARY=$<TARGET_FILE:vqm_test>"
                   "${Python3_EXECUTABLE}" -m unittest discover -s tests
-                  -p test_nvdec_cli.py -v)
-        set_tests_properties(nvdec_cli PROPERTIES
+                  -p test_bestsource_cli.py -v)
+        set_tests_properties(bestsource_cli PROPERTIES
           WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
       endif()
       set(VQM_CVVDP_BENCH_ENV "--unset=VQM_BENCH_BINARY")

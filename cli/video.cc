@@ -35,8 +35,8 @@
 #include "vqm_alpha.h"
 #include "vqm_vulkan.h"
 
-#ifdef VQM_CLI_NVDEC
-#include "nvdec.h"
+#ifdef VQM_CLI_BESTSOURCE
+#include "bestsource.h"
 #endif
 
 namespace vqm::cli {
@@ -507,7 +507,7 @@ PairResult Score(
         if (status == SequenceReadResult::End) break;
         options.input.ApplyTo(ref.format);
         options.input.ApplyTo(test.format);
-        // NVDEC readers may reuse their buffers on the next read.
+        // GPU readers may reuse their buffers on the next read.
         for (std::size_t i = 0; i < scorers.size(); ++i) {
             const auto core = Clock::now();
             scorers[i].Push(result.metrics[i], result.count, ref, test);
@@ -730,26 +730,39 @@ void RunPair(
     }
 }
 
-#ifdef VQM_CLI_NVDEC
-bool UseNvdec(const Options& options, const Pair& pair) {
-    const bool original = IsCompressedVideo(pair.original);
-    const bool distorted = pair.original == pair.distorted
+#ifdef VQM_CLI_BESTSOURCE
+struct VideoTracks {
+    int original;
+    int distorted;
+};
+
+std::optional<VideoTracks> BestSourceTracks(const Pair& pair) {
+    const auto original = FindBestSourceTrack(pair.original);
+    const auto distorted = pair.original == pair.distorted
                                ? original
-                               : IsCompressedVideo(pair.distorted);
-    if (original != distorted || (options.nvdec && !original))
+                               : FindBestSourceTrack(pair.distorted);
+    if (original.has_value() != distorted.has_value())
         throw std::invalid_argument(
-            "NVDEC requires two compressed video inputs"
+            "BestSource requires two compressed video inputs"
         );
-    return original;
+    if (!original) return std::nullopt;
+    return VideoTracks{*original, *distorted};
 }
 
-void RunNvdecPair(
-    const Options& options, const Pair& pair, ScorerCache& cache,
-    NvdecDevice& device
+void RunBestSourcePair(
+    const Options& options, const Pair& pair, VideoTracks tracks,
+    ScorerCache& cache, BestSourceDevice& device
 ) {
     RunPair<VulkanBufferView>(
         options, pair, cache,
-        [&device](const std::string& path) { return NvdecReader(path, device); },
+        [&](const std::string& path) {
+            const int track =
+                path == pair.original ? tracks.original : tracks.distorted;
+            return BestSourceReader(
+                path, track, device, options.start_frame.value_or(0),
+                options.frame_count
+            );
+        },
         &device.vulkan()
     );
 }
@@ -761,13 +774,14 @@ bool HasY4mInput(const Options& options) {
     return IsY4m(options.original) || IsY4m(options.distorted);
 }
 
-bool TryRunNvdecPair(const Options& options) {
-#ifdef VQM_CLI_NVDEC
+bool TryRunBestSourcePair(const Options& options) {
+#ifdef VQM_CLI_BESTSOURCE
     const Pair pair{"pair", options.original, options.distorted};
-    if (!UseNvdec(options, pair)) return false;
-    NvdecDevice device;
+    const auto tracks = BestSourceTracks(pair);
+    if (!tracks) return false;
+    BestSourceDevice device;
     ScorerCache cache(options);
-    RunNvdecPair(options, pair, cache, device);
+    RunBestSourcePair(options, pair, *tracks, cache, device);
     return true;
 #else
     (void)options;
@@ -776,24 +790,29 @@ bool TryRunNvdecPair(const Options& options) {
 }
 
 int RunSequences(const Options& options) {
-#ifdef VQM_CLI_NVDEC
-    std::optional<NvdecDevice> nvdec;
+#ifdef VQM_CLI_BESTSOURCE
+    std::optional<BestSourceDevice> device;
 #else
-    if (options.nvdec)
-        throw std::runtime_error(
-            "--nvdec requires a CLI built with -DVQM_ENABLE_NVDEC=ON"
+    if (options.start_frame || options.frame_count)
+        throw std::invalid_argument(
+            "--start-frame and --frame-count require -DVQM_ENABLE_BESTSOURCE=ON"
         );
 #endif
     const auto pairs = ReadPairs(options);
     ScorerCache cache(options);
     std::cout << std::setprecision(17);
     for (const auto& pair : pairs) {
-#ifdef VQM_CLI_NVDEC
-        if (UseNvdec(options, pair)) {
-            if (!nvdec) nvdec.emplace();
-            RunNvdecPair(options, pair, cache, *nvdec);
+#ifdef VQM_CLI_BESTSOURCE
+        if (const auto tracks = BestSourceTracks(pair)) {
+            if (!device) device.emplace();
+            RunBestSourcePair(options, pair, *tracks, cache, *device);
             continue;
         }
+        if (options.start_frame || options.frame_count)
+            throw std::invalid_argument(
+                "--start-frame and --frame-count require two compressed video "
+                "inputs"
+            );
 #endif
         RunPair<Image>(options, pair, cache, [](const std::string& path) {
             return SequenceReader(path);

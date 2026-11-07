@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include <cstdint>
 #include <optional>
 #include <span>
 #include <string>
@@ -23,7 +24,8 @@ struct Options {
     bool json = false;
     bool verbose = false;
     bool half_planes = false;
-    bool nvdec = false;
+    std::optional<std::int64_t> start_frame;
+    std::optional<std::int64_t> frame_count;
     bool vmaf_scale = false;
     bool vmaf_pad = false;
     std::optional<VmafModel> vmaf_v0_model;
