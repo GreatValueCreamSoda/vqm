@@ -8,7 +8,7 @@ Run the commands from the repository root.
 | Score and time complete clips | [`vqm --json`](#score-a-complete-clip) |
 | Compare complete hosted clips against pinned original scores | [`benchmark.py`](#hosted-video-benchmark) |
 | Compare still-image latency with a pinned peer | [`benchmark.py --suite images`](#still-image-peer-comparison) |
-| Compare latency, exploratory windows or fixed-count workers | [Performance methodology](../docs/performance.md) |
+| Compare latency, exploratory windows or fixed-count workers | [Performance methodology](performance.md) |
 
 ## Time one pair
 
@@ -26,7 +26,7 @@ The default arm streams the input pixels. The resident arm uploads before
 timing. SSIMULACRA 2 prepares both images on each call in either arm.
 Use `./build/vqm_bench --help` for metrics, input modes and CSV flags.
 The performance methodology describes timing boundaries, worker scaling and
-how to compare two builds in one sitting. [Performance methodology](../docs/performance.md)
+how to compare two builds in one sitting. [Performance methodology](performance.md)
 
 ## Score a complete clip
 
@@ -52,7 +52,7 @@ uses `--vmaf-fit pad` for the combined operation.
 
 Run `.venv/bin/python -m validation.temporal.run --profile smoke` for a
 short reference-agreement check or use `--profile qualification` for the full
-matrix. [Hosted video validation](../docs/temporal-validation.md)
+matrix. [Hosted video validation](../validation/temporal/README.md)
 
 ## Hosted video benchmark
 
@@ -89,7 +89,7 @@ time, CLI process wall time, per-round spread and reference agreement separate.
 The core timing includes metric finalization. Process wall time also includes
 warmups, decoding and setup. The reference adapters can perform additional
 conversion and serialization. Use the reports for the specific workload and
-timing boundaries recorded there. [Performance methodology](../docs/performance.md)
+timing boundaries recorded there. [Performance methodology](performance.md)
 
 ## Still-image peer comparison
 
@@ -120,7 +120,7 @@ The build tools work on copies and rebuild when the recorded recipe, source or
 toolchain fingerprint changes. Fetch or build a named reference with
 `tools/fetch_references.py --only NAME` or
 `tools/build_references.py --only NAME`.
-[Reference setup and validation](../docs/validation.md)
+[Reference setup and validation](../validation/README.md)
 
 ## Profiling and specialist workflows
 
@@ -139,10 +139,10 @@ described in the contributor instructions. [Nsight setup](../AGENTS.md#profiling
 startup and decoding inside the timed interval. It supports explicit
 `--baseline NAME=PATH` entries and `--stages` for a separate stage profile.
 Use `--jobs 1` for an uncontended process comparison. The in-memory runner
-uses a different timing boundary. [Performance methodology](../docs/performance.md)
+uses a different timing boundary. [Performance methodology](performance.md)
 
-## Archived results
+## Local reports and probes
 
-Keep raw local runs under `artifacts/reports/` and generated inputs under
-`.cache/`. The research index points to dated results, preserved command
-lines and reusable probes. [Research and measurement archive](notes/README.md)
+Keep benchmark and test reports under `artifacts/reports/` and generated
+inputs under `.cache/`. Earlier checked-in reports are available in Git at
+`26bdffe` under `bench/notes/`. [Reusable probes](experiments/README.md)

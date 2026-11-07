@@ -2,7 +2,7 @@
 
 These compact reports contain original scores for the exact downloaded and
 prepared corpus described in [sources.json](../sources.json) and
-[the workflow guide](../../../docs/temporal-validation.md). They contain no
+[the workflow guide](../README.md). They contain no
 source video, candidate output or executable.
 
 - `smoke/`: three source groups, 13 variants, 12 frames; 39 complete clip pairs
@@ -27,9 +27,8 @@ The [qualified-domain registry](../../qualified_domains.json) binds the original
 scores, input/configuration identities, reference pin and frozen policy.
 Unregistered or modified pairs retain the combined default. This changes
 final corpus-score acceptance while identity and numerical component tests
-remain required. The
-[transition record](../../../docs/design/ranking-default-gates.md)
-documents this scope; historical reports retain their measured gate modes.
+remain required. Historical reports retain their measured gate modes.
+[Qualified score gates](../../README.md#qualified-score-gates)
 
 Originals are Cloudinary SSIMULACRA 2 at
 `81feacf6a5b0bbd7ec11b4a881a4615033ab0b10`, libjxl Butteraugli at
@@ -70,10 +69,5 @@ input/runtime evidence, coverage and mutation audit before promoting
 provenance record. Ordinary validation consumes these fixtures without
 installing the original runtimes.
 
-The [qualification report](../../../bench/notes/system/ranking-temporal-validation-results.md)
-records failed initial coverage attempts and the eventual paired old/new
-results for the historical three-metric qualification. Preserve those policies
-and measurements when adding the spatial metric fixtures; describe new runs
-by their complete selected metric list and aggregate results. This is
-fixed-corpus SDR agreement evidence, not a bound on unseen content or
-subjective video accuracy.
+These fixtures measure agreement on a fixed SDR corpus. Describe new runs
+by their complete metric selection and aggregate results.

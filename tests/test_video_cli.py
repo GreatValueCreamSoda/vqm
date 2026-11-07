@@ -100,6 +100,14 @@ class VideoCliArguments(unittest.TestCase):
                 self.assertEqual(result.returncode, 2, result.stderr)
                 self.assertEqual(result.stdout, "")
 
+    def test_rejects_missing_inputs_and_unknown_options(self) -> None:
+        """Reject incomplete invocations before opening any input."""
+        for arguments in ((), ("--missing", "1")):
+            with self.subTest(arguments=arguments):
+                result = _run(*arguments)
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertEqual(result.stdout, "")
+
     def test_rejects_empty_or_unknown_metric_list_items(self) -> None:
         """Validate every list item, including items after the all alias."""
         for value in ("", ",cvvdp", "cvvdp,", "cvvdp,,butteraugli", "all,unknown"):
@@ -225,6 +233,34 @@ class VideoCliGpu(unittest.TestCase):
                 self.assertEqual(report["frames"], expected["frames"])
                 self.assertEqual(report["score"], expected["score"])
                 self.assertEqual(report["frame_results"], expected["frame_results"])
+
+    def test_vmaf_pools_the_final_distorted_frame(self) -> None:
+        """The final frame changes the pooled score without changing the first frame."""
+        _require_gpu()
+        root = Path(self.enterContext(tempfile.TemporaryDirectory()))
+        original, distorted = root / "original.y4m", root / "distorted.y4m"
+        _write_y4m(original, width=216, height=160)
+        _write_y4m(distorted, width=216, height=160, distorted=True)
+        pairs = root / "pairs.tsv"
+        pairs.write_text(
+            f"identity\t{original}\t{original}\nlate\t{original}\t{distorted}\n",
+            encoding="utf-8",
+        )
+        for metric in ("vmaf-v0", "vmaf-v1"):
+            with self.subTest(metric=metric):
+                result = _run(
+                    "--json", "--metric", metric, "--pairs-file", pairs, "--iterations",
+                    "2", "--warmup", "1",
+                )
+                self.assertEqual(result.returncode, 0, result.stderr)
+                identity, late = map(json.loads, result.stdout.splitlines())
+                self._check_frames(late, metric)
+                expected, actual = identity["frame_results"], late["frame_results"]
+                self.assertEqual(actual[0]["score"], expected[0]["score"])
+                self.assertNotAlmostEqual(
+                    actual[-1]["score"], expected[-1]["score"], places=3
+                )
+                self.assertLess(late["score"], identity["score"])
 
     def test_vmaf_scale_and_pad_are_independent_for_both_versions(self) -> None:
         """Exercise native, scale, pad, and combined modes on a 4:3 clip."""
@@ -483,6 +519,12 @@ class VideoCliGpu(unittest.TestCase):
         if metric.startswith("vmaf"):
             count = 6 if metric == "vmaf-v0" else 4
             self.assertEqual([len(frame["features"]) for frame in frames], [count] * 3)
+            self.assertTrue(
+                all(
+                    math.isfinite(value) for frame in frames
+                    for value in frame["features"]
+                )
+            )
         elif metric == "ssimulacra2":
             self.assertEqual(frames[0]["score"], 100)
             self.assertLess(frames[-1]["score"], frames[0]["score"])

@@ -10,8 +10,7 @@ original/policy identities on 2026-11-06. It includes the required subjective
 noninferiority check and retains raw numerical errors as diagnostics.
 `--gate-mode both` still requests the strict conjunction; unregistered or
 modified policies keep that combined default. Identity and numerical component
-tests remain required. See the
-[transition record](../../../docs/design/ranking-default-gates.md).
+tests remain required. [Qualified score gates](../../README.md#qualified-score-gates)
 
 The selection was fixed before candidate scoring: take the lexicographically
 first 30 original directories under `compressed/`, then select `cld_avif`
@@ -128,9 +127,8 @@ content is independent.
 The candidate was `build/vqm_bench` SHA-256
 `155eda72e223cdb87b08a300f99e9d6959c7228c2c28b75580854b6adff87ee0`.
 Original pins and each measured executable hash are retained in the two
-`*-configuration.json` files. The [compact measurement report](../../../bench/notes/measurements/ranking-still-results.json)
-also records library fingerprints, device identity, build provenance, policy
-hashes, complete MCOS coefficients and correctness limits.
+`*-configuration.json` files. The original measurement report is in Git at
+`26bdffe:bench/notes/measurements/ranking-still-results.json`.
 
 Raw logs and original historical commands remain under
 `artifacts/reports/ranking-temporal/stills/`, using their original

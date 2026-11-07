@@ -545,24 +545,13 @@ if(VQM_BUILD_TESTS AND BUILD_TESTING)
     if(VQM_NUMPY_STATUS EQUAL 0)
       foreach(test_name agreement agreement_adapters agreement_audit all_metric_correlation
           gate_defaults spatial_reference vmaf_agreement temporal_fetch build_references
-          video_benchmark cli_results)
+          video_benchmark cli_results temporal_tools)
         add_test(NAME ${test_name}
           COMMAND "${Python3_EXECUTABLE}" -m unittest discover -s tests
             -p test_${test_name}.py -v)
         set_tests_properties(${test_name} PROPERTIES
           WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
       endforeach()
-      if(VQM_BUILD_CLI)
-        add_test(NAME temporal_tools
-          COMMAND "${CMAKE_COMMAND}" -E env
-            "VQM_TEMPORAL_BINARY=$<TARGET_FILE:vqm>"
-            "VQM_CLI_BINARY=$<TARGET_FILE:vqm>"
-            "VQM_TEST_BINARY=$<TARGET_FILE:vqm_test>"
-            "${Python3_EXECUTABLE}" -m unittest discover -s tests
-            -p test_temporal_tools.py -v)
-        set_tests_properties(temporal_tools PROPERTIES
-          WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
-      endif()
       foreach(test_name benchmark_tools validation_tools)
         if(test_name STREQUAL benchmark_tools)
           set(test_file test_bench_tools.py)

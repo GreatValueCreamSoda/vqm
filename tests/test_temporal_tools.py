@@ -1,18 +1,15 @@
 #!/usr/bin/env python3
 # Copyright (c) 2026 VQM contributors. BSD-3-Clause; see LICENSE.
-"""Check offline temporal preparation, frozen rollout and ordered driver inputs."""
+"""Check offline temporal preparation, frozen policies and reports."""
 
 import argparse
 import copy
 import io
 import json
-import math
-import os
 import subprocess
 import sys
 import tempfile
 import unittest
-from collections.abc import Sequence
 from contextlib import redirect_stderr, redirect_stdout
 from dataclasses import replace
 from itertools import product
@@ -70,39 +67,6 @@ def _fake_values(rows: list[dict[str, object]],
             "frames": row["frames"]
         } for index, row in enumerate(rows)
     ]
-
-
-def _binary(name: str) -> Path:
-    value = os.environ.get(name)
-    if not value or not Path(value).is_file():
-        raise unittest.SkipTest(f"{name} is not configured")
-    return Path(value)
-
-
-def _require_gpu() -> None:
-    probe = subprocess.run(
-        [str(_binary("VQM_TEST_BINARY")), "--probe-gpu"], capture_output=True,
-        text=True, timeout=120, check=False
-    )
-    if probe.returncode and "no usable Vulkan device" in probe.stderr:
-        raise unittest.SkipTest("no usable Vulkan device")
-    if probe.returncode:
-        raise AssertionError(probe.stderr)
-
-
-def _driver(
-    directory: Path, metric: str, original: Path, distorted: Path,
-    options: Sequence[str] = ()
-) -> subprocess.CompletedProcess[str]:
-    pairs = directory / "pairs.tsv"
-    pairs.write_text(f"test-clip\t{original}\t{distorted}\n", encoding="utf-8")
-    return subprocess.run(
-        [
-            str(_binary("VQM_TEMPORAL_BINARY")), "--json", "--metric", metric,
-            "--pairs-file",
-            str(pairs), *options
-        ], capture_output=True, text=True, timeout=120, check=False
-    )
 
 
 class TemporalPreparationTests(unittest.TestCase):
@@ -419,128 +383,6 @@ class TemporalFixtureIntegrityTests(unittest.TestCase):
                 )
                 self.assertEqual(result["numerical"]["status"], "pass")
                 self.assertEqual(result["proposed_status"], "pass")
-
-
-class TemporalDriverTests(unittest.TestCase):
-    """Exercise complete ordered ingestion through the public CLI batch path."""
-
-    def test_invalid_options_fail_without_gpu_work(self) -> None:
-        """Malformed metrics and iteration counts are rejected before scoring."""
-        binary = _binary("VQM_TEMPORAL_BINARY")
-        invalid = (
-            [], ["--metric", "unknown"], ["--missing", "1"],
-            ["--metric", "vmaf-v0", "--pairs-file", "missing", "--iterations",
-             "0"], ["--metric", "vmaf-v0", "--pairs-file", "missing", "--warmup", "-1"]
-        )
-        for options in invalid:
-            with self.subTest(options=options):
-                result = subprocess.run(
-                    [str(binary), *options], capture_output=True, text=True, timeout=10,
-                    check=False
-                )
-                self.assertNotEqual(result.returncode, 0)
-                self.assertEqual(result.stdout, "")
-
-    def test_vmaf_emits_every_frame_and_scores_late_distortion(self) -> None:
-        """The last distorted frame changes the tail and participates in mean pooling."""
-        _require_gpu()
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            source, values = _source(root, width=216, height=160, frames=3)
-            values = corpus.expand_chroma(values, source.width, source.height)
-            original, distorted = root / "original.y4m", root / "distorted.y4m"
-            corpus.write_clip(original, values, source)
-            changed = values.copy()
-            changed[-1, :216 * 160] = 16
-            corpus.write_clip(distorted, changed, source)
-            for metric, features in (("vmaf-v0", 6), ("vmaf-v1", 4)):
-                self._check_vmaf_clip(root, metric, features, original, distorted)
-
-    def _check_vmaf_clip(
-        self, root: Path, metric: str, features: int, original: Path, distorted: Path
-    ) -> None:
-        baseline = _driver(root, metric, original, original)
-        result = _driver(
-            root, metric, original, distorted, ("--iterations", "2", "--warmup", "1")
-        )
-        self.assertEqual(baseline.returncode, 0, baseline.stderr)
-        self.assertEqual(result.returncode, 0, result.stderr)
-        expected, observed = json.loads(baseline.stdout), json.loads(result.stdout)
-        self.assertEqual(observed["frames"], 3)
-        self.assertEqual(
-            [frame["index"] for frame in observed["frame_results"]], [0, 1, 2]
-        )
-        self.assertEqual(
-            [len(frame["features"]) for frame in observed["frame_results"]],
-            [features] * 3
-        )
-        self.assertTrue(
-            all(
-                math.isfinite(value) for frame in observed["frame_results"]
-                for value in frame["features"]
-            )
-        )
-        self.assertAlmostEqual(
-            observed["score"],
-            sum(frame["score"] for frame in observed["frame_results"]) / 3, places=10
-        )
-        self.assertEqual(
-            expected["frame_results"][0]["score"], observed["frame_results"][0]["score"]
-        )
-        self.assertNotAlmostEqual(
-            expected["frame_results"][-1]["score"],
-            observed["frame_results"][-1]["score"], places=3
-        )
-
-    def test_cvvdp_consumes_video_history_through_last_frame(self) -> None:
-        """A final-frame opponent-color error changes whole-clip JOD."""
-        _require_gpu()
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            source, values = _source(root, width=32, height=32, frames=3)
-            values = corpus.expand_chroma(values, source.width, source.height)
-            original, distorted = root / "original.y4m", root / "distorted.y4m"
-            corpus.write_clip(original, values, source)
-            changed = values.copy()
-            changed[-1, :32 * 32] = 81
-            changed[-1, 32 * 32:2 * 32 * 32] = 90
-            changed[-1, 2 * 32 * 32:] = 240
-            corpus.write_clip(distorted, changed, source)
-            baseline = _driver(root, "cvvdp", original, original)
-            observed = _driver(root, "cvvdp", original, distorted)
-            self.assertEqual(baseline.returncode, 0, baseline.stderr)
-            self.assertEqual(observed.returncode, 0, observed.stderr)
-            self.assertEqual(json.loads(baseline.stdout)["score"], 10)
-            result = json.loads(observed.stdout)
-            self.assertEqual(result["frames"], 3)
-            self.assertLess(result["score"], 9.99)
-
-    def test_unequal_counts_and_late_truncation_fail_closed(self) -> None:
-        """A valid first frame cannot conceal missing or malformed later frames."""
-        _require_gpu()
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            source, values = _source(root, width=216, height=160, frames=3)
-            values = corpus.expand_chroma(values, source.width, source.height)
-            original, distorted = root / "original.y4m", root / "distorted.y4m"
-            corpus.write_clip(original, values, source)
-            corpus.write_clip(distorted, values[:2], source)
-            self._expect_driver_failure(
-                root, "vmaf-v0", original, distorted, "frame count"
-            )
-            corpus.write_clip(distorted, values, source)
-            distorted.write_bytes(distorted.read_bytes()[:-1])
-            self._expect_driver_failure(
-                root, "vmaf-v0", original, distorted, "truncated"
-            )
-
-    def _expect_driver_failure(
-        self, root: Path, metric: str, original: Path, distorted: Path, message: str
-    ) -> None:
-        result = _driver(root, metric, original, distorted)
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn(message, result.stderr)
-        self.assertEqual(result.stdout, "")
 
 
 if __name__ == "__main__":

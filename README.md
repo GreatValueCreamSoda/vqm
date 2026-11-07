@@ -11,7 +11,7 @@ JPEG and progressive YUV4MPEG2 clips.
 [Benchmarks](#benchmark) · [Documentation](docs/README.md)
 
 The [metric guide](#command-line) covers score direction, clip pooling and
-viewing settings. See [validation](docs/validation.md) and
+viewing settings. See [validation](validation/README.md) and
 [reference differences](docs/divergence.md) for comparisons with upstream
 implementations.
 
@@ -157,7 +157,7 @@ Scaling fits each metric's input within its selected model canvas while
 preserving aspect ratio. Padding adds black bars to reach 16:9 at the current
 scale. Together the flags fit and pad to each model's full canvas. By default
 both versions score at the input dimensions.
-[VMAF v0 model details](docs/vmaf-development.md#v061-models)
+[VMAF v0 model details](docs/vmaf.md#v061-models)
 
 ### VMAF v1
 
@@ -189,7 +189,7 @@ colorimetry of limited-range HDR10 in Y4M.
   --input-range limited original-hdr.y4m distorted-hdr.y4m
 ```
 
-[VMAF v1 presets and reference details](docs/vmaf-development.md#v1016-sdr-models)
+[VMAF v1 presets and reference details](docs/vmaf.md#v1016-sdr-models)
 
 ### ColorVideoVDP
 
@@ -278,7 +278,7 @@ combined core time. `--warmup` runs untimed clips first.
   --iterations 5 --warmup 1
 ```
 
-[Complete video and batch examples](docs/temporal-validation.md#score-a-complete-video)
+[Complete video and batch examples](validation/temporal/README.md#score-a-complete-video)
 
 ### BestSource indexed hardware decoding
 
@@ -376,7 +376,7 @@ work, `Ssimulacra2Pool` keeps a bounded number of pipelines in flight. The core
 API evaluates one configured alpha background; `ComputeWorstBackground` in
 `vqm_alpha.h` implements the CLI's policy.
 `VmafPipeline` in `vmaf.h` accepts ordered frame pairs and emits scores with
-the motion look-ahead described in [VMAF development](docs/vmaf-development.md).
+the motion look-ahead described in the [VMAF guide](docs/vmaf.md).
 `VmafConfig::model` selects the 1080 or 4K predictor; `neg` and `transform`
 toggle the feature-gain and phone-score options, and `fit`/`model_size` select
 the evaluation geometry. `temporal_weighting = false` is a derived
@@ -442,13 +442,11 @@ the default for these registered qualified profiles and the frozen
 source-balanced CID22 still policies. Raw numerical errors remain diagnostic;
 `--gate-mode both` additionally requires numerical parity. Unregistered or
 changed policies retain the combined default. Identity and numerical component
-tests remain required. The [default-gate transition](docs/design/ranking-default-gates.md)
-records this scope. See the
-[workflow guide](docs/temporal-validation.md) for the separately hashed spatial
-and temporal representations, source notices and exact qualification policy,
-and the [five-metric reference-correlation record](bench/notes/system/all-metric-reference-correlation.md)
-for measured results. Historical three-metric and still-image reports retain
-their original scope.
+tests remain required. [Qualified score gates](validation/README.md#qualified-score-gates)
+
+The workflow describes the separately hashed spatial and temporal
+representations, source notices, and exact qualification policy.
+[Workflow guide](validation/temporal/README.md)
 
 The full [source manifest](validation/temporal/sources.json) pins the first 40
 frames of 30 hosted Xiph SD sequences, about 180 MB in total. It links the source
@@ -457,10 +455,8 @@ control.
 
 ## Documentation
 
-- [API and implementation guide](docs/reference.md)
-- [Metric details, provenance and documentation index](docs/README.md)
-- [Validation and reference differences](docs/validation.md)
-- [Performance methodology](docs/performance.md)
+- [Metric guides and implementation](docs/README.md)
+- [Reference differences](docs/divergence.md)
 - [Contributing](CONTRIBUTING.md)
 
 ## License and provenance

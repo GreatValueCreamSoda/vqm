@@ -148,7 +148,7 @@ VQM_TEST(TestVmafFloatModelRejectsUnknownModel) {
 // the pinned libvmaf float extractor and model, not injected features. They
 // pin the model's agreement with the full upstream pipeline. Reproduce with
 // tests/make_vmaf_fixtures.py and build/vmaf-build/vmaf_reference as described
-// in docs/vmaf-development.md.
+// in docs/vmaf.md.
 VQM_TEST(TestVmafFloatModelReferenceVideoFrames) {
     using namespace vqm::internal;
     const VmafV061Features byte_frame{

@@ -101,11 +101,9 @@ reference. Caller-owned buffers are rebuilt because a retained mapping can
 change their contents without changing the handle. The arena stores two
 12-plane chains per level; intermediate storage is reused within the distorted
 chain and between levels. With two levels this is roughly 34 full-resolution
-float planes, plus the configured input regions and small tables. On the
-measured GPU, the 4K arena uses 1.129 GB with external inputs or 1.394 GB with
-two streaming source regions and no resident slots. Allocation sizes depend on
-the device and configuration; query the memory requirements for your worker.
-See the [memory measurements](../bench/notes/system/butter-memory.md).
+float planes, plus the configured input regions and small tables. Query
+memory requirements for the worker's device and configuration.
+[GPU memory planning](memory.md)
 
 ## Precision and the oracle
 
@@ -118,27 +116,16 @@ cases permit 0.1% relative error in both aggregates. The spatial cases cover
 streamed and cached resident inputs. Identity is exactly `0.0`. Pinned libjxl
 supplies the external accuracy comparison.
 
-The 2026-11-06 correction restores three reference operations that the earlier
-GPU implementation computed incorrectly:
+The GPU path preserves three details from libjxl that affect the score.
 
 - HF subtracts the raw blurred MF before MF's nonlinear range adjustment.
 - HF X receives `SuppressXByY` before the UHF split.
 - Four first-tap occurrences in two repeated UHF Malta directions have the
   reference's x-offset signs.
 
-The earlier two smooth 32x32 gradient comparisons, each allowing 5% error,
-did not expose these defects. Their errors had been attributed to fp32
-rounding. Full-CID22 production validation with the corrections reduces mean absolute
-score error from `0.0758241` to `0.0002853`; the worst baseline outlier moves
-from `6.87010717` to `4.13951015`, against libjxl's `4.13950586`.
-
-The remaining large residuals are MozJPEG ICC color-management differences:
-our loader ignores embedded profiles, while libjxl applies them. Removing only
-the profiles from the eight largest remaining JPEG cases preserves decoded
-pixels and reduces the largest error from `0.03281712` to `0.00024080`.
-The PNG subset's maximum error is `0.00043583`.
-See the [investigation](../bench/notes/system/butteraugli-drift.md) and
-[reproduction tools](../bench/experiments/butteraugli_drift/README.md).
+The largest residuals on CID22 come from MozJPEG ICC color management.
+VQM uses the declared source colors, while libjxl applies embedded ICC
+profiles. [Reference differences](divergence.md#butteraugli-on-cid22)
 
 Vship remains a throughput reference; its default intensity target and UHF
 weighting differ from pinned libjxl.

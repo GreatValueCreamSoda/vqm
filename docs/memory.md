@@ -92,4 +92,4 @@ by heap, including in the conservative direct/staged calculation. Do not add
 only `arena` and `staging` when estimating CVVDP memory. Still-only configurations
 with `temporal = false` allocate no histories. Construction and queries share
 one planner and reject per-buffer descriptor/index limits before allocation.
-See [CVVDP resources](cvvdp.md#resources-and-tools) for formulas and examples.
+See [CVVDP resources](cvvdp.md#resources) for formulas and examples.

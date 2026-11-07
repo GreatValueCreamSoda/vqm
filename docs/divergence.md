@@ -1,9 +1,8 @@
 # Divergence from the references
 
-Two tables: every per-stage difference between this implementation and the
-SSIMULACRA 2 reference (Cloudinary's `ssimulacra2`) and between this
-implementation and libjxl's Butteraugli. The class column says what the
-difference is, not how much it matters:
+The comparisons below distinguish deliberate score changes from differences
+in supported inputs, precision and GPU scheduling. The spatial comparison
+tables use these classes.
 
 - **exact math** -- a different but equivalent formula; contributes to the
   numeric residual only.
@@ -75,6 +74,37 @@ The 2026-11-06 production correction restores the three reference operations
 above. Earlier shaders had mean absolute score error `0.0758241`, maximum
 `2.73060131` and 466 pairs above 5% relative error. Full-CID22 production
 validation reduces these to `0.0002853`, `0.03281712` and zero pairs above 5%.
-The [investigation](../bench/notes/system/butteraugli-drift.md) records the
-cumulative ablations, independent oracle checks, ICC experiment and production
-validation. Historical reports retain their original results.
+The largest remaining errors were associated with embedded JPEG profiles.
+The ablation and ICC comparison are in Git at
+`26bdffe:bench/notes/system/butteraugli-drift.md`.
+
+## VMAF vs Netflix libvmaf
+
+VQM uses the pinned libvmaf model tables and implements float v0 features
+on the GPU. V1's ADM3 and motion3 use FP32 approximations of the reference's
+integer extractors. Conversion from general SDR inputs and optional SDR
+scaling or padding can change the feature input relative to a libvmaf run on
+native samples. The HDR model preserves 16-bit quantization in FP32 planes.
+Its GPU resampling and color conversion can round differently from zimg.
+[VMAF features, geometry and reference modes](vmaf.md#reference-differences)
+
+## ColorVideoVDP vs the original v0.5.7
+
+VQM uses the base model's calibration, bundled sensitivity table, replicated
+temporal startup, mixed-parity pyramid edge rule, and epsilon-adjusted
+pooling. VQM processes a bounded ring of converted frames and accumulates
+temporal powers incrementally. The pinned Python original processes blocks
+and retains per-frame features, so the two implementations can round
+reductions differently. VQM derives the CLI's angular density from the
+content fitted to the display. Use explicit matching pixels per degree and
+photometry for a reference comparison. The VQM API exposes the base score
+path with replicated history. [ColorVideoVDP pipeline and display model](cvvdp.md)
+
+## PSNR-HVS vs libvmaf/Xiph
+
+VQM replaces the reference's rounded integer DCT with an orthonormal FP32
+DCT and reduces weighted block errors in parallel. It retains the contrast
+sensitivity weights, masking and plane mixture. VQM pools frame errors
+before converting to dB. Libvmaf's arithmetic mean operates on frame dB
+scores, so one zero-error frame makes that mean infinite.
+[PSNR-HVS reference relationship](psnr-hvs.md#reference-relationship)

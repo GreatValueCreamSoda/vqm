@@ -8,10 +8,8 @@
 // backend (src/metrics/butteraugli/vulkan.cc), plus every constant and host-side
 // table the shaders consume. The metric is libjxl's "ButteraugliComparator" path
 // (BSD-3-Clause; .reference/libjxl/lib/jxl/butteraugli/butteraugli.cc),
-// translated here with the source line named next to every constant. Nothing is
-// copied from .reference/Vship* (MIT with a no-AI clause); those checkouts were
-// read for mechanisms only, and bench/notes/system/vship-notes.md records the
-// comparison.
+// translated here with the source line named next to every constant.
+// The .reference/Vship* checkouts were read for mechanisms only.
 //
 // Shapes, as libjxl computes them:
 //   - two levels: the base size and one 2x2 box subsample of the *linear rgb*

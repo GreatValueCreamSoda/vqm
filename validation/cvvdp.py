@@ -5,7 +5,7 @@
 CID22 is decoded once with Pillow into lossless RGB8 PNGs. Both arms consume
 those exact samples, so JPEG decoder differences cannot masquerade as metric
 error. Scores are raw tensor predictions from the original authors' v0.5.7.
-Reference dependencies are optional; see docs/cvvdp-development.md.
+Reference dependencies are optional; see validation/cvvdp.md.
 """
 
 from __future__ import annotations

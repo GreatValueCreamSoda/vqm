@@ -3,7 +3,7 @@
 # MIT; see licenses/COLORVIDEOVDP-LICENSE.
 """Generate independent raw-tensor CVVDP oracle scores and stage arrays.
 
-Run with the optional environment in docs/cvvdp-development.md. The upstream
+Run with the optional environment in validation/cvvdp.md. The upstream
 checkout is imported read-only, bytecode output is disabled, and all operations
 use CPU FP32 with one thread. No file loader or video decoder participates.
 """
@@ -26,7 +26,7 @@ sys.dont_write_bytecode = True
 ROOT = Path(__file__).resolve().parent.parent
 REFERENCE = ROOT / ".reference/ColorVideoVDP"
 DEFAULT_OUTPUT = ROOT / "tests/metrics/cvvdp/cvvdp_reference.inc"
-DEFAULT_REPORT = ROOT / "bench/notes/cvvdp/oracle-characterization.json"
+DEFAULT_REPORT = ROOT / "artifacts/reports/cvvdp/oracle-characterization.json"
 PIN = "2a268bce8d56e2f3abde46df3927d8a633707a24"
 sys.path.insert(0, str(REFERENCE))
 

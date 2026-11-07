@@ -93,9 +93,9 @@ geometry-dependent: `Ssimulacra2ChannelPruned` and `Score()` index the same way.
 A `(channel, scale)` pair is skipped when all six of its weights are `<= 0.01`
 (Vship's threshold, `.reference/Vship/src/Vulkan/ssimu2/score.hpp:3-4`); seven
 pairs qualify at six scales. The pruned norms are published as exactly zero,
-which preserves the identity. In the historical comparison, resident pair
-time fell from 2.25 to 1.21 ms and mean absolute score drift was 2.7e-4.
-[Channel-pruning validation](../bench/notes/system/vship-notes.md#channel-pruning-validation)
+which preserves the identity. Mean absolute score drift was 2.7e-4
+in the measured CID22 comparison.
+[Reference differences](divergence.md#ssimulacra-2-vs-cloudinary-ssimulacra2)
 
 The pruning decision is made per geometry with the flat indexing above, so a
 caller with a different scale count gets the reference's own behaviour.
@@ -120,11 +120,11 @@ At six scales, up to nine dispatches per pair:
   both error maps and reduces the six norm partials.
 - `reduce` x1: the 108 norms.
 
-The tile is 32x32x16 (16x32x8 on devices below the first occupancy cliff);
-shared memory is 21 120 B, which is why the 32x32 shape wins: it sits just
-under the first -13% occupancy step measured by padding the block. Pruning is
-applied in prepare, scale and reduce with the same predicate. The host sums
-the partials and takes the mean and fourth root in double.
+The scale pass selects the first tile that fits the device's compute limits.
+The 32×32 output tile uses 256 invocations and 21,120 bytes of shared memory.
+The 32×16 fallback uses 128 invocations and 13,440 bytes. Prepare, scale, and
+reduce use the same pruning predicate. The GPU sums the partials, and the host
+computes the mean and fourth root in double precision.
 
 ## Reference anchors
 

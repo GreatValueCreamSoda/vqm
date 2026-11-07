@@ -1,12 +1,13 @@
-# Reusable precision experiments
+# Benchmark probes
 
-These small probes preserve the numerical examples behind the
-[VMAF FP16 research](../notes/vmaf/research/README.md). Their source belongs in
-version control; generated JSON, CSV and diagnostic logs belong in
-`artifacts/reports/precision-examples/`. Run the commands below from the repository
-root. The Python examples require Python 3 and NumPy.
+Run these standalone diagnostics from the repository root. Save generated
+reports under `artifacts/reports/`. [Benchmark guide](../README.md)
 
-## CPU range and rounding examples
+## VMAF precision
+
+The CPU examples require Python 3 and NumPy.
+
+### CPU range and rounding examples
 
 ```sh
 python3 bench/experiments/vmaf_precision_examples.py
@@ -35,7 +36,7 @@ rounding, denormal handling and the production shader's arithmetic may differ.
 These examples illustrate numerical failure modes; they are not independent
 reference oracles or performance measurements.
 
-## GPU sequence feature probe
+### GPU sequence feature probe
 
 `vmaf_precision_probe.cc` emits six-frame synthetic sequences for both VMAF
 implementations at 8, 10, 12 and 16 bits. Its six scenes exercise flat low-bit
@@ -79,39 +80,78 @@ Use that arm when comparing arithmetic: saturated scores can hide feature
 errors. The default retains the original clipped probe behavior; compare
 like-for-like settings.
 
-## Provenance and historical reproduction
+## Cooperative matrices
 
-These helpers were promoted from the local `build/reports/vmaf-fp16/` study:
+The Vulkan probe checks FP16 operands with FP32 accumulators and results
+for the three tested subgroup shapes. It requires a C++20 compiler,
+Vulkan headers and loader, `glslc`, `spirv-val`, and `spirv-dis`.
+Pass `--build-only` to compile and validate the shader modules without a
+GPU, or `--validation` to run with the Khronos validation layer.
+The NumPy examples isolate operand rounding and covariance error.
 
-| Maintained helper | Original report-relative path |
-| --- | --- |
-| `vmaf_precision_probe.cc` | `sequence_probe.cc` |
-| `vmaf_precision_examples.py` | `experiments/vif-adm-numerics.py` |
-| `vmaf_motion_precision.py` | `motion/cpu_precision_examples.py` |
+```sh
+.venv/bin/python bench/experiments/cooperative_matrix/run_platform.py
+.venv/bin/python bench/experiments/cooperative_matrix/speed_numerics.py
+.venv/bin/python bench/experiments/cooperative_matrix/feature_numerics.py
+```
 
-The promotion reorganized the code for readability and moved generated outputs
-out of the source tree. Both CPU scripts reproduced the original substantive
-JSON exactly when relocated. The associated research notes preserve the
-historical hardware, build settings, measurements and rejected approaches.
-Historical baseline executables, patched shader paths and raw commands in those
-notes describe their original experiments; they are not prerequisites for these
-current-tree recipes. Recreating an experimental comparison requires the source
-revision and variant described in its research note.
+## Butteraugli score drift
 
-The [cooperative-matrix tools](cooperative_matrix/README.md) extend this work to
-FP16 operands with FP32 matrix accumulation, including a private-device probe,
-CPU conditioning examples and isolated SpEED variants.
+### Checker pair and independent oracle
 
-The [SpEED parallelism tools](speed_parallelism/README.md) preserve diagnostic
-timestamp brackets, subgroup and phased solver trials, the historical matrix
-stress generator, and compatibility comparisons.
+Run from the repository root after the Release build. The generator uses
+Pillow and writes a deterministic 64×64 checker pair with a tab-separated
+list of absolute paths.
 
-The [VMAF v1 headroom tools](v1_headroom/README.md) reproduce CAMBI storage,
-tile, pooling and synchronization trials, including the retained subgroup
-pipeline and an exact patch for reconstructing its pre-change baseline.
+```sh
+mkdir -p artifacts/reports
+probe_dir=$(mktemp -d "$PWD/artifacts/reports/butteraugli-drift.XXXXXX")
+.venv/bin/python bench/experiments/butteraugli_drift/make_checker.py \
+  --out-dir "$probe_dir"
+c++ -O3 -std=c++20 -Iinclude -Isrc -Itools/image_io \
+  -Itests/metrics/butteraugli \
+  bench/experiments/butteraugli_drift/oracle_probe.cc \
+  tests/metrics/butteraugli/butter_ref.cc build/libvqm_io.a build/libvqm_core.a \
+  -lpng -lz -ljpeg -lvulkan -pthread -o "$probe_dir/oracle_probe"
+"$probe_dir/oracle_probe" --pairs-file "$probe_dir/checker.pairs"
+./build/vqm_bench --metric butteraugli --pairs-file "$probe_dir/checker.pairs" \
+  --score-only --iterations 1 --warmup 0
+```
 
-The [Butteraugli drift tools](butteraugli_drift/README.md) preserve isolated
-frequency/Malta correction patches, a deterministic checker pair generator,
-an independent CPU oracle runner and the JPEG ICC isolation probe.
+The oracle accepts opaque integer RGB or grayscale PNG/JPEG and prints both
+the diffmap maximum and `distance_p3`. It uses the image decoder's declared
+sRGB interpretation.
 
-- [`cvvdp/`](cvvdp/README.md): compare planned and actual CVVDP auxiliary allocations across geometry/frame-rate limits.
+### JPEG ICC isolation
+
+`strip_jpeg_icc.py` removes ICC APP2 segments before the first JPEG scan,
+copies the scan bytes unchanged, and requires a new output path. Compare
+the same original against the embedded-profile and stripped JPEGs, keeping
+all other inputs and settings fixed. Verify that both JPEGs decode to the
+same pixels before attributing a score change to the profile.
+
+```sh
+.venv/bin/python bench/experiments/butteraugli_drift/strip_jpeg_icc.py \
+  embedded.jpg "$probe_dir/no-icc.jpg"
+```
+
+## CVVDP memory
+
+`memory_probe.cc` compares queried Vulkan buffer requirements to actual
+allocations at 1080p and 4K, each at 24/30/60/120 fps. It counts individual
+temporal allocations, including their memory type and heap, and constructs only
+one pipeline at a time. Device-limit rejection is reported separately from
+allocation failures, which fail the process. A successful query does not promise
+enough available VRAM. The 4K120 case can require roughly 7 GiB.
+
+From the repository root, after a release build:
+
+```sh
+c++ -std=c++20 -O2 -Iinclude bench/experiments/cvvdp/memory_probe.cc \
+  build/libvqm_core.a -lvulkan -o build/cvvdp_memory_probe
+./build/cvvdp_memory_probe
+```
+
+Use a separate machine/device-specific result file under `artifacts/reports/`.
+The reference guide describes the numerical oracles and compatibility limits.
+[CVVDP reference validation](../../validation/cvvdp.md)

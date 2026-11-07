@@ -333,8 +333,7 @@ VQM_TEST(TestButterMappedReferenceMutation) {
 // gives GPU 3.77568078 / 2.92297296 against oracle 3.775690714 / 2.922971662;
 // gradient_C gives GPU 2.95148849 / 2.35224729 against oracle
 // 2.951491534 / 2.352248402. The former percent-scale residual came from
-// frequency separation and Malta errors, not ordinary fp32 rounding; see
-// bench/notes/system/butteraugli-drift.md.
+// frequency separation and Malta errors. See docs/divergence.md.
 //
 // libjxl cross-check (built from .reference/libjxl with highway/lcms/skcms/
 // sjpeg, jxl-internal, one driver calling ButteraugliInterface directly): the
@@ -389,7 +388,7 @@ VQM_TEST(TestButterSpatialTransposedOddTiles) {
 
 // This implementation's own numbers for the fixtures, so a change that moves
 // them is deliberate. Measured after correcting frequency separation and Malta;
-// see bench/notes/system/butteraugli-drift.md for the comparison provenance.
+// see docs/divergence.md for the reference comparison.
 VQM_TEST(TestButterGoldens) {
     if (!vqm::test::GpuAvailable()) return;
     const Image a = vqm::test::MakeGradient(0);

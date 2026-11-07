@@ -42,10 +42,9 @@ syntax. Use the equivalent paths and commands for your environment.
   ownership under `tests/metrics/`.
 - `bench/driver/` owns the timed benchmark, `bench/inmemory/` the reference
   drivers, and `bench/experiments/` reusable research probes.
-  `bench/notes/` records results and compact supporting evidence.
 - `tools/` owns setup and reference builds. `validation/` owns CID22 and hosted
-  video preparation and correlation. Current guides, design records, and
-  repository audits live in [docs](docs/README.md).
+  video preparation and correlation. Metric guides and implementation
+  documentation live in [docs](docs/README.md).
 
 Keep files and directories organized by responsibility. Roughly 500–1,000
 lines per implementation file and 5–10 files per directory are guidelines.
@@ -61,12 +60,30 @@ them. Keep ownership, synchronization, cached state, and buffer lifetimes
 close to the code that uses them. Preserve independent test and reference
 oracles, metric arithmetic, and measured hot-path behavior during refactors.
 
+## Documentation, tests, and experiments
+
+- Keep `docs/` focused on how the metrics work, how VQM implements them, and
+  where its behavior or scores diverge from the pinned references. Put active
+  build, benchmark, and validation instructions with their workflows.
+- Fold durable findings into the metric guides or the active validation workflow.
+  Remove superseded plans, audits, development logs, and duplicate summaries
+  once the current documentation covers their lasting conclusions. Use Git
+  history for retired material.
+- Keep tests that cover current behavior or independent reference contracts.
+  Consolidate overlapping cases and remove tests that exercise retired
+  prototypes. Preserve distinct coverage when merging tests.
+- Keep benchmark probes that run against the current tree or reproduce
+  maintained reference evidence. Keep `bench/` for runnable tools and concise
+  usage guides. Store generated reports, test results, and experiment logs
+  under ignored `artifacts/reports/`. Retire one-off prototype installers
+  and use Git history for historical reproduction.
+
 ## Workspace files and retention
 
 | Location | Retention |
 | --- | --- |
 | Source, headers, shaders, CMake files, editor defaults, docs, scripts, tests, and license notices | Keep in version control. Use ignored `CMakeUserPresets.json` for local CMake overrides. |
-| Checked-in model `.inc` tables, oracle fixtures, and compact research evidence | Keep as reproducible maintained inputs and evidence. |
+| Checked-in model `.inc` tables, oracle fixtures, and frozen validation policies | Keep as maintained inputs beside their owning tests or workflows. |
 | `build/` and `build-*/` | Regenerable CMake outputs, binaries, copied reference build trees, and fixtures. Check for unique work before cleaning. |
 | `.venv/` | Ignored managed Python environment. Preserve existing environments during setup and ordinary cleanup. |
 | `.reference/`, `validation/data/`, and `validation/download/` | Read-only pinned checkouts and external corpus files. Keep during ordinary build cleanup. |
@@ -80,11 +97,8 @@ output paths when working out of tree. Keep copied reference build inputs
 and binaries in the selected build directory.
 
 Before cleaning, inspect builds for authored notes, patches, and one-off
-experiments. Record useful research in `bench/notes/` with its question,
-method, device, driver, build, inputs, results, limitations, and rejected
-approaches. Keep compact evidence with the notes and reusable probes in
-`bench/experiments/`. Preserve historical commands, data, and provenance when
-relocating evidence.
+experiments. Record the workload, device, driver, build, inputs, and
+limitations with local benchmark results under `artifacts/reports/`.
 
 ## Build
 
@@ -135,7 +149,7 @@ python3 tools/build_references.py --only cloudinary
 
 `tools/fetch_references.py --check --only NAMES` verifies selected inputs
 offline. For CVVDP reference setup and model regeneration, follow
-[CVVDP development](docs/cvvdp-development.md). After fetching the pinned
+[CVVDP reference validation](validation/cvvdp.md). After fetching the pinned
 original and provisioning its environment, `tools/generate_cvvdp_tables.py`
 regenerates the maintained tables and `--check` verifies the existing tables.
 
@@ -145,7 +159,7 @@ Use the [benchmark guide](bench/README.md) to select a workload.
 `vqm_bench` uses the timing-enabled core and reports stages, scores, and
 checksums. `vqm` and the installed core use the untimed library. Keep decode,
 upload, core, stage, and whole-process timing boundaries distinct.
-See [Performance methodology](docs/performance.md).
+See [Performance methodology](bench/performance.md).
 
 - Record the baseline commit before the change. Build it separately in a
   detached worktree. Use a unique worktree directory and a separate build
@@ -159,7 +173,7 @@ See [Performance methodology](docs/performance.md).
 - SSIMULACRA 2 alternates pre-uploaded copies of the original to force full
   preparation of both images. Butteraugli can reuse the prepared reference.
   `--resident-ring N` bounds the repeated working set and is a separate workload.
-  See [Resident ring measurements](bench/notes/system/resident-ring.md).
+  See [Performance methodology](bench/performance.md#protocol).
 - Inspect scores, checksums, and stage tables for every run. Checksums include
   warmups and timed calls. Workers warm up separately before sharing the
   timed call count. Alpha latency arms time the dark background and check the
@@ -226,7 +240,7 @@ stage median by at least 2% while meeting the correctness gates.
    pairs per metric for SSIMULACRA 2, Butteraugli, VMAF v0, VMAF v1, and CVVDP.
    Record each outcome with correlation, coverage, and numerical diagnostics.
    Partial runs retain their metric selection. Use the exact spatial and
-   temporal representations in the [video validation guide](docs/temporal-validation.md).
+   temporal representations in the [video validation guide](validation/temporal/README.md).
    Keep independent HDR, high-bit-depth, alternate-display, alternate-model,
    and extreme-rate oracles where applicable. Use direct API tests for temporal
    arithmetic, ownership, synchronization, and lifecycle contracts.
@@ -236,8 +250,7 @@ stage median by at least 2% while meeting the correctness gates.
    rules before retiring another numerical gate. Document recalibration,
    revised score interpretation, and measured results while preserving
    identity, component oracles, and existing thresholds. See
-   [Ranking policy](docs/design/ranking-default-gates.md) and
-   [Validation](docs/validation.md).
+   [Qualified score gates](validation/README.md#qualified-score-gates).
 
 ## Invariants a change must not break
 
@@ -295,10 +308,3 @@ for the inputs and report destination. Counter collection depends on the
 device, driver, and local permissions. Keep system policy changes outside
 the repository workflow. Use the built-in stage timers when the gateway or
 counters are unavailable.
-
-## Historical benchmark results
-
-Historical RTX 5070 timings, profiler observations, occupancy tests, and
-rejected optimizations are recorded with the
-[Vship comparison](bench/notes/system/vship-notes.md). Match the device, build,
-workload, and timing boundaries before comparing those figures to a new run.

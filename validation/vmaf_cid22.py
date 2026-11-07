@@ -6,8 +6,7 @@
 Inputs are cached as planar YUV444P10LE so another implementation can consume
 exactly the same bytes. Each pair is an independent one-frame sequence. This
 is a still-image experiment: temporal features, including motion, are zero.
-See docs/vmaf-development.md for setup and bench/notes/vmaf/vmaf-reference.md
-for the recorded CID22 comparison.
+See validation/vmaf.md for setup and comparison commands.
 """
 
 import argparse

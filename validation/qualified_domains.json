@@ -5,7 +5,7 @@
       "domain_id": "hosted-sdr-smoke-ssimulacra2",
       "reference_file": "temporal/oracles/smoke/ssimulacra2.json",
       "policy_file": "temporal/oracles/smoke/ssimulacra2-policy.json",
-      "evidence": "bench/notes/system/all-metric-reference-correlation.md",
+      "evidence": "validation/README.md",
       "identity": {
         "metric": "ssimulacra2",
         "reference_revision": "81feacf6a5b0bbd7ec11b4a881a4615033ab0b10",
@@ -20,7 +20,7 @@
       "domain_id": "hosted-sdr-smoke-butteraugli",
       "reference_file": "temporal/oracles/smoke/butteraugli.json",
       "policy_file": "temporal/oracles/smoke/butteraugli-policy.json",
-      "evidence": "bench/notes/system/all-metric-reference-correlation.md",
+      "evidence": "validation/README.md",
       "identity": {
         "metric": "butteraugli",
         "reference_revision": "e47d2a2b5bb418f2947ce07f36cb048861db3820",
@@ -35,7 +35,7 @@
       "domain_id": "hosted-sdr-smoke-vmaf-v0",
       "reference_file": "temporal/oracles/smoke/vmaf-v0.json",
       "policy_file": "temporal/oracles/smoke/vmaf-v0-policy.json",
-      "evidence": "bench/notes/system/all-metric-reference-correlation.md",
+      "evidence": "validation/README.md",
       "identity": {
         "metric": "vmaf-v0",
         "reference_revision": "4611e47a7330cd342498dcc130e1008efbeab6e4",
@@ -50,7 +50,7 @@
       "domain_id": "hosted-sdr-smoke-vmaf-v1",
       "reference_file": "temporal/oracles/smoke/vmaf-v1.json",
       "policy_file": "temporal/oracles/smoke/vmaf-v1-policy.json",
-      "evidence": "bench/notes/system/all-metric-reference-correlation.md",
+      "evidence": "validation/README.md",
       "identity": {
         "metric": "vmaf-v1",
         "reference_revision": "4611e47a7330cd342498dcc130e1008efbeab6e4",
@@ -65,7 +65,7 @@
       "domain_id": "hosted-sdr-smoke-cvvdp",
       "reference_file": "temporal/oracles/smoke/cvvdp.json",
       "policy_file": "temporal/oracles/smoke/cvvdp-policy.json",
-      "evidence": "bench/notes/system/all-metric-reference-correlation.md",
+      "evidence": "validation/README.md",
       "identity": {
         "metric": "cvvdp",
         "reference_revision": "2a268bce8d56e2f3abde46df3927d8a633707a24",
@@ -80,7 +80,7 @@
       "domain_id": "hosted-sdr-qualification-ssimulacra2",
       "reference_file": "temporal/oracles/qualification/ssimulacra2.json",
       "policy_file": "temporal/oracles/qualification/ssimulacra2-policy.json",
-      "evidence": "bench/notes/system/all-metric-reference-correlation.md",
+      "evidence": "validation/README.md",
       "identity": {
         "metric": "ssimulacra2",
         "reference_revision": "81feacf6a5b0bbd7ec11b4a881a4615033ab0b10",
@@ -95,7 +95,7 @@
       "domain_id": "hosted-sdr-qualification-butteraugli",
       "reference_file": "temporal/oracles/qualification/butteraugli.json",
       "policy_file": "temporal/oracles/qualification/butteraugli-policy.json",
-      "evidence": "bench/notes/system/all-metric-reference-correlation.md",
+      "evidence": "validation/README.md",
       "identity": {
         "metric": "butteraugli",
         "reference_revision": "e47d2a2b5bb418f2947ce07f36cb048861db3820",
@@ -110,7 +110,7 @@
       "domain_id": "hosted-sdr-qualification-vmaf-v0",
       "reference_file": "temporal/oracles/qualification/vmaf-v0.json",
       "policy_file": "temporal/oracles/qualification/vmaf-v0-policy.json",
-      "evidence": "bench/notes/system/all-metric-reference-correlation.md",
+      "evidence": "validation/README.md",
       "identity": {
         "metric": "vmaf-v0",
         "reference_revision": "4611e47a7330cd342498dcc130e1008efbeab6e4",
@@ -125,7 +125,7 @@
       "domain_id": "hosted-sdr-qualification-vmaf-v1",
       "reference_file": "temporal/oracles/qualification/vmaf-v1.json",
       "policy_file": "temporal/oracles/qualification/vmaf-v1-policy.json",
-      "evidence": "bench/notes/system/all-metric-reference-correlation.md",
+      "evidence": "validation/README.md",
       "identity": {
         "metric": "vmaf-v1",
         "reference_revision": "4611e47a7330cd342498dcc130e1008efbeab6e4",
@@ -140,7 +140,7 @@
       "domain_id": "hosted-sdr-qualification-cvvdp",
       "reference_file": "temporal/oracles/qualification/cvvdp.json",
       "policy_file": "temporal/oracles/qualification/cvvdp-policy.json",
-      "evidence": "bench/notes/system/all-metric-reference-correlation.md",
+      "evidence": "validation/README.md",
       "identity": {
         "metric": "cvvdp",
         "reference_revision": "2a268bce8d56e2f3abde46df3927d8a633707a24",
@@ -155,7 +155,7 @@
       "domain_id": "cid22-balanced-ssimulacra2",
       "reference_file": "fixtures/cid22-balanced/ssimulacra2-original.json",
       "policy_file": "fixtures/cid22-balanced/ssimulacra2-policy.json",
-      "evidence": "bench/notes/system/ranking-temporal-validation-results.md",
+      "evidence": "validation/fixtures/cid22-balanced/README.md",
       "identity": {
         "metric": "ssimulacra2",
         "reference_revision": "81feacf6a5b0bbd7ec11b4a881a4615033ab0b10",
@@ -170,7 +170,7 @@
       "domain_id": "cid22-balanced-butteraugli",
       "reference_file": "fixtures/cid22-balanced/butteraugli-original.json",
       "policy_file": "fixtures/cid22-balanced/butteraugli-policy.json",
-      "evidence": "bench/notes/system/ranking-temporal-validation-results.md",
+      "evidence": "validation/fixtures/cid22-balanced/README.md",
       "identity": {
         "metric": "butteraugli",
         "reference_revision": "e47d2a2b5bb418f2947ce07f36cb048861db3820",

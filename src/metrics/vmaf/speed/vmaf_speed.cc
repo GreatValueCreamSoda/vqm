@@ -183,9 +183,8 @@ void VmafSpeedStats::Record(
     runtime_->Dispatch(pipelines_[0], &pc, sizeof(pc), 50 * channels, 1, 1);
     runtime_->ComputeBarrier();
     pc.op = 1;
-    // Each 25x25 symmetric matrix has 325 independent covariance entries.
-    // Unlike the earlier serial-entry symmetry experiment documented in
-    // bench/notes/vmaf/vmaf-v1-optimization.md, each entry now has 64 lanes.
+    // Each 25x25 symmetric matrix has 325 independent covariance entries,
+    // each reduced by a 64-lane workgroup.
     runtime_->Dispatch(pipelines_[0], &pc, sizeof(pc), 650 * channels, 1, 1);
     runtime_->ComputeBarrier();
     runtime_->Dispatch(pipelines_[1], &pc, sizeof(pc), 2 * channels, 2, 1);

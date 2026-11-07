@@ -1,6 +1,6 @@
 # VQM documentation
 
-The main README covers the build, command line and library quick start.
+The project README covers CLI usage and score interpretation.
 [Project README](../README.md)
 
 ## Metrics
@@ -9,70 +9,19 @@ The main README covers the build, command line and library quick start.
 | --- | --- |
 | SSIMULACRA 2.1 | [Pipeline, norms and score mapping](ssimulacra2.md) |
 | Butteraugli | [Diffmap, two spatial levels and final score](butteraugli.md) |
-| VMAF v0.6.1 and v1 SDR/HDR | [Sequence APIs, viewing presets and reference checks](vmaf-development.md) |
-| ColorVideoVDP v0.5.7 | [Image and video API, viewing conditions and JOD](cvvdp.md) · [Reference implementation and oracles](cvvdp-development.md) |
-| FP32 PSNR-HVS | [Native YUV inputs, dB scores and qualification status](psnr-hvs.md) |
+| VMAF v0.6.1 and v1 SDR/HDR | [Features, model presets and sequence processing](vmaf.md) |
+| ColorVideoVDP v0.5.7 | [Perceptual pipeline, viewing conditions and JOD](cvvdp.md) |
+| FP32 PSNR-HVS | [Native YUV inputs, contrast masking and dB pooling](psnr-hvs.md) |
 
-## Library and development
+## Implementation
 
-| Topic | Guide |
-| --- | --- |
-| C++ API and input layouts | [API and implementation reference](reference.md) |
-| Unified still-image and sequence API | [Metrics](metrics.md) |
-| GPU allocations and worker sizing | [Memory planning](memory.md) |
-| Shared spatial scratch storage | [Shared workspace](shared-workspace.md) |
-| Borrowed buffers, devices and queues | [Vulkan synchronization](vulkan-synchronization.md) |
-| Repository layout and component ownership | [Architecture](architecture.md) |
-| Local tests, sanitizers and formatting | [Contributing](../CONTRIBUTING.md) |
-
-## Design records
-
-These dated records capture the original scope, design choices and acceptance
-criteria. The guides above describe the current APIs and workflows.
-
-| Date | Record |
-| --- | --- |
-| 2026-11-05 | [ColorVideoVDP implementation](design/cvvdp-implementation-plan.md) · [Integration review](design/cvvdp-integration-review.md) · [Original and MATLAB review](design/cvvdp-matlab-review.md) · [Vship source review](design/cvvdp-vship-review.md) |
-| 2026-11-06 | [PSNR-HVS implementation](design/psnr-hvs-implementation-plan.md) |
-| 2026-11-06 | [Ranking agreement and temporal validation](design/ranking-and-temporal-validation-plan.md) · [Adopted ranking defaults](design/ranking-default-gates.md) |
-
-## Repository audits
-
-- [Correctness and organization audit](audits/audit-correctness-readability.md)
-- [Detailed code, structure and correctness review](audits/multi-angle-review.md)
-- [GitHub readiness audit](audits/github-readiness-audit-20261106.md)
-
-## Reference correlation
-
-The hosted qualification matrix uses pinned independent originals for
-SSIMULACRA 2, Butteraugli, VMAF v0, VMAF v1 and CVVDP. Run it after building
-the CLI and preparing the Python environment described in the main README.
-
-```sh
-.venv/bin/python -m validation.temporal.run --profile qualification
-```
-
-The qualification profile covers 390 complete clip pairs per metric.
-`--profile smoke` selects 39 pairs per metric. The aggregate `summary.json`
-records correlation, coverage, numerical diagnostics and the gate outcome for
-each selected metric. Use the workflow guide for input formats, frozen scores
-and ranking policies. [Hosted video validation](temporal-validation.md)
-
-The CID22 workflows provide separate still-image and human-rating evidence.
-Metric-specific differences from the originals are documented separately.
-[Validation guide](validation.md) · [Reference differences](divergence.md)
-
-## Measurements
-
-Start with the benchmark guide for local stage timing, complete clips and
-peer comparisons. The methodology guide describes timing boundaries and
-workload selection. [Benchmark guide](../bench/README.md) ·
-[Performance methodology](performance.md)
-
-Raw reports go under `artifacts/reports/`. Dated results, research conclusions
-and reproduction instructions live in the versioned archive. Reusable
-probes have their own index. [Research and measurement archive](../bench/notes/README.md) ·
-[Experiments](../bench/experiments/README.md)
+- [Reference differences](divergence.md)
+- [Image formats and Vulkan implementation](reference.md)
+- [Unified metrics and frame alignment](metrics.md)
+- [Component ownership](architecture.md)
+- [GPU memory planning](memory.md)
+- [Shared spatial scratch](shared-workspace.md)
+- [Vulkan synchronization](vulkan-synchronization.md)
 
 ## Provenance
 

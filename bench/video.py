@@ -218,7 +218,7 @@ def preflight() -> dict[str, object]:
     if missing:
         raise RuntimeError(
             "missing prerequisites: " + ", ".join(missing) +
-            "; install the system tools listed in docs/temporal-validation.md"
+            "; install the system tools listed in validation/temporal/README.md"
         )
     tools = {
         name: {

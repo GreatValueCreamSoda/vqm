@@ -3,7 +3,7 @@
 # MIT; see licenses/COLORVIDEOVDP-LICENSE.
 """Generate ColorVideoVDP base calibration and CSF tables from pinned originals.
 
-Use the reference-only environment described in docs/cvvdp-development.md.
+Use the reference-only environment described in validation/cvvdp.md.
 The generated tables are checked in; normal builds do not need Python/Torch or
 an upstream checkout. Torch is used only to reproduce the original FP32 log
 axes, including their rounding.

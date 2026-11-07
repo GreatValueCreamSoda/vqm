@@ -32,6 +32,3 @@ Before constructing the workspace, pass the same `SharedMetricConfig` to
 `GetMemoryRequirements()` in `vqm_memory.h`; see [memory planning](memory.md).
 VMAF v0 and v1 keep temporal state between frames and are not included in this
 workspace; their individual pipelines remain separate.
-
-The [shared-memory report](../bench/notes/system/shared-memory.md) records
-measured memory requirements, serial throughput and correctness comparisons.

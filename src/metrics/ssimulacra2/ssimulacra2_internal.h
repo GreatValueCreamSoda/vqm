@@ -59,9 +59,7 @@ constexpr std::size_t BlurNorm(std::size_t channel, std::size_t norm) {
 // why the mask has to be rebuilt per geometry. One workgroup here produces all
 // six norms of a pair at once, so the pair is the unit we can drop -- that is
 // what this answers, and BuildChannelMasks in src/metrics/ssimulacra2/vulkan.cc
-// is its only caller. No peer source is copied: Vship is MIT with a non-AI
-// clause, and bench/notes/system/vship-notes.md records the comparison and the
-// measurements.
+// is its only caller. Vship was consulted for the mechanism only.
 bool Ssimulacra2ChannelPruned(
     std::size_t channel, std::size_t scale, std::size_t scales
 );

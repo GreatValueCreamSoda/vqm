@@ -26,6 +26,17 @@ Each scored plane must be at least 8x8. Minimum image sizes are 16x16 for
 chroma subsampling; they need not be multiples of 8 or 7. Complete 8x8 windows
 are visited with stride 7. Pixels beyond the final complete window are ignored.
 
+## Frequency weighting and masking
+
+VQM transforms each block in both images with a separable 8×8 DCT. Each
+coefficient has a plane-specific contrast-sensitivity weight. The mask is
+estimated from the AC energy and the ratio of local to whole-block variance
+in each image. For AC coefficients, the larger of the two masking strengths
+sets the threshold for visible error. The DC difference is scored directly.
+Vulkan workgroups reduce the squared weighted errors, then the pipeline
+normalizes each plane before combining the errors and converting to dB.
+[Block shader](../src/metrics/psnr_hvs/shaders/psnr_hvs_blocks.comp)
+
 ## Standalone API
 
 ```cpp
@@ -106,22 +117,8 @@ mean infinite. VQM's CLI pools the underlying frame errors.
 [Extractor](https://github.com/Netflix/vmaf/blob/4611e47a7330cd342498dcc130e1008efbeab6e4/libvmaf/src/feature/third_party/xiph/psnr_hvs.c#L326-L375)
 and [feature pooling](https://github.com/Netflix/vmaf/blob/4611e47a7330cd342498dcc130e1008efbeab6e4/libvmaf/src/libvmaf.c#L1100-L1136).
 
-Future qualification will measure direct ranking agreement against the
-pinned reference on frozen input domains. Ranking qualification and validation
-tool integration have not yet been performed; no corpus-wide ranking agreement
-is claimed by this addition.
-
-The original native-input and FP32 requirements are recorded in the
-[implementation plan](design/psnr-hvs-implementation-plan.md).
-
 The local `vqm_test` suite includes independent closed-form DC and
 single-frequency masking checks, all supported depth/subsampling combinations,
 identity, staged and resident inputs, reduction, frame alignment and lifecycle
 contracts in [the PSNR-HVS tests](../tests/metrics/psnr_hvs/pipeline_test.cc).
-These component checks do not establish corpus ranking agreement.
-
-The [resident throughput report](../bench/notes/psnr_hvs/resident-throughput-20261106.md)
-records five-run 1080p/4K timing, spread, stages and allocation provenance.
-The subsequent [optimization report](../bench/notes/psnr_hvs/optimization-20261106.md)
-records the interleaved timings, the matched SSIMULACRA 2 comparison and the
-qualification limits of that experiment.
+Published reference comparisons for PSNR-HVS cover these component checks.

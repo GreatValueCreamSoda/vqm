@@ -6,13 +6,39 @@ higher is better, identical inputs score exactly **10**, and negative scores
 are valid. A clip score pools distortion over the whole clip before converting
 to JOD; it is not an average of per-frame JOD scores.
 
-The pinned original is the numerical reference. Its MATLAB entry point wraps
-Python. Vship informed the design research and is a separate comparison target;
-its temporal, masking and boundary choices differ from the original. No Vship
-implementation code is included. The original model data and attribution ship
-with the library. Current checks and measured limits are in the
-[implementation report](../bench/notes/cvvdp/cvvdp-implementation.md). See [reference reproduction](cvvdp-development.md) and the
-[original design plan](design/cvvdp-implementation-plan.md).
+The numerical reference is the pinned Python implementation at
+`2a268bce8d56e2f3abde46df3927d8a633707a24`. Its MATLAB entry point
+wraps that same implementation. VQM embeds its base calibration and
+contrast sensitivity data. [Reference reproduction](../validation/cvvdp.md)
+
+## Perceptual pipeline
+
+1. Convert each input to absolute display light and then to three DKL
+   opponent channels for achromatic, red–green, and yellow–violet contrast.
+2. For video, apply causal FIR filters to the current frame and its history.
+   Three channels carry sustained responses and a fourth carries transient
+   achromatic response. The odd filter length is `2 * ceil(fps / 8) + 1`.
+   Replicate the first frame into missing history and filter it as part of
+   the clip. Still images use the three opponent channels directly.
+3. Build Gaussian and Laplacian pyramids. The number of bands depends on
+   geometry and pixels per degree. Compute Weber contrast against the
+   coarser sustained luminance and evaluate the contrast sensitivity
+   function using the reference's background adaptation. Mutual masking
+   reduces the visibility of differences around existing contrast. The
+   lowest-frequency band uses its own unmasked response.
+4. Pool spatial errors within each band with exponent 2, then pool weighted
+   bands and channels with exponent 4. Apply the original still-image
+   correction for a single frame. For video, pool the frame distortions with
+   a normalized exponent-2 reduction. The original uses epsilon-adjusted
+   powers in these reductions. Convert the resulting distortion to JOD once.
+
+The Vulkan passes convert color, filter the temporal rings, build pyramids,
+and reduce band errors. The host applies the final band and channel weights
+and keeps a running sum of the temporal powers. This bounds storage
+independently of clip length. The implementation keeps the original
+mixed-parity right-edge pyramid rule, including on odd rectangular inputs.
+[Vulkan pipeline](../src/metrics/cvvdp/cvvdp_pipeline.cc) ·
+[Pooling and model arithmetic](../src/metrics/cvvdp/cvvdp_model.cc)
 
 ## Images and clips
 
@@ -125,7 +151,7 @@ mixed-parity pyramid edge behavior is retained for v0.5.7 compatibility. Some
 uniform luminance changes are invariant under the original contrast model;
 identity-score expectations should not be generalized to arbitrary content.
 
-## Resources and tools
+## Resources
 
 Temporal history is bounded by geometry and frame rate, independent of clip
 length. The two FP32 three-channel rings alone use
@@ -151,8 +177,6 @@ with this implementation. Disable temporal storage for still-only work.
 ./build/vqm --metric cvvdp --json --pairs-file pairs.tsv
 ./build/vqm --metric cvvdp --cvvdp-peak 1500 --cvvdp-contrast 1000000 --cvvdp-ambient 10 \
   --input-transfer st2084 --input-primaries bt2020 --input-matrix bt2020ncl original.y4m distorted.y4m
-./build/vqm_bench --metric cvvdp --pair original.png distorted.png \
-  --iterations 20 --warmup 3 --resident 2
 ```
 
 The CLI consumes an entire progressive Y4M stream with matched rational timing,
@@ -171,24 +195,5 @@ pooling across the clip. The clip score pools the frame distortions first,
 then converts the pooled distortion to JOD. A one-frame input uses the image
 JOD for its frame and clip scores.
 
-Run the hosted smoke profile for CVVDP through the public CLI:
-
-```sh
-.venv/bin/python -m validation.temporal.run --profile smoke --metrics cvvdp
-```
-
-Its canonical full-resolution Y4M 4:4:4 inputs have the same pinned YUV bytes in
-both arms. The original reference converts those samples independently on the
-CPU. The CLI performs its normal GPU input conversion. The registered profile
-requires ranking agreement and reports numerical clip-score differences.
-Add `--gate-mode both` to require the numerical limits too. Source and display
-settings, reference records and ranking policy are documented in
-[temporal validation](temporal-validation.md).
-
-`vqm_bench` uses independent images by default. Its `--cvvdp-video` stage-profiling
-mode also accepts ordered Y4M clips and labels frame and clip work units
-separately. It rejects interlaced input and invalid frame rates. The reader
-uses coded pixel geometry and ignores the Y4M sample aspect ratio. Resample
-non-square inputs before scoring if display geometry requires it. The core
-library takes decoded frames and has no Python, PyTorch, MATLAB or FFmpeg
-dependency.
+The Y4M reader uses coded pixel geometry and ignores the sample aspect ratio.
+Resample non-square inputs before scoring if display geometry requires it.

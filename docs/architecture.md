@@ -119,14 +119,3 @@ test-only variants without changing production shaders.
 
 The canonical executables are `vqm`, `vqm_bench` and `vqm_test`.
 Only `vqm_bench` links the core built with stage timing.
-
-Design decisions and their source reviews live in `docs/design/`. Repository-wide
-audits live in `docs/audits/`. Benchmark and qualification evidence lives in
-`bench/notes/`, with reusable probes under `bench/experiments/`. Scripts create
-ignored `artifacts/reports/` for raw local results and `.cache/` for generated
-benchmark pairs and corpus conversions as needed. The `build/` and
-`build-*/` directories contain disposable build outputs, including copied
-reference build trees and generated fixtures. No unique research document or
-required maintained source belongs there. See the complete
-[workspace retention policy](../AGENTS.md#workspace-files-and-retention) before
-cleaning a workspace.
