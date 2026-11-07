@@ -10,33 +10,10 @@ JPEG and progressive YUV4MPEG2 clips.
 [Build](#build) · [Command line](#command-line) · [C++ library](#c-library) ·
 [Benchmarks](#benchmark) · [Documentation](docs/README.md)
 
-- **SSIMULACRA 2:** higher scores are better; identical images score 100 on a
-  discrete GPU. Scores may be negative.
-- **Butteraugli:** lower scores are better; identical images score 0. The
-  reported score is the maximum of the distance map. See the [Butteraugli
-  guide](docs/butteraugli.md) for reference agreement and input-profile limits.
-- **VMAF v0.6.1:** a sequence-aware perceptual score; higher is better. VQM
-  implements the 211-support-vector 1080p/3H and 262-support-vector 4KTV/1.5H
-  float predictors, with NEG and phone-transform options. Its SDR inputs can be
-  converted on the GPU to coded YUV.
-- **VMAF v1:** SDR v1.0.16 at 1080p 3H, 4K 1.5H, 4K 3H, or phone 5H, plus
-  HDR v1.1.8 at 4K 1.5H. Each preset supports optional five-frame HFR motion.
-- **ColorVideoVDP:** display-aware SDR/HDR image and video quality in JOD;
-  higher is better, identity is 10 and negative scores are valid. The base
-  v0.5.7 model supports explicit physical viewing conditions and whole-clip
-  temporal pooling. See [CVVDP](docs/cvvdp.md).
-- **PSNR-HVS:** an FP32 adaptation of libvmaf/Xiph's masked metric; higher
-  dB scores are better and zero measured error scores positive infinity.
-  Initial inputs are native opaque 8/10/12-bit YUV420/422/444. Reference
-  ranking qualification is pending. See [PSNR-HVS](docs/psnr-hvs.md).
-
-The implementations make documented choices that can produce different scores
-from the upstream references. See [validation](docs/validation.md), [VMAF
-development](docs/vmaf-development.md) and [reference differences](docs/divergence.md)
-before comparing absolute scores.
-
-The VMAF model matrix distinguishes the supported FP32 predictors, feature
-variants, and derived extensions. [VMAF models](docs/vmaf-development.md#v061-models)
+The [metric guide](#command-line) covers score direction, clip pooling and
+viewing settings. See [validation](docs/validation.md) and
+[reference differences](docs/divergence.md) for comparisons with upstream
+implementations.
 
 ## Build
 
@@ -86,80 +63,213 @@ For end-to-end reference correlation across the five established metrics, use th
 
 ## Command line
 
+Pass the original first and the distorted rendition second. Use matching
+dimensions and align video frames to the same content, frame rate and frame
+count. The CLI reads PNG, JPEG and progressive Y4M, plus compressed clips with
+[NVIDIA hardware decoding](#nvidia-hardware-decoding).
+
 ```sh
 ./build/vqm original.png distorted.png
-./build/vqm --metric butteraugli original.png distorted.png
-./build/vqm --metric cvvdp original.png distorted.png
-./build/vqm --metric vmaf-v0 original.y4m distorted.y4m
-./build/vqm --metric vmaf-v1 --json original.y4m distorted.y4m
-./build/vqm --metric cvvdp original.y4m distorted.y4m
-./build/vqm --metric psnr-hvs --json original.y4m distorted.y4m
 ./build/vqm --metric ssimulacra2,butteraugli original.png distorted.png
-./build/vqm --metric all --json original.y4m distorted.y4m
 ./build/vqm --metric all --verbose original.y4m distorted.y4m
 ```
 
-Select several metrics with a comma-separated list or by repeating `--metric`.
-`all` expands to `ssimulacra2`, `butteraugli`, `vmaf-v0`, `vmaf-v1`, `cvvdp`,
-and `psnr-hvs`. The CLI runs each metric once in the order first selected.
-SSIMULACRA 2 is the default. Plain text gives one `metric: score` line per
-metric when several are selected and a bare score for a single metric.
-`--raw` requires a single metric. Every selected metric's input requirements
-apply to the pair.
+SSIMULACRA 2 is the default. Use a comma-separated list or repeat `--metric`
+to run several metrics on the same pair. `all` runs the six metrics below
+in table order. Each metric runs once in first-selected order. The pair must meet
+every selected metric's input requirements.
 
-The CLI supports PNG, JPEG and progressive YUV4MPEG2. All six metrics consume
-every Y4M frame in order, with matching geometry, rational frame rates and frame
-counts. SSIMULACRA 2, Butteraugli, and VMAF average their frame scores.
-PSNR-HVS averages weighted frame errors before converting to dB. CVVDP returns
-its whole-clip JOD after temporal distortion pooling.
-SDR VMAF uses the input dimensions by default. For v1, select a
-viewing preset with `--vmaf-v1-model 1080p-3h|4k-1.5h|4k-3h|phone-5h`.
-The default is `1080p-3h`. `--vmaf-scale` fits the content within the model's
-1920×1080 or 3840×2160 canvas while preserving its aspect ratio.
-`--vmaf-pad` adds black bars to reach 16:9 at the current scale. Use both
-flags to scale and pad to the full model canvas. Use `--vmaf-v1-hfr` with any
-v1 preset for roughly 50/60 fps content. Select `--vmaf-v1-model hdr-4k-1.5h`
-for PQ BT.2020 video. The HDR model controls geometry and scales the short
-side to 2160 pixels while preserving the input aspect ratio.
-[HDR input and reference details](docs/vmaf-development.md#v118-hdr-model)
+| CLI metric | Better score | How the CLI scores a clip |
+| --- | --- | --- |
+| [`ssimulacra2`](#ssimulacra-2) | Higher, up to 100 | Mean of frame scores |
+| [`butteraugli`](#butteraugli) | Lower, down to 0 | Mean of frame diffmap maxima |
+| [`vmaf-v0`](#vmaf-v0) | Higher, up to 100 | Mean of model-predicted frame scores |
+| [`vmaf-v1`](#vmaf-v1) | Higher, up to 100 or 110 by preset | Mean of model-predicted frame scores |
+| [`cvvdp`](#colorvideovdp) | Higher, up to 10 JOD | Pools whole-clip distortion, then converts to JOD |
+| [`psnr-hvs`](#psnr-hvs) | Higher dB, up to `inf` | Averages weighted frame errors, then converts to dB |
 
-PNG and JPEG are interpreted as sRGB with BT.709 primaries; the CLI also offers
-input color overrides and a `--raw` mode. Run `./build/vqm --help` for the
-options. For SSIMULACRA 2 and Butteraugli images with alpha, the CLI evaluates
-dark and bright backgrounds and returns the worse score. CVVDP requires
-opaque inputs; PSNR-HVS requires native opaque
-YUV and encodes positive infinity as the JSON string `"inf"`.
-[Run the three-frame Y4M example](docs/temporal-validation.md#score-a-complete-video).
+Compare renditions of the same original using the same metric, color
+interpretation, model and viewing settings. The metrics use different scales,
+so compare their rankings separately.
 
-`--json` prints one object per metric for each complete input pair, in selection
-order. Each object includes `score`, `frames`, ordered `frame_results`,
-`core_seconds`, and `decode_seconds`. CVVDP's `frame_results` array is empty
-unless `--verbose` is set. Use `--pairs-file` with a TSV containing sample ID,
-original path, and distorted path to process several clips in one process.
+PNG and JPEG use sRGB with BT.709 primaries. Y4M defaults to limited range,
+the BT.470 BG matrix, and BT.709 transfer and primaries. Set `--input-range`,
+`--input-matrix`, `--input-transfer` and `--input-primaries` when the samples
+use different colorimetry. These overrides apply to both inputs. Run
+`./build/vqm --help` for accepted values.
+
+### SSIMULACRA 2
+
+```sh
+./build/vqm --metric ssimulacra2 original.png distorted.png
+```
+
+Use SSIMULACRA 2 for visible image artifacts such as blur and ringing. Identity
+scores 100 on a discrete GPU. As rough landmarks from the original calibration,
+70 is good visual quality, 90 is close to visually lossless, and negative
+scores indicate severe distortion. For images with alpha, the CLI scores dark
+and bright backgrounds and keeps the worse result.
+[Original calibration](https://github.com/cloudinary/ssimulacra2#usage) ·
+[VQM implementation](docs/ssimulacra2.md)
+
+### Butteraugli
+
+```sh
+./build/vqm --metric butteraugli original.png distorted.png
+```
+
+A frame's score is the maximum of its perceptual distance map. Identity scores
+0, and a small area with a strong defect can drive the score up. For a clip,
+**Frame max** is the worst frame score. Use `--raw` to see the per-frame
+`distance_p3` as well, which pools distances across the image. The CLI keeps the
+worse result across dark and bright backgrounds for images with alpha.
+`--intensity-target` and `--hf-asymmetry` default to 80 nits and 1.0.
+[Butteraugli score details](docs/butteraugli.md#score-scale)
+
+### VMAF v0
+
+```sh
+./build/vqm --metric vmaf-v0 --vmaf-model 4k --vmaf-scale --vmaf-neg \
+  original.y4m distorted.y4m
+```
+
+The CLI uses floating-point v0.6.1 SDR predictors. Select `--vmaf-model 1080`
+for 1080p at 3H (the default) or `--vmaf-model 4k` for 4K at 1.5H. Higher means
+better predicted quality on the 0–100 scale. The clip score averages the frame
+predictions, which include reference motion.
+
+Use `--vmaf-neg` to disable enhancement gain when comparing encoders.
+`--vmaf-transform` applies the phone score transform calibrated on the 1080p
+model. VQM also offers both options with the 4K predictor as derived variants.
+The phone transform can saturate 4K scores at 100.
+
+`--vmaf-scale` and `--vmaf-pad` apply to both selected SDR VMAF versions.
+Scaling fits each metric's input within its selected model canvas while
+preserving aspect ratio. Padding adds black bars to reach 16:9 at the current
+scale. Together the flags fit and pad to each model's full canvas. By default
+both versions score at the input dimensions.
+[VMAF v0 model details](docs/vmaf-development.md#v061-models)
+
+### VMAF v1
+
+```sh
+./build/vqm --metric vmaf-v1 --vmaf-v1-model 4k-1.5h --vmaf-scale \
+  original.y4m distorted.y4m
+```
+
+VMAF v1 includes features for banding and chroma detail. Select a preset for
+the viewing setup. The suffix `h` expresses viewing distance in screen heights.
+Use the same preset when comparing renditions.
+
+| `--vmaf-v1-model` | Viewing setup | Score range |
+| --- | --- | --- |
+| `1080p-3h` (default) | SDR 1080p at 3H | 0–100 |
+| `4k-1.5h` | SDR 4K at 1.5H | 0–100 |
+| `4k-3h` | SDR 4K at 3H | 0–110 |
+| `phone-5h` | SDR phone at 5H | 0–100 |
+| `hdr-4k-1.5h` | HDR 4K at 1.5H | 0–100 |
+
+Add `--vmaf-v1-hfr` to any preset for roughly 50/60 fps content. It selects
+five-frame motion and smoothing. The HDR preset automatically scales the short
+side to 2160 pixels, keeping the aspect ratio. The example below declares the
+colorimetry of limited-range HDR10 in Y4M.
+
+```sh
+./build/vqm --metric vmaf-v1 --vmaf-v1-model hdr-4k-1.5h \
+  --input-matrix bt2020ncl --input-transfer st2084 --input-primaries bt2020 \
+  --input-range limited original-hdr.y4m distorted-hdr.y4m
+```
+
+[VMAF v1 presets and reference details](docs/vmaf-development.md#v1016-sdr-models)
+
+### ColorVideoVDP
+
+```sh
+./build/vqm --metric cvvdp --cvvdp-display compact --cvvdp-peak 200 \
+  original.y4m distorted.y4m
+```
+
+ColorVideoVDP scores opaque SDR and HDR inputs in just-objectionable
+differences (JOD) under a specified viewing setup. Identity scores 10 JOD and
+lower scores indicate more objectionable distortion.
+Negative scores are valid. Under the model's calibration, a 1 JOD advantage
+corresponds to a predicted 75% preference in a paired comparison.
+[ColorVideoVDP paper](https://www.cl.cam.ac.uk/~rkm38/pdfs/mantiuk2024_ColorVideoVDP.pdf)
+
+The default `standard` is a 30-inch 16:9 display viewed from 0.7472 m. `compact` is
+24 inches at 0.6 m. Override the aspect ratio, diagonal in inches or distance
+in metres with `--cvvdp-aspect`, `--cvvdp-diagonal` and `--cvvdp-distance`.
+`--cvvdp-peak` sets peak brightness in nits and defaults to 200. Keep these
+conditions fixed when ranking encodes. Read **Aggregate** for the whole-clip
+JOD and use the temporally filtered frame diagnostics to locate problem frames.
+[CVVDP display and input options](docs/cvvdp.md#display-and-input-interpretation)
+
+### PSNR-HVS
+
+```sh
+./build/vqm --metric psnr-hvs --json original.y4m distorted.y4m
+```
+
+Use matching opaque 8-, 10- or 12-bit planar YUV 4:2:0, 4:2:2 or 4:4:4 inputs.
+The metric measures their native sample codes. Higher dB means lower weighted
+error. A gain of about 3 dB corresponds to halving that error. `inf` means
+zero measured error, which includes identical frames and can also occur when
+masking or block coverage excludes the differences. A clip reports `inf` only
+when every frame has zero measured error. JSON writes infinity as the string
+`"inf"`. Use the per-frame Y, Cb and Cr results to see which planes contribute
+to the distortion.
+[PSNR-HVS inputs and error weighting](docs/psnr-hvs.md)
+
+### Reading the report
+
+Use `--verbose` (or `-v`) for an aligned table. This run scored a three-frame,
+320×240 clip with a translucent box over the middle frame. Scoring FPS
+depends on the input, device and selected metrics.
+
+```text
+Frames: 3
+Scoring FPS: 746.57
+Metric             Aggregate       Frame min       Frame max   Finite stddev  Perfect
+ssimulacra2        65.688104      -2.9356868             100       48.524348        2
+butteraugli        29.944338               0       89.833015        42.34769        2
+vmaf-v0            97.460145       95.452462       99.500102       1.6525997        0
+vmaf-v1            98.612725       95.838175             100       1.9619032        2
+cvvdp              9.6586087       9.5719113              10      0.19466893        1
+psnr-hvs           37.861903       33.090691             inf               0        2
+```
+
+- **Aggregate** uses the clip calculation for each metric. PSNR-HVS stays
+  finite here because the altered frame contributes error to the clip.
+- **Frame min / max** show the extremes. Read the minimum for higher-is-better
+  metrics and the maximum for Butteraugli to find the worst frame score.
+- **Finite stddev** measures the spread of finite frame scores as a population
+  standard deviation. One finite score gives 0. With no finite scores it
+  displays `n/a`.
+- **Perfect** counts scores that equal the metric's best value, including
+  `inf` for PSNR-HVS. Motion can affect a frame's VMAF prediction, and clipping
+  can put distorted frames at the ceiling.
+- **Scoring FPS** divides the shared frame count by the sum of the selected
+  metrics' core scoring times. Decode time is measured separately.
+
+Plain text prints a bare score for one metric and labeled scores for multiple
+metrics. `--raw` prints additional metric-specific values for a single metric.
+`--json` emits one object per pair and metric, with the clip `score`, ordered
+`frame_results` with zero-based indices, `core_seconds` and `decode_seconds`.
+Add `--verbose` for `scoring_fps`, `frame_stats` including the finite-frame
+mean, and CVVDP's diagnostic frame JODs. Without it, CVVDP returns its clip score with an empty
+`frame_results` array. Unavailable statistics are `null`.
+
+Use `--pairs-file` with `--json` to process a batch. Each TSV row holds a
+unique sample ID, original path and distorted path. `--iterations` repeats
+the complete clip with reset history and reports the iteration with median
+combined core time. `--warmup` runs untimed clips first.
 
 ```sh
 ./build/vqm --metric vmaf-v0 --json --pairs-file pairs.tsv \
   --iterations 5 --warmup 1
 ```
 
-Each iteration resets temporal history and reads the whole clip once for all
-selected metrics. The CLI reports the iteration with median total core time.
-Each metric's object has its own core time and the shared decode time.
-
-`--verbose` (`-v`) prints the shared frame count and scoring FPS once, followed
-by an aligned table. Scoring FPS divides the frame count by the sum of the
-selected metrics' core times in the reported iteration. With `--json`, each
-metric record carries the same `scoring_fps` for the pair.
-
-`Aggregate` is each metric's clip score. The other columns
-show the frame minimum and maximum, the population standard deviation of
-finite frame scores, and `Perfect`, the count of frames that reached the
-metric's best score. When every frame score is infinite, the standard deviation
-displays as `n/a`. With `--json`, the clip score is in `score` and frame
-statistics, including the finite-frame mean, are in `frame_stats`. Unavailable
-values are `null`. This mode includes CVVDP frame JOD diagnostics after temporal
-filtering in `frame_results`.
-[CVVDP clip and frame scores](docs/cvvdp.md#resources-and-tools)
+[Complete video and batch examples](docs/temporal-validation.md#score-a-complete-video)
 
 ### NVIDIA hardware decoding
 
