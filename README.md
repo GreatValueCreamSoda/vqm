@@ -284,18 +284,19 @@ combined core time. `--warmup` runs untimed clips first.
 
 On Linux, build with `-DVQM_ENABLE_BESTSOURCE=ON` to enable compressed video
 input. The CLI detects compressed video pairs by their contents and decodes
-them with BestSource. The backend requires a GPU-enabled [BestSource R23](https://github.com/vapoursynth/bestsource/tree/R23)
-library and a compatible FFmpeg build with Vulkan Video, libavutil 61.6 or
-newer and the Vulkan UUID device selector. When building BestSource as a
-standalone library, use Meson's `-Denable_plugin=false -Denable_gpu=enabled`.
-Make the dependencies visible to `pkg-config` and the runtime linker. Pass
-the BestSource `src` directory from the same revision as the library because
-its GPU export header is distributed in the source tree.
+them with BestSource. CMake fetches pinned BestSource R23 and libp2p sources,
+verifies their archive hashes, and builds both into static libraries linked
+into the CLI. [BestSource R23 release](https://github.com/vapoursynth/bestsource/releases/tag/R23)
+
+The build needs a Python 3 interpreter to embed the GPU shaders. FFmpeg
+and xxHash are external dependencies. Make their development packages
+visible to `pkg-config` and their shared libraries visible to the runtime
+linker. Use an FFmpeg build with Vulkan Video, libavutil 61.6 or newer, and
+the Vulkan UUID device selector. For a non-system prefix, add its
+`lib/pkgconfig` directory to `PKG_CONFIG_PATH` before configuring.
 
 ```sh
-cmake --preset release -B build-bestsource \
-  -DVQM_ENABLE_BESTSOURCE=ON \
-  -DVQM_BESTSOURCE_GPU_INCLUDE_DIR=/path/to/bestsource/src
+cmake --preset release -B build-bestsource -DVQM_ENABLE_BESTSOURCE=ON
 cmake --build build-bestsource --parallel 8
 ./build-bestsource/vqm --start-frame 174 --frame-count 24 \
   --metric vmaf-v1 --json original.mp4 distorted.mp4
