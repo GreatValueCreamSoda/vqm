@@ -28,7 +28,6 @@
 #include "butteraugli.h"
 #include "cvvdp.h"
 #include "metrics/cvvdp/cvvdp_internal.h"
-#include "metrics/metric_scratch.h"
 #include "psnr_hvs.h"
 #include "vmaf.h"
 #include "vmaf_v1.h"
@@ -210,46 +209,60 @@ ScorerConfig MakeScorerConfig(
     return config;
 }
 
+MetricsConfig MakePipelineConfig(
+    const Options& options, const InputKey& key, bool streaming
+) {
+    MetricsConfig config{.size = key.size,
+                         .original_format = key.original,
+                         .distorted_format = key.distorted,
+                         .streaming_inputs = streaming};
+    for (const auto metric : options.metrics) {
+        std::visit(
+            [&](const auto& value) {
+                using Config = std::decay_t<decltype(value)>;
+                if constexpr (std::is_same_v<Config, Ssimulacra2Config>)
+                    config.ssimulacra2 = value;
+                else if constexpr (std::is_same_v<Config, ButteraugliConfig>)
+                    config.butteraugli = value;
+                else if constexpr (std::is_same_v<Config, VmafConfig>)
+                    config.vmaf_v0 = value;
+                else if constexpr (std::is_same_v<Config, VmafV1Config>)
+                    config.vmaf_v1 = value;
+                else if constexpr (std::is_same_v<Config, CvvdpConfig>)
+                    config.cvvdp = value;
+                else if constexpr (std::is_same_v<Config, PsnrHvsConfig>)
+                    config.psnr_hvs = value;
+            },
+            MakeScorerConfig(options, metric, key)
+        );
+    }
+    return config;
+}
+
 // One geometry, format domain and frame rate per cached pipeline. Push consumes
 // the current sources synchronously and retains its own temporal history.
 class Scorer {
 public:
     Scorer(
-        const Options& options, const InputKey& key, const ScorerConfig& config,
-        const VulkanDevice* device,
-        const std::shared_ptr<internal::SharedMetricStorage>& scratch
+        const Options& options, const InputKey& key, Metric metric,
+        std::shared_ptr<MetricPipelines> pipelines
     )
-        : raw_(options.raw), verbose_(options.verbose), video_(key.video) {
-        std::visit(
-            [&](const auto& value) {
-                using Config = std::decay_t<decltype(value)>;
-                if constexpr (std::is_same_v<Config, Ssimulacra2Config>)
-                    ssimu_ = internal::MetricScratchAccess::Create<
-                        Ssimulacra2Pipeline>(value, device, scratch);
-                else if constexpr (std::is_same_v<Config, ButteraugliConfig>)
-                    butter_ = internal::MetricScratchAccess::Create<
-                        ButteraugliPipeline>(value, device, scratch);
-                else if constexpr (std::is_same_v<Config, VmafConfig>)
-                    v0_ = internal::MetricScratchAccess::Create<VmafPipeline>(
-                        value, device, scratch
-                    );
-                else if constexpr (std::is_same_v<Config, VmafV1Config>)
-                    v1_ = internal::MetricScratchAccess::Create<VmafV1Pipeline>(
-                        value, device, scratch
-                    );
-                else if constexpr (std::is_same_v<Config, CvvdpConfig>)
-                    cvvdp_ =
-                        internal::MetricScratchAccess::Create<CvvdpPipeline>(
-                            value, device, scratch
-                        );
-                else if constexpr (std::is_same_v<Config, PsnrHvsConfig>)
-                    psnr_hvs_ =
-                        internal::MetricScratchAccess::Create<PsnrHvsPipeline>(
-                            value, device, scratch
-                        );
-            },
-            config
-        );
+        : pipelines_(std::move(pipelines)),
+          raw_(options.raw),
+          verbose_(options.verbose),
+          video_(key.video),
+          ssimu_(
+              metric == Metric::Ssimulacra2 ? pipelines_->Ssimulacra2() : nullptr
+          ),
+          butter_(
+              metric == Metric::Butteraugli ? pipelines_->Butteraugli() : nullptr
+          ),
+          v0_(metric == Metric::VmafV0 ? pipelines_->VmafV0() : nullptr),
+          v1_(metric == Metric::VmafV1 ? pipelines_->VmafV1() : nullptr),
+          cvvdp_(metric == Metric::Cvvdp ? pipelines_->Cvvdp() : nullptr),
+          psnr_hvs_(
+              metric == Metric::PsnrHvs ? pipelines_->PsnrHvs() : nullptr
+          ) {
         if (cvvdp_ && verbose_ && video_)
             internal::CvvdpFrameAccess::Enable(*cvvdp_);
     }
@@ -328,15 +341,16 @@ public:
     }
 
 private:
+    std::shared_ptr<MetricPipelines> pipelines_;
     bool raw_;
     bool verbose_;
     bool video_;
-    std::unique_ptr<Ssimulacra2Pipeline> ssimu_;
-    std::unique_ptr<ButteraugliPipeline> butter_;
-    std::unique_ptr<VmafPipeline> v0_;
-    std::unique_ptr<VmafV1Pipeline> v1_;
-    std::unique_ptr<CvvdpPipeline> cvvdp_;
-    std::unique_ptr<PsnrHvsPipeline> psnr_hvs_;
+    Ssimulacra2Pipeline* ssimu_;
+    ButteraugliPipeline* butter_;
+    VmafPipeline* v0_;
+    VmafV1Pipeline* v1_;
+    CvvdpPipeline* cvvdp_;
+    PsnrHvsPipeline* psnr_hvs_;
 };
 
 class ScorerCache {
@@ -348,29 +362,13 @@ public:
         if (scorers.empty() || key_ != key || device_ != device) {
             scorers.clear();
             scorers.reserve(options_.metrics.size());
-            internal::MetricScratchBuilder planner;
-            std::vector<ScorerConfig> configs;
-            for (const auto metric : options_.metrics) {
-                auto config = MakeScorerConfig(options_, metric, key);
-                std::visit(
-                    [&](auto& value) {
-                        value.gpu_resident_images = 0;
-                        value.streaming_inputs = device == nullptr;
-                        planner.Add(
-                            device ? GetMemoryRequirements(value, *device)
-                                   : GetMemoryRequirements(value)
-                        );
-                    },
-                    config
-                );
-                configs.push_back(std::move(config));
-            }
-            const auto scratch =
-                configs.size() > 1
-                    ? planner.Build(device)
-                    : std::shared_ptr<internal::SharedMetricStorage>{};
-            for (const auto& config : configs)
-                scorers.emplace_back(options_, key, config, device, scratch);
+            const auto config =
+                MakePipelineConfig(options_, key, device == nullptr);
+            const auto pipelines =
+                device ? std::make_shared<MetricPipelines>(config, *device)
+                       : std::make_shared<MetricPipelines>(config);
+            for (const auto metric : options_.metrics)
+                scorers.emplace_back(options_, key, metric, pipelines);
             key_ = key;
             device_ = device;
         }

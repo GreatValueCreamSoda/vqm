@@ -13,13 +13,14 @@ include/
   psnr_hvs.h                   frame-local native YUV PSNR-HVS API
   vmaf.h, vmaf_v1.h            versioned VMAF APIs
   cvvdp.h                      display-aware image and clip JOD API
-  vqm_metrics.h                combined evaluation and frame alignment
+  vqm_metrics.h                pipeline ownership and combined evaluation
   vqm.h                        convenience umbrella
 src/
   input.*, image_view.*        image validation, geometry and host views
   handles.*                    resident-handle identity and ownership
   metrics/
     metrics.cc                 combined metric evaluation
+    metric_pipelines.*         selected pipeline ownership and memory planning
     shared_workspace.*         serial spatial-metric composition
     metric_scratch.h           shared scratch planning and pipeline construction
     ssimulacra2/                facade, score, layout, Vulkan passes, shaders/
@@ -73,9 +74,13 @@ planner used by construction is also used by memory queries. Every planner
 returns the common `BufferMemoryPlan`; metric-specific planning declarations
 remain beside their layouts.
 
-`Metrics` aligns per-frame results from selected metrics and returns CVVDP's
-whole-clip score separately from `Finalize`. `SharedMetricWorkspace` serializes
-SSIMULACRA 2 and Butteraugli in one arena. VMAF and CVVDP sequences keep private
+`MetricPipelines` owns selected pipelines and automatically manages their shared
+scratch and private allocations. The CLI borrows these pipelines through public
+getters, without accessing internal memory machinery. `Metrics` uses the same
+library-owned construction and memory planning, aligns per-frame results, and
+returns CVVDP's whole-clip score separately from `Finalize`.
+`SharedMetricWorkspace` serializes SSIMULACRA 2 and Butteraugli in one arena.
+VMAF and CVVDP sequences keep private
 temporal state and allocations. These are distinct ownership contracts;
 adding a metric requires an explicit decision about its state lifetime.
 

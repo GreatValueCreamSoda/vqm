@@ -54,6 +54,7 @@ set(VQM_CORE_SOURCES
   src/timing.cc
   # Metric composition.
   src/metrics/metrics.cc
+  src/metrics/metric_pipelines.cc
   src/metrics/shared_workspace.cc
   # SSIMULACRA 2.
   src/metrics/ssimulacra2/pipeline.cc

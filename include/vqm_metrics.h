@@ -60,9 +60,11 @@ struct MetricsResult {
     std::optional<double> psnr_hvs;
 };
 
-// Actual Vulkan allocations. Metric entries contain only private retained
-// storage; spatial combines SSIMULACRA 2 and Butteraugli private storage.
-// Scratch contains the one shared arena and optional staging allocation.
+// Actual Vulkan allocations. When scratch is present, metric entries contain
+// only private retained storage; spatial combines the two spatial metrics.
+// Scratch contains the shared arena and optional staging allocation. A
+// single-metric MetricPipelines instead reports its standalone allocations
+// in the selected metric entry, with no scratch entry.
 struct MetricsMemoryUsage {
     std::optional<PipelineMemoryUsage> spatial;
     std::optional<PipelineMemoryUsage> vmaf_v0;
@@ -84,6 +86,41 @@ struct MetricsMemoryRequirements {
     std::optional<MetricMemoryRequirements> scratch;
 };
 
+// Owns selected pipelines and their memory without combining their results.
+// Multiple metrics automatically share maximum-sized scratch; a single metric
+// uses standalone storage. MetricsConfig normalization applies to both paths.
+// Getters return nullptr for unselected metrics. Returned pointers are borrowed
+// and remain valid across moves while the owning collection lives. Do not move
+// individual pipelines out of the collection. Use them serially: an unfinished
+// submission prevents other selected pipelines from using shared scratch.
+// One collection is one worker and is not thread-safe.
+class MetricPipelines {
+public:
+    explicit MetricPipelines(MetricsConfig config);
+    MetricPipelines(MetricsConfig config, const VulkanDevice& device);
+    ~MetricPipelines();
+    MetricPipelines(MetricPipelines&&) noexcept;
+    MetricPipelines& operator=(MetricPipelines&&) noexcept;
+    MetricPipelines(const MetricPipelines&) = delete;
+    MetricPipelines& operator=(const MetricPipelines&) = delete;
+
+    [[nodiscard]] Ssimulacra2Pipeline* Ssimulacra2() noexcept;
+    [[nodiscard]] ButteraugliPipeline* Butteraugli() noexcept;
+    [[nodiscard]] VmafPipeline* VmafV0() noexcept;
+    [[nodiscard]] VmafV1Pipeline* VmafV1() noexcept;
+    [[nodiscard]] CvvdpPipeline* Cvvdp() noexcept;
+    [[nodiscard]] PsnrHvsPipeline* PsnrHvs() noexcept;
+    [[nodiscard]] MetricsMemoryUsage GetMemoryUsage() const;
+
+private:
+    friend class Metrics;
+    struct Impl;
+    std::unique_ptr<Impl> impl_;
+};
+
+// Plans the always-shared Metrics allocation path. Multi-metric
+// MetricPipelines uses the same plan; for a single-metric collection, query
+// that metric's normalized configuration with its individual overload.
 [[nodiscard]] MetricsMemoryRequirements GetMemoryRequirements(
     const MetricsConfig& config
 );

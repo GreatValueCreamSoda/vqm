@@ -74,7 +74,8 @@ MetricsConfig Config(Size size, MemoryPolicy policy) {
     return config;
 }
 
-void CheckAllMemory(const Metrics& metrics, const MetricsConfig& config) {
+template <class Pipelines>
+void CheckAllMemory(const Pipelines& metrics, const MetricsConfig& config) {
     const auto actual = metrics.GetMemoryUsage();
     const auto planned = GetMemoryRequirements(config);
     CHECK(actual.scratch.has_value());
@@ -201,6 +202,24 @@ VQM_TEST(TestAllMetricScratchAndPrivateHistory) {
     if (!vqm::test::GpuAvailable()) return;
     CheckAllScores(vqm::MemoryPolicy::Automatic);
     CheckAllScores(vqm::MemoryPolicy::Staged);
+}
+
+VQM_TEST(TestMetricPipelinesAllMetricMemory) {
+    if (!vqm::test::GpuAvailable()) return;
+    const auto image = YuvFrame(0);
+    for (const auto policy : {MemoryPolicy::Automatic, MemoryPolicy::Staged}) {
+        auto config = Config(image.size, policy);
+        config.original_format = image.format;
+        config.distorted_format = image.format;
+        MetricPipelines pipelines(config);
+        CHECK(pipelines.Ssimulacra2() != nullptr);
+        CHECK(pipelines.Butteraugli() != nullptr);
+        CHECK(pipelines.VmafV0() != nullptr);
+        CHECK(pipelines.VmafV1() != nullptr);
+        CHECK(pipelines.Cvvdp() != nullptr);
+        CHECK(pipelines.PsnrHvs() != nullptr);
+        CheckAllMemory(pipelines, config);
+    }
 }
 
 VQM_TEST(TestSharedScratchPrivateWorkerBudgets) {

@@ -6,6 +6,7 @@
 #include <optional>
 #include <span>
 #include <stdexcept>
+#include <utility>
 
 #include "butteraugli.h"
 #include "support.h"
@@ -93,6 +94,95 @@ void CheckMemoryRequirements(
 }
 
 }  // namespace
+
+VQM_TEST(TestMetricPipelinesSelectionAndStandaloneMemory) {
+    CHECK_THROWS_AS(MetricPipelines(MetricsConfig{}), std::invalid_argument);
+    if (!vqm::test::GpuAvailable()) return;
+    const auto pair = MakePair(false);
+    auto config = AllConfig(pair);
+    config.ssimulacra2.reset();
+    config.vmaf_v0.reset();
+    config.vmaf_v1.reset();
+    MetricPipelines pipelines(config);
+    CHECK(pipelines.Ssimulacra2() == nullptr);
+    CHECK(pipelines.Butteraugli() != nullptr);
+    CHECK(pipelines.VmafV0() == nullptr);
+    CHECK(pipelines.VmafV1() == nullptr);
+    CHECK(pipelines.Cvvdp() == nullptr);
+    CHECK(pipelines.PsnrHvs() == nullptr);
+    const auto memory = pipelines.GetMemoryUsage();
+    CHECK(!memory.scratch);
+    CHECK(memory.spatial.has_value());
+    if (memory.spatial) {
+        CHECK(memory.spatial->arena.allocation_bytes > 0);
+        CHECK(
+            memory.spatial->arena.allocation_bytes ==
+            pipelines.Butteraugli()->GetMemoryUsage().arena.allocation_bytes
+        );
+    }
+    ButteraugliPipeline standalone(*config.butteraugli);
+    CHECK_NEAR(
+        pipelines.Butteraugli()->Compute(pair.original, pair.distorted).score,
+        standalone.Compute(pair.original, pair.distorted).score, 0.0
+    );
+}
+
+VQM_TEST(TestMetricPipelinesMoveAndSubmissionOwnership) {
+    if (!vqm::test::GpuAvailable()) return;
+    const auto pair = MakePair(false);
+    auto config = AllConfig(pair);
+    config.vmaf_v0.reset();
+    config.vmaf_v1.reset();
+    MetricPipelines pipelines(config);
+    auto* ssimu = pipelines.Ssimulacra2();
+    auto* butter = pipelines.Butteraugli();
+    MetricPipelines moved(std::move(pipelines));
+    CHECK(moved.Ssimulacra2() == ssimu);
+    CHECK(moved.Butteraugli() == butter);
+    const auto token = ssimu->Submit(pair.original, pair.distorted);
+    CHECK_THROWS_AS(
+        butter->Submit(pair.original, pair.distorted), std::logic_error
+    );
+    const auto score = ssimu->Finish(token).Score();
+    MetricPipelines assigned(config);
+    assigned = std::move(moved);
+    CHECK(assigned.Ssimulacra2() == ssimu);
+    CHECK(assigned.Butteraugli() == butter);
+    static_cast<void>(butter->Compute(pair.original, pair.distorted));
+    CHECK_NEAR(
+        ssimu->Compute(pair.original, pair.distorted).Score(), score, 0.0
+    );
+}
+
+VQM_TEST(TestMetricPipelinesPrivateTemporalHistory) {
+    if (!vqm::test::GpuAvailable()) return;
+    const std::array<Pair, 3> pairs{MakePair(false), MakePair(true),
+                                    MakePair(false)};
+    auto config = AllConfig(pairs[0]);
+    config.butteraugli.reset();
+    config.vmaf_v1.reset();
+    MetricPipelines pipelines(config);
+    VmafPipeline reference(*config.vmaf_v0);
+    const auto compare = [](const auto& actual, const auto& expected) {
+        CHECK(actual.has_value() == expected.has_value());
+        if (!actual || !expected) return;
+        CHECK(actual->index == expected->index);
+        CHECK_NEAR(actual->score, expected->score, 0.0);
+        CHECK_NEAR(actual->adm2, expected->adm2, 0.0);
+        CHECK_NEAR(actual->motion2, expected->motion2, 0.0);
+        CHECK(actual->vif == expected->vif);
+    };
+    for (const auto& pair : pairs) {
+        const auto expected = reference.Push(pair.original, pair.distorted);
+        const auto actual =
+            pipelines.VmafV0()->Push(pair.original, pair.distorted);
+        static_cast<void>(
+            pipelines.Ssimulacra2()->Compute(pair.original, pair.distorted)
+        );
+        compare(actual, expected);
+    }
+    compare(pipelines.VmafV0()->Flush(), reference.Flush());
+}
 
 VQM_TEST(TestMetricsWorstCaseWorkerBudget) {
     MetricsMemoryRequirements requirements;

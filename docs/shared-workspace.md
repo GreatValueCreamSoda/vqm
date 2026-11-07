@@ -1,9 +1,12 @@
 # Shared metric scratch
 
-The CLI and unified `Metrics` pipeline share one overwriteable GPU arena across
-all selected metrics: SSIMULACRA 2, Butteraugli, VMAF v0, VMAF v1, CVVDP, and
-PSNR-HVS. Initialization queries their requirements, allocates the maximum
+The library-owned `MetricPipelines` collection and unified `Metrics` pipeline
+share one overwriteable GPU arena across all selected metrics: SSIMULACRA 2,
+Butteraugli, VMAF v0, VMAF v1, CVVDP, and PSNR-HVS. Initialization queries their
+requirements, allocates the maximum
 scratch size rather than the sum, and binds it internally to each pipeline.
+The CLI constructs `MetricPipelines` using public configuration and borrows its
+selected pipelines; it never plans, allocates, or accesses internal scratch.
 The frame loop does not allocate or pass a buffer manually. A fallback upload
 and readback staging buffer, when required, is also sized to the maximum.
 
@@ -27,8 +30,8 @@ until the first submission is finished. A worker is not thread-safe; use a
 separate composed pipeline and scratch allocation for each concurrent worker.
 Resident image handles and mapped input pools are unavailable on shared scratch.
 Standalone metric pipelines retain their existing allocation and handle APIs.
-With only one CLI metric selected, the CLI uses its standalone allocation path
-and does not duplicate retained state for sharing.
+With only one metric selected, `MetricPipelines` uses its standalone allocation
+path and does not duplicate retained state for sharing.
 
 The CLI reuses initialized pipelines across frames, repetitions, and compatible
 pairs. Geometry, input format, or rate changes create a new set. Metric options,
@@ -36,12 +39,28 @@ alpha-background policy, frame ordering, and temporal reset/finalization rules
 are unchanged. GPU-resident BestSource inputs remain borrowed on the same GPU
 without CPU input staging.
 
+Use `Metrics` for frame-aligned, combined scores and unified sequence handling.
+Use `MetricPipelines` when individual APIs are needed, such as the CLI's raw
+features, per-metric timing, requested metric order, and alpha-background policy.
+Its typed getters return null for unselected metrics. Returned pipeline pointers
+are non-owning and remain valid across collection moves while the owner lives;
+do not move individual pipelines out of the collection. The library retains
+scratch and private state for the collection's lifetime. Callers submit work
+serially and follow each metric's reset and finalization contracts.
+
 `Metrics::GetMemoryUsage()` reports the arena and optional staging buffer once
 in `scratch`. Metric entries contain only private `auxiliary` allocations;
 `spatial` combines the two spatial metrics' private storage. Queries made with
 the same complete configuration and device predict these allocations and their
 per-heap charges. They exclude borrowed inputs and driver overhead. See
 [memory planning](memory.md).
+
+Multi-metric `MetricPipelines::GetMemoryUsage()` uses the same accounting and
+requirements plan. With a single metric, the collection reports the standalone
+arena and staging allocations in that metric's entry instead, with no `scratch`
+entry. Query its normalized individual configuration for that standalone plan;
+`GetMemoryRequirements(MetricsConfig)` describes the always-shared `Metrics`
+path, including when `Metrics` selects just one metric.
 
 ## Two-metric spatial workspace
 
