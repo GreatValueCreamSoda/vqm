@@ -85,12 +85,12 @@ The normal CLI accepts native Y4M images and progressive fixed-rate clips:
 ./build/vqm --metric psnr-hvs --json --pairs-file clips.tsv
 ```
 
-Every frame is evaluated. As for the other spatial metrics, the clip summary
-is the arithmetic mean of the frame dB scores. One infinite frame therefore
-makes the clip summary infinite. JSON represents positive infinity as the
-string `"inf"`; ordinary finite scores remain numbers. Clip geometry, frame
-counts and rational timing must match. The metric adds no temporal filtering
-or clip-finalization state.
+The CLI averages the weighted normalized errors of all frames and converts
+that mean to dB with `-10 * log10(mean_error)`. Every frame has equal weight.
+The clip score is infinite only when every frame has zero measured error.
+JSON represents positive infinity as the string `"inf"` and reports the
+individual frame scores and errors. Clip geometry, frame counts, and rational
+timing must match.
 
 ## Reference relationship
 
@@ -99,6 +99,13 @@ and plane mixture. It uses an orthonormal FP32 DCT instead of libvmaf's rounded
 integer transform, parallel reductions instead of its serial FP32 fold, and
 FP32 throughout the remaining metric arithmetic. Final scores need not be
 identical.
+
+For clips, libvmaf's PSNR-HVS extractor publishes per-frame dB values. Its
+arithmetic mean pools those dB values, so a single infinite frame makes the
+mean infinite. VQM's CLI pools the underlying frame errors.
+[Extractor](https://github.com/Netflix/vmaf/blob/4611e47a7330cd342498dcc130e1008efbeab6e4/libvmaf/src/feature/third_party/xiph/psnr_hvs.c#L326-L375)
+and [feature pooling](https://github.com/Netflix/vmaf/blob/4611e47a7330cd342498dcc130e1008efbeab6e4/libvmaf/src/libvmaf.c#L1100-L1136).
+
 Future qualification will measure direct ranking agreement against the
 pinned reference on frozen input domains. Ranking qualification and validation
 tool integration have not yet been performed; no corpus-wide ranking agreement

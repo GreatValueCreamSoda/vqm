@@ -58,10 +58,12 @@ and range through the `--input-*` options. These options apply to both clips.
 
 JSON contains `sample_id`, `metric`, `score`, `frames`, `frame_results`,
 `core_seconds` and `decode_seconds`. VMAF frame results include its features
-in emitted index order. SSIMULACRA 2, Butteraugli, VMAF, and PSNR-HVS use the
-arithmetic mean of their frame scores. PSNR-HVS represents a positive infinite
-score as the JSON string `"inf"`. CVVDP converts pooled whole-clip distortion
-to JOD and returns an empty `frame_results` array.
+in emitted index order. SSIMULACRA 2, Butteraugli, and VMAF average their frame
+scores. PSNR-HVS averages weighted frame errors before converting to dB and
+represents a positive infinite score as the JSON string `"inf"`. CVVDP converts
+pooled whole-clip distortion to JOD and returns an empty `frame_results` array.
+The optional `--verbose` mode adds `frame_stats` and includes diagnostic CVVDP
+frame JODs. The qualification runner uses the default JSON output.
 
 `--pairs-file` accepts UTF-8 TSV rows `sample_id<TAB>original<TAB>distorted`
 and requires `--json`. It runs all clips in one process, resetting sequence

@@ -345,6 +345,8 @@ struct CvvdpPipeline::Impl {
         VQM_TIMED(CvvdpScore);
         const double distortion = CvvdpFrameDistortion(Results(4), 4);
         power_sum += CvvdpSafePow(distortion, 2.0);
+        if (frame_scores_enabled)
+            frame_scores[frame_score_count++] = CvvdpJod(distortion);
     }
     void ProcessFirstVideoFrame() {
         const auto token = runtime.BeginSubmission();
@@ -375,6 +377,7 @@ struct CvvdpPipeline::Impl {
         const auto sources =
             Resolve(a, b);  // Invalid inputs do not advance the clip.
         try {
+            if (!image && frame_scores_enabled) frame_score_count = 0;
             if (!image && frames == 1) ProcessFirstVideoFrame();
             runtime.PrepareSourceBindings(sources);
             const auto token = runtime.BeginSubmission();
@@ -408,6 +411,7 @@ struct CvvdpPipeline::Impl {
             ++frames;
             return {};
         } catch (...) {
+            frame_score_count = 0;
             failed = true;
             throw;
         }
@@ -450,6 +454,7 @@ struct CvvdpPipeline::Impl {
             );
         frames = 0;
         power_sum = 0;
+        frame_score_count = 0;
         failed = false;
         finished = false;
         final_score.reset();
@@ -465,6 +470,9 @@ struct CvvdpPipeline::Impl {
     ResidentTable resident;
     std::uint64_t frames = 0;
     double power_sum = 0;
+    std::array<double, 2> frame_scores{};
+    std::size_t frame_score_count = 0;
+    bool frame_scores_enabled = false;
     bool failed = false, finished = false;
     std::optional<CvvdpScore> final_score;
 };
@@ -534,5 +542,16 @@ std::optional<CvvdpScore> CvvdpPipeline::Finalize() { return impl_->Finalize(); 
 void CvvdpPipeline::Reset() { impl_->Reset(); }
 PipelineMemoryUsage CvvdpPipeline::GetMemoryUsage() const {
     return impl_->runtime.GetMemoryUsage();
+}
+
+void internal::CvvdpFrameAccess::Enable(CvvdpPipeline& pipeline) {
+    pipeline.impl_->frame_scores_enabled = true;
+}
+
+std::span<const double> internal::CvvdpFrameAccess::Scores(
+    const CvvdpPipeline& pipeline
+) {
+    const auto& impl = *pipeline.impl_;
+    return {impl.frame_scores.data(), impl.frame_score_count};
 }
 }  // namespace vqm

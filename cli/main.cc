@@ -1,14 +1,17 @@
 // Derived from Cloudinary SSIMULACRA 2 (Copyright (c) Jon Sneyers, Cloudinary).
 // BSD-3-Clause; see LICENSE.
 
-#include <cmath>
+#include <algorithm>
+#include <array>
 #include <charconv>
+#include <cmath>
 #include <cstddef>
 #include <cstdio>
 #include <exception>
 #include <format>
 #include <optional>
 #include <span>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -26,11 +29,69 @@
 #include "vulkan/vulkan_support.h"
 
 namespace vqm::cli {
+namespace {
+
+struct MetricEntry {
+    Metric metric;
+    std::string_view name;
+};
+
+constexpr std::array kMetrics{
+    MetricEntry{Metric::Ssimulacra2, "ssimulacra2"},
+    MetricEntry{Metric::Butteraugli, "butteraugli"},
+    MetricEntry{Metric::VmafV0, "vmaf-v0"},
+    MetricEntry{Metric::VmafV1, "vmaf-v1"},
+    MetricEntry{Metric::Cvvdp, "cvvdp"},
+    MetricEntry{Metric::PsnrHvs, "psnr-hvs"},
+};
+
+bool HasMetric(std::span<const Metric> metrics, Metric metric) {
+    return std::ranges::find(metrics, metric) != metrics.end();
+}
+
+void AppendMetric(std::vector<Metric>& metrics, Metric metric) {
+    if (!HasMetric(metrics, metric)) metrics.push_back(metric);
+}
+
+std::optional<ParseError> ParseMetricList(
+    std::string_view value, std::vector<Metric>& metrics
+) {
+    for (;;) {
+        const auto separator = value.find(',');
+        const auto name = value.substr(0, separator);
+        if (name == "all") {
+            for (const auto& entry : kMetrics)
+                AppendMetric(metrics, entry.metric);
+        } else {
+            const auto entry =
+                std::ranges::find(kMetrics, name, &MetricEntry::name);
+            if (entry == kMetrics.end()) {
+                return ParseError{std::format(
+                    "invalid value for --metric: '{}' (expected "
+                    "ssimulacra2|butteraugli|vmaf-v0|vmaf-v1|cvvdp|psnr-hvs|"
+                    "all)",
+                    name
+                )};
+            }
+            AppendMetric(metrics, entry->metric);
+        }
+        if (separator == std::string_view::npos) return std::nullopt;
+        value.remove_prefix(separator + 1);
+    }
+}
+
+}  // namespace
+
+std::string_view MetricName(Metric metric) {
+    const auto entry = std::ranges::find(kMetrics, metric, &MetricEntry::metric);
+    if (entry == kMetrics.end()) throw std::logic_error("unknown metric");
+    return entry->name;
+}
 
 std::string Usage(std::string_view program) {
     return std::format(
         R"help(VQM - SSIMULACRA 2.1 / Butteraugli / VMAF / ColorVideoVDP / PSNR-HVS (Vulkan)
-Usage: {} [--metric ssimulacra2|butteraugli|vmaf-v0|vmaf-v1|cvvdp|psnr-hvs] [--raw|--json]
+Usage: {} [--metric METRIC[,METRIC...]] [--raw|--json] [--verbose]
           [--half-planes] [--nvdec] [--iterations N] [--warmup N]
           [--chroma-filter KERNEL] [--intensity-target NITS]
           [--hf-asymmetry F]
@@ -41,18 +102,33 @@ Usage: {} [--metric ssimulacra2|butteraugli|vmaf-v0|vmaf-v1|cvvdp|psnr-hvs] [--r
 
 Batch clips: use --json --pairs-file PAIRS.tsv instead of positional paths.
 Each TSV row contains sample ID, original path and distorted path, separated by tabs.
-JSON prints one complete clip object per pair, with ordered frame_results and
-separate core_seconds and decode_seconds. --iterations repeats whole reset clips
-and reports the iteration with median core time; --warmup runs untimed clips first.
+JSON prints one complete clip object per pair and metric, in selection order.
+Each object contains ordered frame_results, per-metric core_seconds and the
+pair's shared decode_seconds. --iterations repeats whole reset clips and
+reports the iteration with median combined core time. --warmup runs untimed
+clips first.
 
---metric selects the metric: ssimulacra2 (default) prints a score in -inf..100,
-higher is better; butteraugli prints its diffmap maximum (0 for identical
-images, larger is worse) and --raw also prints its distance_p3 aggregate.
---intensity-target and --hf-asymmetry are butteraugli's libjxl parameters
-(defaults 80 nits and 1.0); ssimulacra2 ignores them.
+--metric selects one or more of ssimulacra2 (default), butteraugli, vmaf-v0,
+vmaf-v1, cvvdp and psnr-hvs. Repeat --metric or use a comma-separated list.
+The alias all selects all six metrics. Each selected metric must support the
+input pair. Duplicate selections are scored once, in first-seen order.
+Multiple metrics print labeled scores in text mode. --raw requires one metric.
+--verbose (-v) prints an aligned table with clip scores and frame statistics.
+Scoring FPS divides the clip's frame count by the combined core scoring time.
+Aggregate shows each metric's clip score. Frame min and max use all frames.
+Finite stddev is the population standard deviation of finite frame
+scores. Perfect counts frames that reached the metric's best score.
+With --json it adds scoring_fps, frame_stats and CVVDP's diagnostic frame
+JOD values after temporal filtering. --verbose cannot be combined with --raw.
+
+SSIMULACRA 2 prints a score in -inf..100, higher is better. Butteraugli prints
+its diffmap maximum (0 for identical images, larger is worse). With --raw it
+also prints its distance_p3 aggregate.
+--intensity-target and --hf-asymmetry configure Butteraugli's libjxl parameters
+(defaults 80 nits and 1.0).
 CVVDP prints JOD (10 for identical, higher is better; negative values are valid).
 VMAF v0.6.1 and v1 use their native input geometry and coded input formats.
-VMAF and spatial clip scores are the arithmetic mean of the ordered frame scores.
+SSIMULACRA 2, Butteraugli and VMAF average their frame scores.
 CVVDP uses the original standard_4k display by default. Physical display/viewing
 options are independent of image geometry. CVVDP reads all frames of progressive
 Y4M inputs, using their matching rational frame rates and one final clip score.
@@ -63,8 +139,9 @@ the configured physical display; special CL and ICtCp encodings are rejected.
 PSNR-HVS reports dB (higher is better) from matching opaque native planar YUV
 4:2:0, 4:2:2 or 4:4:4 inputs, at 8, 10 or 12 bits; every plane must be at least
 8x8. RGB conversion is unavailable. Pixel codes are measured directly, without
-range, matrix or transfer conversion. Zero weighted error prints inf, including
-when only part of a clip has zero error. JSON represents infinity as "inf".
+range, matrix or transfer conversion. For clips, the CLI averages weighted
+frame errors before converting to dB. The clip score is inf only when every
+frame has zero measured error. JSON represents infinity as "inf".
 --raw also prints PSNR-HVS Y, Cb and Cr dB, then normalized plane errors.
 
 Inputs may be PNG (8/16-bit), JPEG or progressive YUV4MPEG2.
@@ -116,12 +193,15 @@ SSIMULACRA 2 returns a score in -inf..100, correlated to subjective visual quali
 ParseResult ParseOptions(std::span<const std::string_view> args) {
     Options options;
     std::vector<std::string> positional;
+    std::vector<Metric> metrics;
     for (std::size_t i = 0; i < args.size(); ++i) {
         const std::string_view arg = args[i];
         if (arg == "--raw") {
             options.raw = true;
         } else if (arg == "--json") {
             options.json = true;
+        } else if (arg == "--verbose" || arg == "-v") {
+            options.verbose = true;
         } else if (arg == "--nvdec") {
             options.nvdec = true;
         } else if (arg == "--pairs-file") {
@@ -148,29 +228,10 @@ ParseResult ParseOptions(std::span<const std::string_view> args) {
         } else if (arg == "--half-planes") {
             options.half_planes = true;
         } else if (arg == "--metric") {
-            if (i + 1 >= args.size()) {
+            if (i + 1 >= args.size())
                 return ParseError{"--metric needs a value"};
-            }
-            const std::string_view value = args[++i];
-            if (value == "ssimulacra2") {
-                options.metric = Metric::Ssimulacra2;
-            } else if (value == "butteraugli") {
-                options.metric = Metric::Butteraugli;
-            } else if (value == "cvvdp") {
-                options.metric = Metric::Cvvdp;
-            } else if (value == "vmaf-v0") {
-                options.metric = Metric::VmafV0;
-            } else if (value == "vmaf-v1") {
-                options.metric = Metric::VmafV1;
-            } else if (value == "psnr-hvs") {
-                options.metric = Metric::PsnrHvs;
-            } else {
-                return ParseError{std::format(
-                    "invalid value for --metric: '{}' (expected "
-                    "ssimulacra2|butteraugli|vmaf-v0|vmaf-v1|cvvdp|psnr-hvs)",
-                    value
-                )};
-            }
+            if (auto error = ParseMetricList(args[++i], metrics))
+                return std::move(*error);
         } else if (tool::IsCvvdpOption(arg)) {
             if (i + 1 >= args.size())
                 return ParseError{std::format("{} needs a value", arg)};
@@ -229,12 +290,17 @@ ParseResult ParseOptions(std::span<const std::string_view> args) {
             positional.emplace_back(arg);
         }
     }
-    if (options.cvvdp.specified && options.metric != Metric::Cvvdp)
+    if (!metrics.empty()) options.metrics = std::move(metrics);
+    if (options.cvvdp.specified && !HasMetric(options.metrics, Metric::Cvvdp))
         return ParseError{"--cvvdp-* options require --metric cvvdp"};
-    if (options.metric != Metric::Ssimulacra2 && options.half_planes)
-        return ParseError{"--half-planes is ssimulacra2 only"};
+    if (options.half_planes && !HasMetric(options.metrics, Metric::Ssimulacra2))
+        return ParseError{"--half-planes requires ssimulacra2"};
     if (options.json && options.raw)
         return ParseError{"--json and --raw cannot be combined"};
+    if (options.verbose && options.raw)
+        return ParseError{"--verbose and --raw cannot be combined"};
+    if (options.raw && options.metrics.size() != 1)
+        return ParseError{"--raw requires exactly one metric"};
     if (!options.pairs_file.empty()) {
         if (!options.json) return ParseError{"--pairs-file requires --json"};
         if (!positional.empty())
@@ -331,12 +397,13 @@ int RunCliMain(int argc, char** argv) try {
         return 2;
     }
     const vqm::cli::Options& options = std::get<vqm::cli::Options>(result);
+    const auto metric = options.metrics.front();
 
-    if (options.nvdec || options.json ||
-        options.metric == vqm::cli::Metric::Cvvdp ||
-        options.metric == vqm::cli::Metric::PsnrHvs ||
-        options.metric == vqm::cli::Metric::VmafV0 ||
-        options.metric == vqm::cli::Metric::VmafV1 || options.iterations != 1 ||
+    if (options.metrics.size() > 1 || options.nvdec || options.json ||
+        options.verbose || metric == vqm::cli::Metric::Cvvdp ||
+        metric == vqm::cli::Metric::PsnrHvs ||
+        metric == vqm::cli::Metric::VmafV0 ||
+        metric == vqm::cli::Metric::VmafV1 || options.iterations != 1 ||
         options.warmup != 0)
         return vqm::cli::RunSequences(options);
 
@@ -373,7 +440,7 @@ int RunCliMain(int argc, char** argv) try {
 
     if (vqm::cli::HasY4mInput(options)) return vqm::cli::RunSequences(options);
 
-    if (options.metric == vqm::cli::Metric::Butteraugli) {
+    if (metric == vqm::cli::Metric::Butteraugli) {
         return RunButteraugli(options, *original, *distorted);
     }
     return RunSsimulacra2(options, *original, *distorted);

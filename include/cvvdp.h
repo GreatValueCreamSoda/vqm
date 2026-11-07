@@ -13,6 +13,10 @@
 
 namespace vqm {
 
+namespace internal {
+struct CvvdpFrameAccess;
+}  // namespace internal
+
 // Physical display parameters, independent of the input image dimensions.
 // Luminance is cd/m^2, illuminance is lux, reflectivity is diffuse. Angular
 // sampling is the display's central pixels per visual degree; no resizing is
@@ -98,6 +102,7 @@ public:
     [[nodiscard]] PipelineMemoryUsage GetMemoryUsage() const;
 
 private:
+    friend struct internal::CvvdpFrameAccess;
     struct Impl;
     std::unique_ptr<Impl> impl_;
 };

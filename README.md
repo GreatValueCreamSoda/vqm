@@ -95,12 +95,24 @@ For end-to-end reference correlation across the five established metrics, use th
 ./build/vqm --metric vmaf-v1 --json original.y4m distorted.y4m
 ./build/vqm --metric cvvdp original.y4m distorted.y4m
 ./build/vqm --metric psnr-hvs --json original.y4m distorted.y4m
+./build/vqm --metric ssimulacra2,butteraugli original.png distorted.png
+./build/vqm --metric all --json original.y4m distorted.y4m
+./build/vqm --metric all --verbose original.y4m distorted.y4m
 ```
+
+Select several metrics with a comma-separated list or by repeating `--metric`.
+`all` expands to `ssimulacra2`, `butteraugli`, `vmaf-v0`, `vmaf-v1`, `cvvdp`,
+and `psnr-hvs`. The CLI runs each metric once in the order first selected.
+SSIMULACRA 2 is the default. Plain text gives one `metric: score` line per
+metric when several are selected and a bare score for a single metric.
+`--raw` requires a single metric. Every selected metric's input requirements
+apply to the pair.
 
 The CLI supports PNG, JPEG and progressive YUV4MPEG2. All six metrics consume
 every Y4M frame in order, with matching geometry, rational frame rates and frame
-counts. SSIMULACRA 2, Butteraugli, VMAF and PSNR-HVS return the arithmetic mean of their
-frame scores; CVVDP returns its whole-clip JOD after temporal distortion pooling.
+counts. SSIMULACRA 2, Butteraugli, and VMAF average their frame scores.
+PSNR-HVS averages weighted frame errors before converting to dB. CVVDP returns
+its whole-clip JOD after temporal distortion pooling.
 PNG and JPEG are interpreted as sRGB with BT.709 primaries; the CLI also offers
 input color overrides and a `--raw` mode. Run `./build/vqm --help` for the
 options. For SSIMULACRA 2 and Butteraugli images with alpha, the CLI evaluates
@@ -109,20 +121,35 @@ opaque inputs; PSNR-HVS requires native opaque
 YUV and encodes positive infinity as the JSON string `"inf"`.
 [Run the three-frame Y4M example](docs/temporal-validation.md#score-a-complete-video).
 
-`--json` prints one object per complete input pair, including `score`, `frames`,
-ordered `frame_results`, `core_seconds` and `decode_seconds`. CVVDP has a clip
-score and an empty `frame_results` array. Use `--pairs-file` with a TSV containing
-sample ID, original path and distorted path to process several clips in one
-process:
+`--json` prints one object per metric for each complete input pair, in selection
+order. Each object includes `score`, `frames`, ordered `frame_results`,
+`core_seconds`, and `decode_seconds`. CVVDP's `frame_results` array is empty
+unless `--verbose` is set. Use `--pairs-file` with a TSV containing sample ID,
+original path, and distorted path to process several clips in one process.
 
 ```sh
 ./build/vqm --metric vmaf-v0 --json --pairs-file pairs.tsv \
   --iterations 5 --warmup 1
 ```
 
-Each iteration reads and scores the whole clip after resetting its temporal
-history. The reported timing selects the iteration with median core time; decode
-time is separate. `--json` and `--raw` are separate output modes.
+Each iteration resets temporal history and reads the whole clip once for all
+selected metrics. The CLI reports the iteration with median total core time.
+Each metric's object has its own core time and the shared decode time.
+
+`--verbose` (`-v`) prints the shared frame count and scoring FPS once, followed
+by an aligned table. Scoring FPS divides the frame count by the sum of the
+selected metrics' core times in the reported iteration. With `--json`, each
+metric record carries the same `scoring_fps` for the pair.
+
+`Aggregate` is each metric's clip score. The other columns
+show the frame minimum and maximum, the population standard deviation of
+finite frame scores, and `Perfect`, the count of frames that reached the
+metric's best score. When every frame score is infinite, the standard deviation
+displays as `n/a`. With `--json`, the clip score is in `score` and frame
+statistics, including the finite-frame mean, are in `frame_stats`. Unavailable
+values are `null`. This mode includes CVVDP frame JOD diagnostics after temporal
+filtering in `frame_results`.
+[CVVDP clip and frame scores](docs/cvvdp.md#resources-and-tools)
 
 ### NVIDIA hardware decoding
 

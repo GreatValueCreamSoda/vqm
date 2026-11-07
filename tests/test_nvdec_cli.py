@@ -113,6 +113,11 @@ class NvdecCliGpu(unittest.TestCase):
     ) -> None:
         expected = self._report("--metric", metric, *raw)
         actual = self._report("--metric", metric, *compressed)
+        self._compare_reports(metric, actual, expected)
+
+    def _compare_reports(
+        self, metric: str, actual: dict[str, object], expected: dict[str, object]
+    ) -> None:
         self.assertEqual(actual["frames"], _FRAMES)
         self.assertEqual(actual["metric"], metric)
         self.assertAlmostEqual(actual["score"], expected["score"], delta=1e-6)
@@ -126,9 +131,14 @@ class NvdecCliGpu(unittest.TestCase):
         """Compare complete 8-bit 4:2:0 clips, including reordered B frames."""
         pair = self.original, self.distorted
         raw = self._software_decode(pair[0]), self._software_decode(pair[1])
-        for metric in _METRICS:
+        result = _run("--json", "--metric", "all", *pair)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        reports = [json.loads(line) for line in result.stdout.splitlines()]
+        self.assertEqual([report["metric"] for report in reports], list(_METRICS))
+        for metric, report in zip(_METRICS, reports, strict=True):
             with self.subTest(metric=metric):
-                self._compare(metric, pair, raw)
+                expected = self._report("--metric", metric, *raw)
+                self._compare_reports(metric, report, expected)
 
     def test_default_text_output_uses_nvdec(self) -> None:
         """Detect compressed video content and score it without extra flags."""

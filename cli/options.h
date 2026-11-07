@@ -6,6 +6,7 @@
 #include <string>
 #include <string_view>
 #include <variant>
+#include <vector>
 
 #include "cvvdp_options.h"
 #include "io.h"
@@ -17,9 +18,10 @@ enum class Metric { Ssimulacra2, Butteraugli, VmafV0, VmafV1, Cvvdp, PsnrHvs };
 struct Options {
     bool raw = false;
     bool json = false;
+    bool verbose = false;
     bool half_planes = false;
     bool nvdec = false;
-    Metric metric = Metric::Ssimulacra2;
+    std::vector<Metric> metrics{Metric::Ssimulacra2};
     tool::CvvdpOptions cvvdp;
     float hf_asymmetry = 1.0f;
     float intensity_target = 80.0f;
@@ -39,5 +41,6 @@ using ParseResult = std::variant<Options, ParseError, HelpRequested>;
 
 [[nodiscard]] ParseResult ParseOptions(std::span<const std::string_view> args);
 [[nodiscard]] std::string Usage(std::string_view program);
+[[nodiscard]] std::string_view MetricName(Metric metric);
 
 }  // namespace vqm::cli

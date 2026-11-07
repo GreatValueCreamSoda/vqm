@@ -13,8 +13,8 @@ namespace vqm::cli {
 // for other inputs, including all inputs in a build without NVDEC.
 [[nodiscard]] bool TryRunNvdecPair(const Options& options);
 
-// Process complete ordered inputs, with one final result per input pair.
-// Returns after all requested pairs; failures throw before that clip is printed.
+// Process complete ordered inputs, with one result per pair and metric.
+// A failed pair throws before any of its results are printed.
 int RunSequences(const Options& options);
 
 }  // namespace vqm::cli

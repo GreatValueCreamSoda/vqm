@@ -30,6 +30,16 @@ void ValidateCvvdpInput(const ImageFormat& format, const CvvdpDisplay& display);
 [[nodiscard]] double CvvdpJod(double distortion);
 [[nodiscard]] double CvvdpImageJod(std::span<const float> bands);
 
+// Optional CLI diagnostics from the same temporally filtered distortion used
+// to pool clip JOD. Enable before scoring. A Push can emit zero, one, or two
+// frame JODs in order. The view is valid until the next Push or Reset.
+struct CvvdpFrameAccess {
+    static void Enable(CvvdpPipeline& pipeline);
+    [[nodiscard]] static std::span<const double> Scores(
+        const CvvdpPipeline& pipeline
+    );
+};
+
 class CvvdpPrepare {
 public:
     CvvdpPrepare(VulkanRuntime&, const CvvdpDisplay&, ChromaFilter);

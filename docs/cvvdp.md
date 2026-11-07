@@ -108,6 +108,7 @@ with this implementation. Disable temporal storage for still-only work.
 ```sh
 ./build/vqm --metric cvvdp original.png distorted.png
 ./build/vqm --metric cvvdp original.y4m distorted.y4m
+./build/vqm --metric cvvdp --verbose --json original.y4m distorted.y4m
 ./build/vqm --metric cvvdp --json original.y4m distorted.y4m \
   --iterations 5 --warmup 1
 ./build/vqm --metric cvvdp --json --pairs-file pairs.tsv
@@ -121,11 +122,17 @@ The CLI consumes an entire progressive Y4M stream with matched rational timing,
 geometry and frame count. PNG/JPEG input is an independent image. Plain text and
 `--raw` output retain their image and clip score formats; `--raw` also prints the
 frame count. JSON contains one complete clip result, its frame count and separate
-core/decode times. Its `frame_results` array is empty because CVVDP exposes a
-whole-clip score. Every repetition resets the clip history, and the returned
-timing selects the iteration with median core time. `--pairs-file` reads TSV rows
-with sample ID, original path and distorted path, allowing multiple independent
-clips in one process.
+core/decode times. Its `frame_results` array is empty by default. Every
+repetition resets the clip history, and the CLI reports the iteration with
+median core time. `--pairs-file` reads TSV rows with sample ID, original path
+and distorted path, allowing multiple independent clips in one process.
+
+`--verbose` summarizes diagnostic frame JODs. With `--json` it also reports
+each frame's index and JOD in `frame_results`. For video, each value maps that
+frame's spatially pooled, temporally filtered distortion to JOD before
+pooling across the clip. The clip score pools the frame distortions first,
+then converts the pooled distortion to JOD. A one-frame input uses the image
+JOD for its frame and clip scores.
 
 Run the hosted smoke profile for CVVDP through the public CLI:
 

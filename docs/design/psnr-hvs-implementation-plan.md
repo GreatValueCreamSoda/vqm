@@ -240,12 +240,12 @@ layout and resolution domains need corresponding qualification coverage and
 component oracles. For file-based video workloads use complete clips through
 the normal `vqm` CLI and explicitly define frame-to-clip pooling for both arms.
 Keep nonfinite-score invariants separate from the finite agreement reports.
-The current spatial video summary averages frame dB scores; one infinite
-frame makes that summary infinite. Freeze reference-finite video variants
-before candidate scoring, including a base distortion on every frame where
-needed. Existing isolated-final-frame-error variants cannot automatically
-supply finite PSNR-HVS clip scores. Do not silently drop frames or substitute
-the logarithm of mean error for mean frame dB.
+The initial CLI summary used libvmaf's arithmetic mean of frame dB scores,
+where one infinite frame makes the mean infinite. When evaluating that
+reference mean, freeze reference-finite video variants before candidate
+scoring, including a base distortion on every frame where needed.
+The [current CLI summary](../psnr-hvs.md#combined-metrics-and-video) uses the
+mean frame error before converting to dB.
 
 Benchmark native 420/444 at 1080p and 4K, separately for resident, streaming and
 borrowed Vulkan inputs, with all input/CPU/GPU/build provenance. Follow the
