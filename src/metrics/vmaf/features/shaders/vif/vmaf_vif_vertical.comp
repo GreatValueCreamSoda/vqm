@@ -1,0 +1,74 @@
+// VMAF VIF: Copyright 2016-2020 Netflix, Inc.
+// BSD-2-Clause-Patent; see licenses/NETFLIX-VMAF-LICENSE.
+// Vertical filtering of ref, dist, ref², dist², and ref*dist, following
+// libvmaf vif_tools.c:314-361,431-551 at
+// 4611e47a7330cd342498dcc130e1008efbeab6e4.
+
+#version 450
+#include "vmaf_vif_common.glsl"
+
+layout(local_size_x = 16, local_size_y = 16) in;
+// Each 16-row statistics tile shares its input rows plus an eight-pixel
+// halo; every source sample is loaded once per column and tile.
+shared float ref_tile[32 * 16];
+shared float dist_tile[32 * 16];
+
+void main() {
+    const uvec2 thread = gl_GlobalInvocationID.xy;
+    if (pc.op != 0u) {
+        const uint lx = gl_LocalInvocationID.x, ly = gl_LocalInvocationID.y;
+        // The last workgroup may fetch unused halo rows. Clamp these before
+        // mirroring so even the two-row final scale stays inside the plane.
+        const int halo = min(8, int(pc.height) - 1);
+        for (uint block = 0u; block < 2u; ++block) {
+            const uint ty = ly + 16u * block;
+            const int raw_y = clamp(
+                int(gl_WorkGroupID.y * 16u + ty) - 8, -halo,
+                int(pc.height) - 1 + halo
+            );
+            const int y = vif_mirror(raw_y, int(pc.height));
+            const uint source = uint(y) * pc.width + thread.x;
+            const uint dest = ty * 16u + lx;
+            ref_tile[dest] =
+                thread.x < pc.width ? arena[pc.reference + source] : 0.0;
+            dist_tile[dest] =
+                thread.x < pc.width ? arena[pc.distorted + source] : 0.0;
+        }
+        barrier();
+    }
+    // Decimation consumes only even rows; retain their full-plane scratch
+    // offsets but do not filter the other rows.
+    if (pc.op == 0u && thread.y >= pc.height / 2u) return;
+    const uvec2 p = uvec2(thread.x, pc.op == 0u ? thread.y * 2u : thread.y);
+    if (p.x >= pc.width || p.y >= pc.height) return;
+    const uint area = pc.width * pc.height;
+    vec2 means = vec2(0.0);
+    vec3 moments = vec3(0.0);
+    const int width = vif_width();
+    for (int k = 0; k < width; ++k) {
+        float r, d;
+        if (pc.op != 0u) {
+            const uint index =
+                uint(int(gl_LocalInvocationID.y) + 8 + k - width / 2) * 16u +
+                gl_LocalInvocationID.x;
+            r = ref_tile[index];
+            d = dist_tile[index];
+        } else {
+            const int y = vif_mirror(int(p.y) + k - width / 2, int(pc.height));
+            const uint index = uint(y) * pc.width + p.x;
+            r = arena[pc.reference + index];
+            d = arena[pc.distorted + index];
+        }
+        const float weight = vif_weight(k);
+        means += weight * vec2(r, d);
+        if (pc.op != 0u) moments += weight * vec3(r * r, d * d, r * d);
+    }
+    const uint i = p.y * pc.width + p.x;
+    arena[pc.scratch + i] = means.x;
+    arena[pc.scratch + area + i] = means.y;
+    if (pc.op != 0u) {
+        arena[pc.scratch + 2u * area + i] = moments.x;
+        arena[pc.scratch + 3u * area + i] = moments.y;
+        arena[pc.scratch + 4u * area + i] = moments.z;
+    }
+}

@@ -1,0 +1,27 @@
+// VMAF motion: Copyright 2016-2020 Netflix, Inc.
+// BSD-2-Clause-Patent; see licenses/NETFLIX-VMAF-LICENSE.
+// Reduce the absolute differences to the average motion score. The
+// per-workgroup summation order is ours; libvmaf uses a row-wise reduction
+// (motion.c:44-58, revision 4611e47a7330cd342498dcc130e1008efbeab6e4).
+
+#version 450
+#include "vmaf_motion_common.glsl"
+
+layout(local_size_x = 256) in;
+shared float partial[256];
+
+void main() {
+    const uint lane = gl_LocalInvocationIndex;
+    float sum = 0.0;
+    for (uint i = lane; i < pc.groups; i += 256u) sum += arena[pc.partials + i];
+    partial[lane] = sum;
+    barrier();
+    for (uint stride = 128u; stride > 0u; stride >>= 1u) {
+        if (lane < stride) partial[lane] += partial[lane + stride];
+        barrier();
+    }
+    if (lane == 0u) {
+        arena[pc.output_score] =
+            partial[0] / (float(pc.width) * float(pc.height));
+    }
+}

@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "metric": "ssimulacra2",
+  "reference_revision": "81feacf6a5b0bbd7ec11b4a881a4615033ab0b10",
+  "direction": "higher",
+  "mos_direction": "higher",
+  "margins": {
+    "ssimulacra2:cid22": 0.1
+  },
+  "required_strata": {
+    "cid22": {
+      "min_sources": 30,
+      "min_samples": 180,
+      "min_eligible_pairs": 1,
+      "min_eligible_fraction": 0.1
+    }
+  },
+  "coverage": {
+    "min_sources": 30,
+    "min_samples": 2,
+    "min_eligible_pairs": 1,
+    "min_eligible_fraction": 0.1
+  },
+  "limits": {
+    "srcc_min": 0.999,
+    "tau_min": 0.99,
+    "macro_error_max": 0.005,
+    "family_error_max": 0.01,
+    "source_error_max": 0.05
+  },
+  "subjective": {
+    "required": true,
+    "margin": 0.005,
+    "min_sources": 30,
+    "resamples": 10000,
+    "seed": 0
+  },
+  "numerical_max": 0.01,
+  "numerical_mean": 0.001,
+  "input_manifest_hash": "27244e276ffaf890378f4f899eeff6c7de73cf56aaf9ee9359a33758f9d31a2e",
+  "min_total_sources": 30,
+  "min_total_samples": 180
+}

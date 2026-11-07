@@ -1,0 +1,4 @@
+# Local Python test dependencies; keep these versions aligned with the CPU
+# reference environment in cvvdp-reference-requirements.txt.
+numpy==2.5.4
+pillow==13.0.0

@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "metric": "ssimulacra2",
+  "reference_revision": "81feacf6a5b0bbd7ec11b4a881a4615033ab0b10",
+  "margins": {
+    "ssimulacra2-srgb444-8bit-frame-mean": 1.7688777193304999
+  },
+  "configuration_hash": "133ef18eeaffb7a54db2c363e6e84b40a3d527349e9d171c9db2129d2306b5c7",
+  "input_manifest_hash": "d9531f485c1dd0204763599fd53ca9e84dcb33a7c5467e71a80120bb81a2aea6",
+  "min_total_sources": 30,
+  "min_total_samples": 390,
+  "coverage": {
+    "min_sources": 1,
+    "min_samples": 2,
+    "min_eligible_pairs": 1,
+    "min_eligible_fraction": 0.1
+  },
+  "required_strata": {
+    "sdr-spatial-srgb444": {
+      "min_sources": 1,
+      "min_samples": 2,
+      "min_eligible_pairs": 1,
+      "min_eligible_fraction": 0.1
+    }
+  },
+  "numerical_max": 0.01,
+  "subjective": {
+    "required": false
+  },
+  "direction": "higher",
+  "numerical_mean": 0.001
+}

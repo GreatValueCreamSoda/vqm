@@ -1,0 +1,104 @@
+// Derived from Cloudinary SSIMULACRA 2 (Copyright (c) Jon Sneyers, Cloudinary).
+// BSD-3-Clause; see LICENSE.
+// Butteraugli portions: Copyright (c) the JPEG XL Project Authors.
+// BSD-3-Clause; see licenses/JPEG-XL-LICENSE.
+
+// Per-workgroup partials of the final diffmap: the maximum (Butteraugli's
+// score, butteraugli.cc:1954-1964) and the three powered sums behind
+// ComputeDistanceP(p=3) (lib/extras/metrics.cc:42-145): sum of d^3, d^6 and
+// d^12. The host sums the partials in double -- a 4-value tail per workgroup --
+// and takes the roots, so the device never needs a cross-workgroup barrier.
+//
+// Four partials per workgroup at pc.a (level 0's row holds the arena offset).
+
+#version 450
+
+#include "butter_common.glsl"
+
+layout(local_size_x = 256) in;
+
+shared float red_max[256];
+shared float red_3[256];
+shared float red_6[256];
+shared float red_12[256];
+
+void main() {
+    const uint tid = gl_LocalInvocationIndex;
+
+    // Second stage: fold the per-workgroup partials into four floats, so the
+    // host reads 16 bytes instead of one PCIe round trip per partial (which
+    // measured 49 ms at 4K).
+    if (pc.op == 1u) {
+        const uint groups = uint(pc.q0);
+        float m = 0.0;
+        float s3 = 0.0;
+        float s6 = 0.0;
+        float s12 = 0.0;
+        for (uint g = tid; g < groups; g += 256u) {
+            const uint entry = pc.a + g * 4u;
+            m = max(m, arena[entry + 0u]);
+            s3 += arena[entry + 1u];
+            s6 += arena[entry + 2u];
+            s12 += arena[entry + 3u];
+        }
+        red_max[tid] = m;
+        red_3[tid] = s3;
+        red_6[tid] = s6;
+        red_12[tid] = s12;
+        barrier();
+        for (uint stride = 128u; stride > 0u; stride >>= 1) {
+            if (tid < stride) {
+                red_max[tid] = max(red_max[tid], red_max[tid + stride]);
+                red_3[tid] += red_3[tid + stride];
+                red_6[tid] += red_6[tid + stride];
+                red_12[tid] += red_12[tid + stride];
+            }
+            barrier();
+        }
+        if (tid == 0u) {
+            arena[pc.b + 0u] = red_max[0];
+            arena[pc.b + 1u] = red_3[0];
+            arena[pc.b + 2u] = red_6[0];
+            arena[pc.b + 3u] = red_12[0];
+        }
+        return;
+    }
+
+    const uint area = butter_row(0u, R_AREA);
+    const uint base = gl_WorkGroupID.x * 256u;
+    const uint index = base + tid;
+
+    float m = 0.0;
+    float s3 = 0.0;
+    float s6 = 0.0;
+    float s12 = 0.0;
+    if (index < area) {
+        const float d = arena[butter_row(0u, R_DIFFMAP) + index];
+        m = d;
+        const float d3 = d * d * d;
+        s3 = d3;
+        s6 = d3 * d3;
+        s12 = s6 * s6;
+    }
+    red_max[tid] = m;
+    red_3[tid] = s3;
+    red_6[tid] = s6;
+    red_12[tid] = s12;
+    barrier();
+    for (uint stride = 128u; stride > 0u; stride >>= 1) {
+        if (tid < stride) {
+            red_max[tid] = max(red_max[tid], red_max[tid + stride]);
+            red_3[tid] += red_3[tid + stride];
+            red_6[tid] += red_6[tid + stride];
+            red_12[tid] += red_12[tid + stride];
+        }
+        barrier();
+    }
+    if (tid == 0u) {
+        const uint base_out = pc.a + gl_WorkGroupID.x * 4u;
+        arena[base_out + 0u] = red_max[0];
+        arena[base_out + 1u] = red_3[0];
+        arena[base_out + 2u] = red_6[0];
+        arena[base_out + 3u] = red_12[0];
+    }
+}

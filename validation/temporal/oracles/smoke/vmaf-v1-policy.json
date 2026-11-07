@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "metric": "vmaf-v1",
+  "reference_revision": "4611e47a7330cd342498dcc130e1008efbeab6e4",
+  "margins": {
+    "vmaf-v1-native444-8bit": 0.60009012175
+  },
+  "configuration_hash": "d06bade22b9ec7617a4b686bc22ca75caffc8fc25bef6b8a32d9e7cf7b2a4d89",
+  "input_manifest_hash": "23ba1bdbc11aeb6b42db25abc0ee7056cb0c09285f48d978c2b1a9267e020379",
+  "min_total_sources": 3,
+  "min_total_samples": 39,
+  "coverage": {
+    "min_sources": 1,
+    "min_samples": 2,
+    "min_eligible_pairs": 1,
+    "min_eligible_fraction": 0.1
+  },
+  "required_strata": {
+    "sdr-native-444": {
+      "min_sources": 1,
+      "min_samples": 2,
+      "min_eligible_pairs": 1,
+      "min_eligible_fraction": 0.1
+    }
+  },
+  "numerical_max": 0.35,
+  "subjective": {
+    "required": false
+  }
+}

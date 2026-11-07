@@ -1,0 +1,262 @@
+// VMAF CAMBI: Copyright 2016-2020 Netflix, Inc.
+// BSD-2-Clause-Patent; see licenses/NETFLIX-VMAF-LICENSE.
+// Mode filter and local contrast: libvmaf/src/feature/cambi.c, pinned
+// 4611e47a7330cd342498dcc130e1008efbeab6e4.
+#version 450
+#ifdef VQM_CAMBI_SUBGROUP_ROWS
+#extension GL_KHR_shader_subgroup_basic : require
+#define CAMBI_LOGICAL_INDEX logical_index
+#else
+#define CAMBI_LOGICAL_INDEX gl_LocalInvocationIndex
+#endif
+#ifdef VQM_CAMBI_HALF_SOURCE
+#extension GL_EXT_shader_explicit_arithmetic_types_float16 : require
+#define CAMBI_SOURCE_TYPE float16_t
+#define CAMBI_SOURCE_STORE(value) float16_t(value)
+#define CAMBI_SOURCE_LOAD(value) uint(value)
+#else
+#define CAMBI_SOURCE_TYPE uint
+#define CAMBI_SOURCE_STORE(value) (value)
+#define CAMBI_SOURCE_LOAD(value) (value)
+#endif
+#include "bindings.glsl"
+layout(local_size_x = 16, local_size_y = 16) in;
+// Eight output rows share exact packed integer histograms. Moving one column
+// updates only the entering and leaving samples, following the sliding histogram
+// mechanism in libvmaf/src/feature/cambi.c:1172-1179. The cooperative workgroup
+// organization and source tile are ours. 48*40 + 8*256 + 1 + 8*4 words = 16,004
+// B, below Vulkan's 16 KiB minimum even for the largest 33-pixel window.
+// Eligible symbols are 0..497, exactly representable in FP16. Only this
+// source tile shrinks: the half variant uses 12,164 shared bytes, while the
+// integer histograms, FP32 contrast arithmetic and global banks are unchanged.
+shared CAMBI_SOURCE_TYPE source_tile[48 * 40];
+shared uint histograms[8 * 256];
+shared uint active_rows;
+shared float contrast_terms[8 * 4];
+layout(push_constant) uniform Push {
+    uint width, height, input_offset, mask, horizontal, filtered, contrast;
+    uint radius, phase, row_base;
+}
+pc;
+
+float mode3(float a, float b, float c) {
+    if (a == b || a == c) return a;
+    if (b == c) return b;
+    return min(a, min(b, c));
+}
+
+uint bin_count(uint row, int bin) {
+    if (bin < 0 || bin > 496) return 0u;
+    uint b = uint(bin);
+    uint packed = histograms[row * 256u + b / 2u];
+    return (packed >> (16u * (b & 1u))) & 65535u;
+}
+
+void update_bin(uint row, uint packed, bool add) {
+    uint bin = packed - 1u;
+    uint increment = (bin & 1u) == 0u ? 1u : 65536u;
+    // The starting window contains every sample that can leave this slide,
+    // so a 16-bit count cannot underflow even if atomics are interleaved.
+    atomicAdd(
+        histograms[row * 256u + bin / 2u], add ? increment : 0u - increment
+    );
+}
+
+uint packed_sample(int x, int y) {
+    if (x < 0 || y < 0 || x >= int(pc.width) || y >= int(pc.height)) return 0u;
+    uint at = uint(y) * pc.width + uint(x);
+    int value = int(arena[pc.filtered + at]);
+    if (arena[pc.mask + at] == 0.0 || value < 67 || value > 563) return 0u;
+    return uint(value - 66);
+}
+
+void contrast_map() {
+#ifdef VQM_CAMBI_SUBGROUP_ROWS
+    // All 256 invocations reach this workgroup-uniform test before any
+    // pixel-bound return. Eight 32-slot subgroups therefore form full rows.
+    bool subgroup_rows = gl_SubgroupSize == 32u && gl_NumSubgroups == 8u;
+    uint lane =
+        subgroup_rows ? gl_SubgroupInvocationID : gl_LocalInvocationIndex % 32u;
+    uint row = subgroup_rows ? gl_SubgroupID : gl_LocalInvocationIndex / 32u;
+    uint logical_index = row * 32u + lane;
+#else
+    uint lane = gl_LocalInvocationIndex % 32u;
+    uint row = gl_LocalInvocationIndex / 32u;
+#endif
+    uint extent = 16u + 2u * pc.radius;
+    uint window = 1u + 2u * pc.radius;
+    int x0 = int(gl_WorkGroupID.x * 16u) - int(pc.radius);
+    int y0 = int(gl_WorkGroupID.y * 8u) - int(pc.radius);
+    if (CAMBI_LOGICAL_INDEX == 0u) active_rows = 0u;
+    barrier();
+    // Probe the output centers before clearing histograms or loading their
+    // halo. A group with no eligible center has an exactly zero contrast map.
+    // Publish the center samples into the tile for reuse by active groups.
+    if (lane < 16u) {
+        uint out_x = gl_WorkGroupID.x * 16u + lane;
+        uint out_y = gl_WorkGroupID.y * 8u + row;
+        uint packed = packed_sample(int(out_x), int(out_y));
+        source_tile[(row + pc.radius) * extent + lane + pc.radius] =
+            CAMBI_SOURCE_STORE(packed);
+        if (packed != 0u) atomicOr(active_rows, 1u << row);
+    }
+    barrier();
+    if (active_rows == 0u) {
+        if (lane < 16u) {
+            uint out_x = gl_WorkGroupID.x * 16u + lane;
+            uint out_y = gl_WorkGroupID.y * 8u + row;
+            if (out_x < pc.width && out_y < pc.height)
+                arena[pc.contrast + out_y * pc.width + out_x] = 0.0;
+        }
+        return;
+    }
+    for (uint i = CAMBI_LOGICAL_INDEX; i < 8u * 256u; i += 256u)
+        histograms[i] = 0u;
+    for (uint i = CAMBI_LOGICAL_INDEX; i < extent * (8u + 2u * pc.radius);
+         i += 256u) {
+        uint x = i % extent, y = i / extent;
+        // The 16x8 output center rectangle is already in the shared tile.
+        if (x >= pc.radius && x < pc.radius + 16u && y >= pc.radius &&
+            y < pc.radius + 8u)
+            continue;
+        source_tile[i] =
+            CAMBI_SOURCE_STORE(packed_sample(x0 + int(x), y0 + int(y)));
+    }
+    barrier();
+    bool row_active = (active_rows & (1u << row)) != 0u;
+    if (active_rows == 255u) {
+        // All rows are needed: build the first window cooperatively, then
+        // derive each next row by removing its top and adding its bottom.
+        // The row slide follows libvmaf/src/feature/cambi.c:1172-1179; our
+        // packed counter copies and barriers are independent of subgroup size.
+        for (uint i = CAMBI_LOGICAL_INDEX; i < window * window; i += 256u) {
+            uint packed = CAMBI_SOURCE_LOAD(
+                source_tile[(i / window) * extent + i % window]
+            );
+            if (packed != 0u) update_bin(0u, packed, true);
+        }
+        barrier();
+        for (uint target = 1u; target < 8u; ++target) {
+            histograms[target * 256u + CAMBI_LOGICAL_INDEX] =
+                histograms[(target - 1u) * 256u + CAMBI_LOGICAL_INDEX];
+            barrier();
+            for (uint x = CAMBI_LOGICAL_INDEX; x < window; x += 256u) {
+                uint leaving =
+                    CAMBI_SOURCE_LOAD(source_tile[(target - 1u) * extent + x]);
+                uint entering = CAMBI_SOURCE_LOAD(
+                    source_tile[(target + window - 1u) * extent + x]
+                );
+                if (leaving != entering) {
+                    if (leaving != 0u) update_bin(target, leaving, false);
+                    if (entering != 0u) update_bin(target, entering, true);
+                }
+            }
+            barrier();
+        }
+    } else {
+        // Sparse tiles retain independent construction and avoid copying
+        // histograms for inactive rows.
+        if (row_active) {
+            for (uint i = lane; i < window * window; i += 32u) {
+                uint packed = CAMBI_SOURCE_LOAD(
+                    source_tile[(row + i / window) * extent + i % window]
+                );
+                if (packed != 0u) update_bin(row, packed, true);
+            }
+        }
+        barrier();
+    }
+    for (uint x = 0u; x < 16u; ++x) {
+        // The four d terms are independent. Compute them on four lanes per
+        // row before the read barrier, then have lane zero combine the terms
+        // while the other lanes slide the histogram. The barrier that already
+        // separates reading and updating the histogram publishes the terms too.
+        if (lane < 4u) {
+            uint center_packed = CAMBI_SOURCE_LOAD(
+                source_tile[(row + pc.radius) * extent + x + pc.radius]
+            );
+            float result = 0.0;
+            if (center_packed != 0u) {
+                int center = int(center_packed) + 66;
+                int bin = int(center_packed) - 1;
+                int d = int(lane) + 1;
+                const int tvi[4] = int[4](182, 309, 436, 563);
+                if (center + 4 <= tvi[lane] && center + 4 + d > 78) {
+                    int p0 = int(bin_count(row, bin));
+                    int pother = int(
+                        max(bin_count(row, bin + d), bin_count(row, bin - d))
+                    );
+                    if (p0 + pother > 0)
+                        result =
+                            float(d * p0 * pother) * (1.0 / float(p0 + pother));
+                }
+            }
+            contrast_terms[row * 4u + lane] = result;
+        }
+        // All histogram readers and term writers complete before updates.
+#ifdef VQM_CAMBI_SUBGROUP_ROWS
+        if (subgroup_rows)
+            subgroupBarrier();
+        else
+#endif
+            barrier();
+        if (lane == 0u) {
+            uint out_x = gl_WorkGroupID.x * 16u + x;
+            uint out_y = gl_WorkGroupID.y * 8u + row;
+            if (out_x < pc.width && out_y < pc.height) {
+                float result = contrast_terms[row * 4u];
+                for (uint d = 1u; d < 4u; ++d)
+                    result = max(result, contrast_terms[row * 4u + d]);
+                arena[pc.contrast + out_y * pc.width + out_x] = result;
+            }
+        }
+        if (x == 15u) break;
+        if (row_active) {
+            for (uint k = lane; k < window; k += 32u) {
+                uint at = (row + k) * extent + x;
+                uint leaving = CAMBI_SOURCE_LOAD(source_tile[at]),
+                     entering = CAMBI_SOURCE_LOAD(source_tile[at + window]);
+                if (leaving != entering) {
+                    if (leaving != 0u) update_bin(row, leaving, false);
+                    if (entering != 0u) update_bin(row, entering, true);
+                }
+            }
+        }
+#ifdef VQM_CAMBI_SUBGROUP_ROWS
+        if (subgroup_rows)
+            subgroupBarrier();
+        else
+#endif
+            barrier();
+    }
+}
+
+void main() {
+    if (pc.phase == 2u) {
+        contrast_map();
+        return;
+    }
+    uvec2 p = gl_GlobalInvocationID.xy;
+    if (p.x >= pc.width || p.y >= pc.height) return;
+    uint index = p.y * pc.width + p.x;
+    if (pc.phase == 0u) {
+        float center = arena[pc.input_offset + index];
+        if (p.x == 0u || p.x + 1u == pc.width) {
+            arena[pc.horizontal + index] = center;
+        } else {
+            arena[pc.horizontal + index] = mode3(
+                arena[pc.input_offset + index - 1u], center,
+                arena[pc.input_offset + index + 1u]
+            );
+        }
+        return;
+    }
+    if (p.y == 0u || p.y + 1u == pc.height) {
+        arena[pc.filtered + index] = arena[pc.input_offset + index];
+    } else {
+        arena[pc.filtered + index] = mode3(
+            arena[pc.horizontal + index - pc.width],
+            arena[pc.horizontal + index], arena[pc.horizontal + index + pc.width]
+        );
+    }
+}

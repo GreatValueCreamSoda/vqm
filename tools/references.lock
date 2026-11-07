@@ -1,0 +1,20 @@
+# Upstream checkouts this repository compares against.
+# One row per reference: <name> <url> <commit>. tools/fetch_references.py
+# clones each into .reference/<name> at exactly this commit; the build script
+# copies them under build/ and never writes into .reference/.
+#
+# Never edit a pin without re-running the validation and benchmark reports:
+# every quoted parity number is relative to these commits.
+
+ssimulacra2  https://github.com/cloudinary/ssimulacra2  81feacf6a5b0bbd7ec11b4a881a4615033ab0b10
+libjxl       https://github.com/libjxl/libjxl            e47d2a2b5bb418f2947ce07f36cb048861db3820
+fssimu2      https://github.com/gianni-rosato/fssimu2    9883fc89c5bd2c647abe788fa29e44247d9f69d3
+Vship        https://codeberg.org/Line-fr/Vship          91d03ec2f2e03e4817b64655a5ea58ab7ab3d3ba
+Vship-fast   https://github.com/4KVCD/Vship-fast         2a937ebaa1ae18718596a047c1e4947caf858c8e
+zimg         https://github.com/sekrit-twc/zimg          67e0603271c080e22c8429856dd4a8a56587e61e
+
+# Netflix reference for VMAF v0.6.1 and v1 development.
+vmaf         https://github.com/Netflix/vmaf             4611e47a7330cd342498dcc130e1008efbeab6e4
+
+# Original ColorVideoVDP v0.5.7: base model, calibration and CSF lookup table.
+ColorVideoVDP https://github.com/gfxdisp/ColorVideoVDP    2a268bce8d56e2f3abde46df3927d8a633707a24

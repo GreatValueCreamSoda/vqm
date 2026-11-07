@@ -1,0 +1,29 @@
+// VMAF VIF: Copyright 2016-2020 Netflix, Inc.
+// BSD-2-Clause-Patent; see licenses/NETFLIX-VMAF-LICENSE.
+// Workgroup reduction order is ours. The reference's scale score and clamping
+// follow float_vif.c:245-263 at 4611e47a7330cd342498dcc130e1008efbeab6e4.
+
+#version 450
+#include "vmaf_vif_common.glsl"
+
+layout(local_size_x = 256) in;
+shared vec2 partial[256];
+
+void main() {
+    const uint lane = gl_LocalInvocationIndex;
+    vec2 sums = vec2(0.0);
+    for (uint i = lane; i < pc.groups; i += 256u) {
+        sums +=
+            vec2(arena[pc.partials + 2u * i], arena[pc.partials + 2u * i + 1u]);
+    }
+    partial[lane] = sums;
+    barrier();
+    for (uint stride = 128u; stride > 0u; stride >>= 1u) {
+        if (lane < stride) partial[lane] += partial[lane + stride];
+        barrier();
+    }
+    if (lane == 0u) {
+        const float score = partial[0].x / partial[0].y;
+        arena[pc.results + pc.scale] = pc.scale == 0u ? score : max(score, 0.0);
+    }
+}

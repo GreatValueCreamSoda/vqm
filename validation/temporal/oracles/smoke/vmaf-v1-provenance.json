@@ -1,0 +1,8 @@
+{
+  "revision": "4611e47a7330cd342498dcc130e1008efbeab6e4",
+  "numpy": "2.5.4",
+  "runner_sha256": "cbd2ea8bf38d218e243a9f43f4ecd4480b98f531902945f47e31cc6f4a058376",
+  "executable_sha256": "0b082f1918ea001b2a91e402db3a3365b6c2a2f0bbdf69b56888101dcd1b81d4",
+  "model_sha256": "e4cf8c147e1368b35497d772920bc92f98c1ad7853c1033d8a836947f427140e",
+  "threads": 1
+}

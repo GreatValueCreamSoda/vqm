@@ -1,0 +1,90 @@
+diff --git a/src/metrics/butteraugli/shaders/butter_blur.comp b/src/metrics/butteraugli/shaders/butter_blur.comp
+--- a/src/metrics/butteraugli/shaders/butter_blur.comp
++++ b/src/metrics/butteraugli/shaders/butter_blur.comp
+@@ -15,17 +15,13 @@
+ //   op 1 LF     out0 = blur(in) (raw; XybLowFreqToVals runs where it is read)
+ //               out1 = in - out0        (mf = xyb - lf)
+ //   op 2 MF     out0 = range(blur(in))  (X remove 0.29, Y amplify 0.1)
+-//               out1 = in - blur(in)    (hf = mf_before - raw_blur)
++//               out1 = in - out0        (hf = mf_before - mf_after)
+ //               the B channel (z == 2) has no hf and takes the plain blur.
+ //   op 3 UHF    out0 = hf after the UHF range rule, out1 = uhf
+ //               (X: hf = remove(blur, 1.5), uhf = remove(in - blur, 0.04);
+ //                Y: hf = amplify(2.155*clamp(blur, 28.469), 0.132),
+ //                   uhf = 2.69313763794*clamp(in - clamp(blur, 28.469), 5.1918))
+ //               SeparateHFAndUHF, butteraugli.cc:476-537.
+-// Before op 3, SuppressXByY (:367-390,472) scales the raw HF X samples by
+-// their sibling HF Y values. Loading that transform into the source tile
+-// applies it to both the blur taps and the unblurred residual. The raw HF
+-// input planes remain immutable; the dispatch writes separate HF/UHF planes.
+ //
+ // Geometry: 16x16 invocations own a 32x32 output tile plus a radius halo, so
+ // the shared block is (32+2R)^2 + 32*(32+2R) floats -- 24 KB at 33 taps.
+@@ -72,11 +68,11 @@
+     if (op == 2u) {
+         if (z == 0u) {
+             value = remove_range(blurred, 0.29);
+-            aux = pre - blurred;
++            aux = pre - value;
+             write_aux = true;
+         } else if (z == 1u) {
+             value = amplify_range(blurred, 0.1);
+-            aux = pre - blurred;
++            aux = pre - value;
+             write_aux = true;
+         }
+     } else if (op == 3u) {
+@@ -123,17 +119,7 @@
+         const int gy = int(y0) + int(r) - int(kRadius);
+         float value = 0.0;
+         if (gx >= 0 && uint(gx) < width && gy >= 0 && uint(gy) < height) {
+-            const uint index = uint(gy) * width + uint(gx);
+-            value = arena[in_base + index];
+-            if (pc.op == 3u && z == 0u) {
+-                // SuppressXByY, pinned libjxl butteraugli.cc:367-390,472.
+-                const float y = arena[pc.a + area + index];
+-                const float suppress = 46.0;
+-                const float scale = 0.653020556257;
+-                const float factor =
+-                    scale + (1.0 - scale) * (suppress / (y * y + suppress));
+-                value *= factor;
+-            }
++            value = arena[in_base + uint(gy) * width + uint(gx)];
+         }
+         pool[r * kSrc + c] = value;
+     }
+diff --git a/src/metrics/butteraugli/shaders/butter_malta.comp b/src/metrics/butteraugli/shaders/butter_malta.comp
+--- a/src/metrics/butteraugli/shaders/butter_malta.comp
++++ b/src/metrics/butteraugli/shaders/butter_malta.comp
+@@ -85,13 +85,13 @@
+     );
+     total += line * line;
+     line = sum9(
+-        tap(cy, cx, -4, 1), tap(cy, cx, -3, 1), tap(cy, cx, -2, 1),
++        tap(cy, cx, -4, -1), tap(cy, cx, -3, 1), tap(cy, cx, -2, 1),
+         tap(cy, cx, -1, 0), tap(cy, cx, 0, 0), tap(cy, cx, 1, 0),
+         tap(cy, cx, 2, -1), tap(cy, cx, 3, -1), tap(cy, cx, 4, -1)
+     );
+     total += line * line;
+     line = sum9(
+-        tap(cy, cx, -4, -1), tap(cy, cx, -3, -1), tap(cy, cx, -2, -1),
++        tap(cy, cx, -4, 1), tap(cy, cx, -3, -1), tap(cy, cx, -2, -1),
+         tap(cy, cx, -1, 0), tap(cy, cx, 0, 0), tap(cy, cx, 1, 0),
+         tap(cy, cx, 2, 1), tap(cy, cx, 3, 1), tap(cy, cx, 4, 1)
+     );
+@@ -146,13 +146,13 @@
+     );
+     total += line * line;
+     line = sum9(
+-        tap(cy, cx, -4, -1), tap(cy, cx, -3, -1), tap(cy, cx, -2, -1),
++        tap(cy, cx, -4, 1), tap(cy, cx, -3, -1), tap(cy, cx, -2, -1),
+         tap(cy, cx, -1, 0), tap(cy, cx, 0, 0), tap(cy, cx, 1, 0),
+         tap(cy, cx, 2, 1), tap(cy, cx, 3, 1), tap(cy, cx, 4, 1)
+     );
+     total += line * line;
+     line = sum9(
+-        tap(cy, cx, -4, 1), tap(cy, cx, -3, 1), tap(cy, cx, -2, 1),
++        tap(cy, cx, -4, -1), tap(cy, cx, -3, 1), tap(cy, cx, -2, 1),
+         tap(cy, cx, -1, 0), tap(cy, cx, 0, 0), tap(cy, cx, 1, 0),
+         tap(cy, cx, 2, -1), tap(cy, cx, 3, -1), tap(cy, cx, 4, -1)
+     );

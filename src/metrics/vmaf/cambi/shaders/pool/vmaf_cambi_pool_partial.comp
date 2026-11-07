@@ -1,0 +1,24 @@
+// Copyright 2016-2020 Netflix, Inc. BSD-2-Clause-Patent.
+// See licenses/NETFLIX-VMAF-LICENSE.
+#version 450
+#include "vmaf_cambi_pool_common.glsl"
+layout(local_size_x = 256) in;
+shared float sums[256];
+void main() {
+    PoolArgs a = pool_args();
+    if (a.group >= a.groups) return;
+    uint i = a.group * 256u + gl_LocalInvocationIndex;
+    uint lane = gl_LocalInvocationIndex;
+    float value = 0.0;
+    if (i < a.count) {
+        uint key = data[a.values + i] & 0x7fffffffu;
+        if (key > data[a.state]) value = uintBitsToFloat(key);
+    }
+    sums[lane] = value;
+    barrier();
+    for (uint step = 128; step != 0; step >>= 1) {
+        if (lane < step) sums[lane] += sums[lane + step];
+        barrier();
+    }
+    if (lane == 0) data[a.partials + a.group] = floatBitsToUint(sums[0]);
+}

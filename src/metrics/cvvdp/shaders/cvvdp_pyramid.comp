@@ -1,0 +1,90 @@
+// ColorVideoVDP: Copyright (c) 2024, Graphics and Displays group.
+// MIT; see licenses/COLORVIDEOVDP-LICENSE.
+// Reduce/expand and edge corrections follow pycvvdp/lpyr_dec.py:117-252,
+// pinned v0.5.7. The horizontal reduce intentionally retains its height-parity
+// branch, including on mixed-parity rectangles; oracle fixtures pin it.
+
+#version 450
+#include "cvvdp_spatial_common.glsl"
+
+layout(local_size_x = 256) in;
+
+const float weights[5] = float[5](0.05, 0.25, 0.4, 0.25, 0.05);
+
+float read_value(uint base, int x, int y) {
+    return arena[base + uint(y) * pc.width + uint(x)];
+}
+
+// Expand is a convolution over interleaved zeros and explicit duplicated
+// boundary samples, rather than a generic mirror of the coarser image.
+float expanded_sample(uint base, uint x, uint y, int coordinate, bool vertical) {
+    const int extent = int(vertical ? pc.next_height : pc.next_width);
+    const int source_extent = int(vertical ? pc.height : pc.width);
+    int sample_index;
+    if (coordinate == 0) {
+        sample_index = 0;
+    } else if (coordinate == extent + 2 + (extent & 1)) {
+        sample_index = source_extent - 1;
+    } else if (coordinate >= 2 && coordinate < extent + 2 &&
+               (coordinate & 1) == 0) {
+        sample_index = (coordinate - 2) / 2;
+    } else {
+        return 0.0;
+    }
+    return vertical ? read_value(base, int(x), sample_index)
+                    : read_value(base, sample_index, int(y));
+}
+
+void main() {
+    const uint index = gl_GlobalInvocationID.x;
+    if (index >= pc.next_width * pc.next_height) return;
+    const uint image = gl_WorkGroupID.y / pc.channels;
+    const uint channel = gl_WorkGroupID.y % pc.channels;
+    const uint base =
+        (image == 0u ? pc.reference : pc.distorted) + channel * pc.input_stride;
+    const uint destination = (image == 0u ? pc.destination : pc.auxiliary) +
+                             channel * pc.destination_stride;
+    const uint x = index % pc.next_width;
+    const uint y = index / pc.next_width;
+    const bool vertical = pc.op == 0u || pc.op == 2u;
+    float value = 0.0;
+    if (pc.op < 2u) {
+        const int center = 2 * int(vertical ? y : x);
+        const int extent = int(vertical ? pc.height : pc.width);
+        for (int tap = 0; tap < 5; ++tap) {
+            const int q = center + tap - 2;
+            if (q >= 0 && q < extent) {
+                value += weights[tap] * (vertical ? read_value(base, int(x), q)
+                                                  : read_value(base, q, int(y)));
+            }
+        }
+        const uint position = vertical ? y : x;
+        const uint count = vertical ? pc.next_height : pc.next_width;
+        if (position == 0u) {
+            const float first = vertical ? read_value(base, int(x), 0)
+                                         : read_value(base, 0, int(y));
+            const float second = vertical ? read_value(base, int(x), 1)
+                                          : read_value(base, 1, int(y));
+            value += first * weights[1] + second * weights[0];
+        }
+        if (position + 1u == count) {
+            const float last = vertical ? read_value(base, int(x), extent - 1)
+                                        : read_value(base, extent - 1, int(y));
+            if (pc.parity != 0u) {
+                const float previous =
+                    vertical ? read_value(base, int(x), extent - 2)
+                             : read_value(base, extent - 2, int(y));
+                value += last * weights[3] + previous * weights[4];
+            } else {
+                value += last * weights[4];
+            }
+        }
+    } else {
+        const int position = int(vertical ? y : x);
+        for (int tap = 0; tap < 5; ++tap) {
+            value += (2.0 * weights[tap]) *
+                     expanded_sample(base, x, y, position + tap, vertical);
+        }
+    }
+    arena[destination + index] = value;
+}

@@ -1,0 +1,11 @@
+{
+  "revision": "2a268bce8d56e2f3abde46df3927d8a633707a24",
+  "numpy": "2.5.4",
+  "runner_sha256": "cbd2ea8bf38d218e243a9f43f4ecd4480b98f531902945f47e31cc6f4a058376",
+  "torch": "2.15.0+cpu",
+  "threads": 1,
+  "precision": "CPU-FP32-highest",
+  "display": "standard_4k",
+  "source_colorspace": "sRGB",
+  "temporal_padding": "replicate"
+}

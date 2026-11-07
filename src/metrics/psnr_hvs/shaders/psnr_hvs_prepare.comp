@@ -1,0 +1,23 @@
+// Copyright (c) 2026 VQM contributors. BSD-3-Clause; see LICENSE.
+
+#version 450
+
+#include "psnr_hvs_common.glsl"
+
+layout(local_size_x = 16, local_size_y = 8) in;
+
+void main() {
+    const uvec2 pixel = gl_GlobalInvocationID.xy;
+    if (pixel.x >= pc.width || pixel.y >= pc.height) return;
+    const uint type = desc[pc.desc_base + 4u] & 3u;
+    const uint row_samples = desc[pc.desc_base + 40u + pc.plane];
+    const uint index = pixel.y * row_samples + pixel.x;
+    const uint base = desc[pc.desc_base + pc.plane];
+    // Only storage addressing and packed-sample extraction use integers.
+    // Preserve the raw code value and enter the FP32 metric domain here.
+    const uint word =
+        source_words[base + (type == 0u ? index / 4u : index / 2u)];
+    const uint raw = type == 0u ? (word >> (8u * (index & 3u))) & 255u
+                                : (word >> (16u * (index & 1u))) & 65535u;
+    arena[pc.destination + pixel.y * pc.width + pixel.x] = float(raw);
+}

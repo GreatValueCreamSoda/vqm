@@ -1,0 +1,269 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-06",
+  "timezone": "America/New_York",
+  "recorded_utc": "2026-11-07T00:06:59.696410+00:00",
+  "question": "Does ranking-faithful agreement accept current still metrics while preserving previous MCOS and strict raw numerical diagnostics?",
+  "method": "Frozen first30 CID22 sources; cld_avif and mozjpeg q30,q60,q90 chosen before candidate scoring; both arms score every180 selected raw file pairs. No candidate-based exclusions or threshold adjustments.",
+  "base_commit": "a949b6177efb88890dd44860cc30dff45486a25d",
+  "working_tree": "Substantial preexisting uncommitted source/layout work; no production arithmetic changed during this qualification. Binary hashes identify actual measured arms.",
+  "build": "release; /usr/bin/c++ GCC16.2.1; CMake4.4.5; Python3.14.9",
+  "device": {
+    "name": "NVIDIA GeForce RTX 5070",
+    "uuid": "7293d6cd964492010338cb259cfc9cf2",
+    "driver_version": 2580775424
+  },
+  "source_csv_sha256": "fbaf42f5031b0c520209e9739a352d3048d711c85c20552679304e9784af0cc6",
+  "subset_csv_sha256": "7f54d321d8eb26e6ed3c0bd6b96c1001e97a83731093078735c98d6f43c52e9a",
+  "source_count": 30,
+  "pairs_per_metric": 180,
+  "fixture": "validation/fixtures/cid22-balanced",
+  "raw_reports": "artifacts/reports/ranking-temporal/stills",
+  "metrics": {
+    "ssimulacra2": {
+      "policy_file_sha256": "289a490b488468b417d87bcd7b228715220e6dd9858155d06289e0f0f2b03483",
+      "policy_canonical_sha256": "5402741f31c719a3933529cd0d39a80c2211e1f7b2e0eaea2673ebd63f47ab47",
+      "reference_revision": "81feacf6a5b0bbd7ec11b4a881a4615033ab0b10",
+      "configuration_hash": "5fafce17caa0f814bf1c7dcba721ddbc0e51ce18e410a0d5933eae0e59c80a97",
+      "input_manifest_hash": "27244e276ffaf890378f4f899eeff6c7de73cf56aaf9ee9359a33758f9d31a2e",
+      "binary_sha256": {
+        "ours": "155eda72e223cdb87b08a300f99e9d6959c7228c2c28b75580854b6adff87ee0",
+        "cloudinary": "c66a3d7cada0de986c920568c85ab31327f035c6d7d4c6c0db70146e4280dc08"
+      },
+      "ranking_status": "pass",
+      "srcc": 0.9995514264843565,
+      "tau_b": 0.9905648665425202,
+      "global_reversals": 76,
+      "global_total_pairs": 16110,
+      "meaningful_within_source": {
+        "pairs": 450,
+        "eligible_pairs": 450,
+        "excluded_pairs": 0,
+        "failures": 0,
+        "reversals": 0,
+        "collapsed_pairs": 0,
+        "informative_sources": 30,
+        "macro_error": 0.0,
+        "worst_source_error": 0.0
+      },
+      "families": {
+        "cld_avif": {
+          "status": "pass",
+          "eligible_pairs": 90,
+          "macro_error": 0.0,
+          "diagnostic_srcc": 0.9995719636169075,
+          "diagnostic_tau_b": 0.9920099875156055
+        },
+        "mozjpeg": {
+          "status": "pass",
+          "eligible_pairs": 90,
+          "macro_error": 0.0,
+          "diagnostic_srcc": 0.9975964110795571,
+          "diagnostic_tau_b": 0.9795255930087391
+        }
+      },
+      "numerical": {
+        "status": "fail",
+        "failures": [
+          "max_error",
+          "mae"
+        ],
+        "thresholds": {
+          "max_error": 0.01,
+          "mae": 0.001
+        },
+        "max_error": 2.02056257000001,
+        "mae": 0.34931865122222217,
+        "rmse": 0.4338450439451718,
+        "mean_offset": 0.34931865122222217,
+        "affine_slope": 1.0030094329457502,
+        "affine_intercept": 0.1464891287810985,
+        "pearson": 0.9998391541132419
+      },
+      "legacy_mcos": {
+        "status": "pass",
+        "shortfall_tolerance": 0.005,
+        "correlations": {
+          "ours": {
+            "krcc": 0.7851024208566107,
+            "srcc": 0.9394775558916427,
+            "pcc": 0.9444145592714926
+          },
+          "cloudinary": {
+            "krcc": 0.7900682805710739,
+            "srcc": 0.9418377110404642,
+            "pcc": 0.9459891322164377
+          }
+        }
+      },
+      "both_gates_status": "fail",
+      "process_exit_code": 1,
+      "commands_retained_in": "artifacts/reports/ranking-temporal/stills/ssimulacra2/ssimulacra2-summary.md",
+      "initial_policy_file_sha256": "6d878a37c0ff1c058ee57fc39aecda1815794a377cd28ae830e4fd461fc607ab",
+      "initial_policy_canonical_sha256": "b5f0ea9198b4f624ef768572d43354867f658f483d345f330c21bef68cb338cc",
+      "subjective": {
+        "status": "pass",
+        "configurations": {
+          "ssimulacra2:cid22": {
+            "status": "pass",
+            "reference_srcc": 0.9418377110404642,
+            "candidate_srcc": 0.9394775558916427,
+            "delta_srcc": -0.0023601551488214856,
+            "lower_one_sided_95": -0.004377140338312513,
+            "margin": 0.005,
+            "sources": 30,
+            "resamples": 10000,
+            "undefined_resamples": 0,
+            "seed": 0,
+            "statistic": "pooled sample SRCC within configuration",
+            "interval": "5th percentile of paired whole-source bootstrap deltas; linear quantile"
+          }
+        }
+      },
+      "subjective_phase_report": "artifacts/reports/ranking-temporal/stills/input-pinned/ssimulacra2/ssimulacra2-agreement.json",
+      "initial_ranking_only_reproduction_exit_code": 0,
+      "previous_subjective_policy_file_sha256": "cc7b83921950e46e9625861e0f6a95bb7350cd26dbbdd8da7dea494fcec02805",
+      "previous_subjective_policy_canonical_sha256": "89ca05319dc5b8639fb896500b5d8d66ca30d968b7a6e807399e0a8b5b50ce7b",
+      "input_pinned_reproduction": {
+        "process_exit_code": 0,
+        "gate_mode": "ranking",
+        "ranking": "pass",
+        "subjective": "pass",
+        "numerical": "fail",
+        "input_manifest_hash": "27244e276ffaf890378f4f899eeff6c7de73cf56aaf9ee9359a33758f9d31a2e",
+        "configuration_hash": "5fafce17caa0f814bf1c7dcba721ddbc0e51ce18e410a0d5933eae0e59c80a97",
+        "policy_canonical_sha256": "5402741f31c719a3933529cd0d39a80c2211e1f7b2e0eaea2673ebd63f47ab47",
+        "min_total_sources": 30,
+        "min_total_samples": 180,
+        "canonical_agreement": "artifacts/reports/ranking-temporal/stills/input-pinned/ssimulacra2/ssimulacra2-agreement.json"
+      }
+    },
+    "butteraugli": {
+      "policy_file_sha256": "44053394ebfa353b153194ae5360bbcd76960c773170221d6b41c880e520addf",
+      "policy_canonical_sha256": "d74d4c1b2e650de1cbe16dcb837253e7f869112f33fb3d1c29c588e7371163e1",
+      "reference_revision": "e47d2a2b5bb418f2947ce07f36cb048861db3820",
+      "configuration_hash": "344e1aa5998071572895546889706adef1da10d5f09abc13bc00f6b0d2fadca6",
+      "input_manifest_hash": "460b2ed7d2b678db90c2b87b6fe2ab7a7d002f8496ddabcf6190f58a8ec1468f",
+      "binary_sha256": {
+        "ours": "155eda72e223cdb87b08a300f99e9d6959c7228c2c28b75580854b6adff87ee0",
+        "libjxl": "6f63cca605f9c717076ba09514ae996199cdb1f12a9b424f84b6c41caa92c37c"
+      },
+      "ranking_status": "pass",
+      "srcc": 0.9999814809099046,
+      "tau_b": 0.9990068280571074,
+      "global_reversals": 8,
+      "global_total_pairs": 16110,
+      "meaningful_within_source": {
+        "pairs": 450,
+        "eligible_pairs": 450,
+        "excluded_pairs": 0,
+        "failures": 0,
+        "reversals": 0,
+        "collapsed_pairs": 0,
+        "informative_sources": 30,
+        "macro_error": 0.0,
+        "worst_source_error": 0.0
+      },
+      "families": {
+        "cld_avif": {
+          "status": "pass",
+          "eligible_pairs": 90,
+          "macro_error": 0.0,
+          "diagnostic_srcc": 1.0,
+          "diagnostic_tau_b": 1.0
+        },
+        "mozjpeg": {
+          "status": "pass",
+          "eligible_pairs": 90,
+          "macro_error": 0.0,
+          "diagnostic_srcc": 0.999934148248755,
+          "diagnostic_tau_b": 0.9980024968789014
+        }
+      },
+      "numerical": {
+        "status": "fail",
+        "failures": [
+          "max_error",
+          "mae"
+        ],
+        "thresholds": {
+          "max_error": 0.01,
+          "mae": 0.001
+        },
+        "max_error": 0.032817120000000255,
+        "mae": 0.0012097628888888803,
+        "rmse": 0.0032392057640640197,
+        "mean_offset": -2.516588888893883e-05,
+        "affine_slope": 1.0001905928890926,
+        "affine_intercept": -0.0007887725940402706,
+        "pearson": 0.9999980877455577
+      },
+      "legacy_mcos": {
+        "status": "pass",
+        "shortfall_tolerance": 0.005,
+        "correlations": {
+          "ours": {
+            "krcc": 0.6101800124146493,
+            "srcc": 0.8128254987293847,
+            "pcc": 0.7814952595746076
+          },
+          "libjxl": {
+            "krcc": 0.6104283054003724,
+            "srcc": 0.8129571900367295,
+            "pcc": 0.7814851451159474
+          }
+        }
+      },
+      "both_gates_status": "fail",
+      "process_exit_code": 1,
+      "commands_retained_in": "artifacts/reports/ranking-temporal/stills/butteraugli/butteraugli-summary.md",
+      "initial_policy_file_sha256": "a22a43c4ca64f19b76490904e37e4f2acd146bda04d15f9183e3927db740535b",
+      "initial_policy_canonical_sha256": "bd54df27987e33bdf215b5c20b2aa3c2abfa5e31f5c7d2e379e78f9d852d37b2",
+      "subjective": {
+        "status": "pass",
+        "configurations": {
+          "butteraugli:cid22": {
+            "status": "pass",
+            "reference_srcc": 0.8129571900367295,
+            "candidate_srcc": 0.8128254987293847,
+            "delta_srcc": -0.0001316913073448056,
+            "lower_one_sided_95": -0.0007511500570533735,
+            "margin": 0.005,
+            "sources": 30,
+            "resamples": 10000,
+            "undefined_resamples": 0,
+            "seed": 0,
+            "statistic": "pooled sample SRCC within configuration",
+            "interval": "5th percentile of paired whole-source bootstrap deltas; linear quantile"
+          }
+        }
+      },
+      "subjective_phase_report": "artifacts/reports/ranking-temporal/stills/input-pinned/butteraugli/butteraugli-agreement.json",
+      "initial_ranking_only_reproduction_exit_code": 0,
+      "previous_subjective_policy_file_sha256": "48cc9e91fd04ba4f40766c9ec5e303fb6b336cab6593255c72e02b4a9560101f",
+      "previous_subjective_policy_canonical_sha256": "4bb9e73e2ce4f83478ff9dafcbaece2f8272f1250ac3c7685c2df5c518cedff2",
+      "input_pinned_reproduction": {
+        "process_exit_code": 0,
+        "gate_mode": "ranking",
+        "ranking": "pass",
+        "subjective": "pass",
+        "numerical": "fail",
+        "input_manifest_hash": "460b2ed7d2b678db90c2b87b6fe2ab7a7d002f8496ddabcf6190f58a8ec1468f",
+        "configuration_hash": "344e1aa5998071572895546889706adef1da10d5f09abc13bc00f6b0d2fadca6",
+        "policy_canonical_sha256": "d74d4c1b2e650de1cbe16dcb837253e7f869112f33fb3d1c29c588e7371163e1",
+        "min_total_sources": 30,
+        "min_total_samples": 180,
+        "canonical_agreement": "artifacts/reports/ranking-temporal/stills/input-pinned/butteraugli/butteraugli-agreement.json"
+      }
+    }
+  },
+  "limits": "Fixed-corpus engineering gates, not an unseen-source error-rate guarantee. The separately planned paired whole-source subjective gate uses margin0.005,30 source groups,10000 resamples,seed0; source-group independence is an assumption. Legacy MCOS shortfall tolerance remains0.005.",
+  "conclusion": "Both direct ranking and required subjective noninferiority gates pass, as do legacy MCOS checks. Both strict numerical gates fail; default both-gates mode therefore fails. Numerical checks remain intact and ranking-only acceptance is explicit.",
+  "library_sha256_at_measurement_review": {
+    "build/libvqm_core.a": "913cbd1d299e7c09c74567640570cdd438f39f40c6af23092c39c584eb6623ba",
+    "build/libvqm_core_timing.a": "cb5b41143724707531f193d341d34a14e15c11b1f236cd1b7168e7e6c9d90750",
+    "build/libvqm_io.a": "ef973dbc1cb9002047b570dccf483c6d18c17e58d6a322520e1137883b6a4bff"
+  },
+  "subjective_phase": "Predeclared planned human-label criterion evaluated separately from retained paired canonical reports. Earlier logs, policies and reports remain unchanged under raw_reports; promoted policies now require the passing subjective gate.",
+  "input_pin_phase": "The promoted policy now freezes the exact canonical input_manifest_hash and requires min_total_sources30/min_total_samples180. Policies from the prior subjective phase and all historical logs remain unchanged under stills/input-pinned/*-previous-policy.json and their original phase directories."
+}

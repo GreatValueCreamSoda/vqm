@@ -1,0 +1,32 @@
+// Copyright 2016-2020 Netflix, Inc. BSD-2-Clause-Patent.
+// See licenses/NETFLIX-VMAF-LICENSE.
+#version 450
+#include "vmaf_cambi_pool_common.glsl"
+layout(local_size_x = 256) in;
+void main() {
+    PoolArgs a = pool_args();
+    uint i = a.group * 256u + gl_LocalInvocationIndex;
+    if (i >= a.count || data[a.state + 1u] == 0u) return;
+    // Unsigned FP32 bit patterns preserve the order of finite nonnegative
+    // values. Mask the sign bit to canonicalize either sign of zero.
+    uint key = data[a.values + i] & 0x7fffffffu;
+    if (a.pass == 3u) {
+        // Zero is common in masked CAMBI maps. Count the other first-byte
+        // bins and derive bin zero by subtraction in the selector instead of
+        // contending on one global atomic for every zero-valued pixel.
+        uint bin = key >> 24u;
+        if (bin != 0u) {
+            atomicAdd(data[a.histogram + bin], 1u);
+        } else if (key != 0u) {
+            // Preserve the generic pool contract for tiny positive values:
+            // first-byte bin zero need not contain only exact zero.
+            atomicOr(data[a.state], key);
+        }
+        return;
+    }
+    uint shift = a.pass * 8;
+    uint mask = 0u;
+    if (a.pass != 3) mask = 0xffffffffu << (shift + 8u);
+    if ((key & mask) == data[a.state])
+        atomicAdd(data[a.histogram + ((key >> shift) & 255u)], 1u);
+}

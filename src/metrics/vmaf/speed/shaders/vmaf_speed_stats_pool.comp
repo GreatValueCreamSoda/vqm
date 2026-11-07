@@ -1,0 +1,74 @@
+// VMAF SpEED: Copyright 2016-2025 Netflix, Inc.
+// BSD-2-Clause-Patent; see licenses/NETFLIX-VMAF-LICENSE.
+#version 450
+#include "vmaf_speed_stats_common.glsl"
+layout(local_size_x = 64) in;
+shared float partial[64];
+shared float factors[2 * 625];
+shared float eigenvalues[2 * 25];
+void main() {
+    uint id = gl_GlobalInvocationID.x, lane = gl_LocalInvocationIndex;
+    uint nw = pc.width / 5u, nh = pc.height / 5u, blocks = nw * nh;
+    uint channel_base = 2u * gl_WorkGroupID.y;
+    // Every block solves against the same two Cholesky factors and spectra.
+    // Stage them once per group; edge lanes still publish their share before
+    // entering the independent per-block forward solves.
+    bool regular =
+        status(channel_base) == 0.0 && status(channel_base + 1u) == 0.0;
+    if (regular) {
+        for (uint at = lane; at < 2u * 625u; at += 64u) {
+            uint component = at / 625u, entry = at % 625u;
+            factors[at] = arena[cholesky(
+                channel_base + component, entry / 25u, entry % 25u
+            )];
+        }
+        for (uint at = lane; at < 2u * 25u; at += 64u)
+            eigenvalues[at] = arena[eigen(channel_base + at / 25u, at % 25u)];
+    }
+    barrier();
+    float score = 0.0;
+    if (id < blocks && regular) {
+        uint by = id / nw, bx = id % nw;
+        vec2 variance = vec2(0.0), entropy = vec2(0.0);
+        for (uint component = 0u; component < 2u; component++) {
+            uint ch = channel_base + component;
+            float solution[25];
+            float sum = 0.0;
+            // K = L L': solving L z = y gives y' K^-1 y = z' z.
+            for (uint k = 0u; k < 25u; ++k) {
+                float value = arena
+                    [source(ch) + (by * 5u + k / 5u) * pc.width + bx * 5u +
+                     k % 5u];
+                for (uint j = 0u; j < k; ++j)
+                    value -=
+                        factors[component * 625u + k * 25u + j] * solution[j];
+                solution[k] = value / factors[component * 625u + k * 25u + k];
+                sum += solution[k] * solution[k];
+            }
+            float v = sum / 25.0;
+            float e = 0.0;
+            for (uint k = 0u; k < 25u; k++)
+                e +=
+                    log2(max(eigenvalues[component * 25u + k], 0.0) * v + 0.19) +
+                    4.09419117;
+            variance[component] = v;
+            entropy[component] = e;
+        }
+        const float base = 25.0 * (log2(1.1 * 0.19) + 4.09419117);
+        if (entropy.x >= base || entropy.y >= base) {
+            float a = entropy.x * log2(1.0 + variance.x);
+            float b =
+                entropy.y * log2(1.0 + 0.75 * variance.x + 0.25 * variance.y);
+            score = abs(a - b);
+        }
+    }
+    partial[lane] = score;
+    barrier();
+    for (uint step = 32u; step > 0u; step >>= 1u) {
+        if (lane < step) partial[lane] += partial[lane + step];
+        barrier();
+    }
+    if (lane == 0u)
+        arena[pc.partials + gl_WorkGroupID.y * pc.groups + gl_WorkGroupID.x] =
+            partial[0];
+}

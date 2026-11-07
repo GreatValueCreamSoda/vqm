@@ -1,0 +1,105 @@
+// VMAF VIF: Copyright 2016-2020 Netflix, Inc.
+// BSD-2-Clause-Patent; see licenses/NETFLIX-VMAF-LICENSE.
+// Scale construction, FP32 statistic, and fast log2 follow libvmaf's
+// vif.c:150-205 and vif_tools.c:35-82,198-312 (pinned 4611e47). The workgroup
+// reduction order is ours; libvmaf accumulates row-wise.
+
+#version 450
+#include "vmaf_vif_common.glsl"
+
+layout(local_size_x = 16, local_size_y = 16) in;
+shared vec2 partial[256];
+
+float vif_log2(float x) {
+    const uint bits = floatBitsToUint(x);
+    const int exponent = int((bits & 0x7f800000u) >> 23u) - 127;
+    const float rem = uintBitsToFloat((bits & 0x007fffffu) | 0x3f800000u) - 1.0;
+    float v = -0.012671635276421;
+    v = v * rem + 0.064841182402670;
+    v = v * rem - 0.157048836463065;
+    v = v * rem + 0.257167726303123;
+    v = v * rem - 0.353800560300520;
+    v = v * rem + 0.480131410397451;
+    v = v * rem - 0.721314327952201;
+    v = v * rem + 1.442694803896991;
+    v *= rem;
+    return float(exponent) + v;
+}
+
+vec2 vif_statistic(vec2 mu, vec3 moments) {
+    const float eps = 1.0e-10;
+    const float s1 = max(moments.x - mu.x * mu.x, 0.0);
+    const float s2 = max(moments.y - mu.y * mu.y, 0.0);
+    // Flat reference regions use the low-variance branch regardless of gain
+    // or covariance. Skip the divisions and logarithms whose results it
+    // replaces.
+    if (s1 < 2.0) return vec2(1.0 - s2 * (4.0 / (255.0 * 255.0)), 1.0);
+    const float s12 = moments.z - mu.x * mu.y;
+    float gain = s12 / (s1 + eps);
+    float residual = s2 - gain * s12;
+    if (s2 < eps) {
+        gain = 0.0;
+        residual = 0.0;
+    }
+    if (gain < 0.0) {
+        residual = s2;
+        gain = 0.0;
+    }
+    residual = max(residual, eps);
+    gain = min(gain, pc.gain_limit);
+    float num = vif_log2(1.0 + (gain * gain * s1) / (residual + 2.0));
+    float den = vif_log2(1.0 + s1 / 2.0);
+    if (s12 < 0.0) num = 0.0;
+    return vec2(num, den);
+}
+
+void main() {
+    const uvec2 output_pos = gl_GlobalInvocationID.xy;
+    const uint lane = gl_LocalInvocationIndex;
+    const uvec2 extent = pc.op == 0u ? uvec2(pc.width / 2u, pc.height / 2u)
+                                     : uvec2(pc.width, pc.height);
+    vec2 sums = vec2(0.0);
+    if (output_pos.x < extent.x && output_pos.y < extent.y) {
+        const uvec2 p = pc.op == 0u ? output_pos * 2u : output_pos;
+        const uint area = pc.width * pc.height;
+        const int width = vif_width();
+        vec2 mu = vec2(0.0);
+        vec3 moments = vec3(0.0);
+        for (int k = 0; k < width; ++k) {
+            const int x = vif_mirror(int(p.x) + k - width / 2, int(pc.width));
+            const uint index = p.y * pc.width + uint(x);
+            const float weight = vif_weight(k);
+            mu += weight *
+                  vec2(
+                      arena[pc.scratch + index], arena[pc.scratch + area + index]
+                  );
+            if (pc.op != 0u) {
+                moments += weight * vec3(
+                                        arena[pc.scratch + 2u * area + index],
+                                        arena[pc.scratch + 3u * area + index],
+                                        arena[pc.scratch + 4u * area + index]
+                                    );
+            }
+        }
+        if (pc.op == 0u) {
+            const uint i = output_pos.y * extent.x + output_pos.x;
+            arena[pc.reference_out + i] = mu.x;
+            arena[pc.distorted_out + i] = mu.y;
+        } else {
+            sums = vif_statistic(mu, moments);
+        }
+    }
+    if (pc.op == 0u) return;
+    partial[lane] = sums;
+    barrier();
+    for (uint stride = 128u; stride > 0u; stride >>= 1u) {
+        if (lane < stride) partial[lane] += partial[lane + stride];
+        barrier();
+    }
+    if (lane == 0u) {
+        const uint groups_x = (pc.width + 15u) / 16u;
+        const uint i = 2u * (gl_WorkGroupID.y * groups_x + gl_WorkGroupID.x);
+        arena[pc.partials + i] = partial[0].x;
+        arena[pc.partials + i + 1u] = partial[0].y;
+    }
+}

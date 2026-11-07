@@ -1,0 +1,60 @@
+// ColorVideoVDP: Copyright (c) 2024, Graphics and Displays group.
+// MIT; see licenses/COLORVIDEOVDP-LICENSE.
+// Weber backgrounds, reference-derived CSF and mult-mutual perceptual gains:
+// original lpyr_dec.py:367-419 and cvvdp_metric.py:665-727,822-861 (v0.5.7).
+
+#version 450
+#include "cvvdp_spatial_common.glsl"
+
+layout(local_size_x = 256) in;
+
+float sensitivity(uint channel, float background) {
+    const float log_luminance = log(background) / log(10.0);
+    const float position = clamp(
+        (log_luminance - model(37u)) / (model(38u) - model(37u)) * 31.0, 0.0,
+        31.0
+    );
+    const uint lower = uint(position);
+    const uint upper = min(lower + 1u, 31u);
+    const float fraction = fract(position);
+    const uint row = pc.tables + 40u + (pc.band * 4u + channel) * 32u;
+    const float log_s =
+        arena[row + lower] * (1.0 - fraction) + arena[row + upper] * fraction;
+    return pow(10.0, log_s) * model(3u);
+}
+
+void main() {
+    const uint index = gl_GlobalInvocationID.x;
+    const uint area = pc.width * pc.height;
+    if (index >= area) return;
+    const uint channel = gl_WorkGroupID.y;
+    const uint plane = channel * area + index;
+    const bool baseband = pc.op != 0u;
+    // Expanded planes are [reference channels][distorted channels]. Baseband
+    // backgrounds instead contain the image-wide mean of each clamped Y plane.
+    const float reference_background =
+        baseband ? arena[pc.scratch] : max(arena[pc.scratch + index], 0.01);
+    const float distorted_background =
+        baseband ? arena[pc.scratch + 1u]
+                 : max(arena[pc.scratch + pc.channels * area + index], 0.01);
+    const float reference_layer = arena[pc.reference + plane] -
+                                  (baseband ? 0.0 : arena[pc.scratch + plane]);
+    const float distorted_layer =
+        arena[pc.distorted + plane] -
+        (baseband ? 0.0 : arena[pc.scratch + pc.channels * area + plane]);
+    const float band_scale = pc.band == 0u || baseband ? 1.0 : 2.0;
+    const float r =
+        min(reference_layer / reference_background, 1000.0) * band_scale;
+    const float t =
+        min(distorted_layer / distorted_background, 1000.0) * band_scale;
+    const float s = sensitivity(channel, reference_background);
+    if (baseband) {
+        arena[pc.destination + plane] = abs(t - r) * s;
+    } else {
+        const float gain = channel == 1u ? 1.45 : 1.0;
+        const float rp = r * s * gain;
+        const float tp = t * s * gain;
+        arena[pc.destination + plane] = abs(tp - rp);
+        arena[pc.auxiliary + plane] = min(abs(tp), abs(rp));
+    }
+}

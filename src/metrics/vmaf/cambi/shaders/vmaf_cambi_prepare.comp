@@ -1,0 +1,110 @@
+// VMAF CAMBI: Copyright 2016-2020 Netflix, Inc.
+// BSD-2-Clause-Patent; see licenses/NETFLIX-VMAF-LICENSE.
+// Conversion and spatial-mask semantics: libvmaf/src/feature/cambi.c,
+// pinned revision 4611e47a7330cd342498dcc130e1008efbeab6e4.
+#version 450
+#include "bindings.glsl"
+layout(local_size_x = 16, local_size_y = 16) in;
+// Reuse one workgroup tile for conversion's right/bottom halo and for
+// seven-tap horizontal sums plus the mask's vertical halo. Both are integers
+// exactly representable as FP32 and the phases are separate dispatches.
+shared float tile[22 * 16];
+layout(push_constant) uniform Push {
+    uint width, height, input_offset, processed, derivative, mask;
+    uint depth, threshold, op;
+}
+pc;
+
+uint sample10(uvec2 p) {
+    // The preceding luma converter is binary-exact for 8/10/12/16-bit input.
+    uint source = uint(
+        (arena[pc.input_offset + p.y * pc.width + p.x] + 128.0) *
+        exp2(float(pc.depth) - 8.0)
+    );
+    if (pc.depth < 10u) return source << (10u - pc.depth);
+    uint shift = pc.depth - 10u;
+    return (source + (shift == 0u ? 0u : (1u << (shift - 1u)))) >> shift;
+}
+
+uint process10(uvec2 p) {
+    uint value = sample10(p);
+    if ((pc.op & 4u) != 0u) {
+        bool has_x = p.x + 1u < pc.width;
+        bool has_y = p.y + 1u < pc.height;
+        if (has_x && has_y) {
+            value = (value + sample10(p + uvec2(1, 0)) +
+                     sample10(p + uvec2(0, 1)) + sample10(p + uvec2(1, 1))) >>
+                    2u;
+        } else if (has_x) {
+            value = (value + sample10(p + uvec2(1, 0))) >> 1u;
+        } else if (has_y) {
+            value = (value + sample10(p + uvec2(0, 1))) >> 1u;
+        }
+    }
+    return value;
+}
+
+void main() {
+    uvec2 p = gl_GlobalInvocationID.xy;
+    uint phase = pc.op & 3u;
+    if (phase == 0u && (pc.op & 8u) != 0u) {
+        // Every lane fills part of the 17x17 processed tile, including its
+        // right/bottom halo; no invocation returns before the barrier.
+        for (uint i = gl_LocalInvocationIndex; i < 17u * 17u; i += 256u) {
+            uvec2 q = gl_WorkGroupID.xy * 16u + uvec2(i % 17u, i / 17u);
+            tile[i] =
+                q.x < pc.width && q.y < pc.height ? float(process10(q)) : 0.0;
+        }
+        barrier();
+        if (p.x >= pc.width || p.y >= pc.height) return;
+        uint index = p.y * pc.width + p.x;
+        uint ti = gl_LocalInvocationID.y * 17u + gl_LocalInvocationID.x;
+        float center = tile[ti];
+        bool xeq = p.x + 1u == pc.width || center == tile[ti + 1u];
+        bool yeq = p.y + 1u == pc.height || center == tile[ti + 17u];
+        arena[pc.processed + index] = center;
+        arena[pc.derivative + index] = xeq && yeq ? 1.0 : 0.0;
+        return;
+    }
+    if (phase == 2u) {
+        // Compute horizontal sums for the output tile and its vertical halo.
+        // All lanes participate in the barrier, including partial edge tiles.
+        for (uint i = gl_LocalInvocationIndex; i < 22u * 16u; i += 256u) {
+            int x = int(gl_WorkGroupID.x * 16u + i % 16u);
+            int y = int(gl_WorkGroupID.y * 16u + i / 16u) - 3;
+            float total = 0.0;
+            if (x < int(pc.width) && y >= 0 && y < int(pc.height)) {
+                for (int dx = -3; dx <= 3; ++dx) {
+                    int sx = x + dx;
+                    if (sx >= 0 && sx < int(pc.width))
+                        total +=
+                            arena[pc.derivative + uint(y) * pc.width + uint(sx)];
+                }
+            }
+            tile[i] = total;
+        }
+        barrier();
+        if (p.x < pc.width && p.y < pc.height) {
+            float total = 0.0;
+            for (uint dy = 0u; dy < 7u; ++dy)
+                total += tile
+                    [(gl_LocalInvocationID.y + dy) * 16u +
+                     gl_LocalInvocationID.x];
+            arena[pc.mask + p.y * pc.width + p.x] =
+                total > float(pc.threshold) ? 1.0 : 0.0;
+        }
+        return;
+    }
+    if (p.x >= pc.width || p.y >= pc.height) return;
+    uint index = p.y * pc.width + p.x;
+    if (phase == 0u) {
+        arena[pc.processed + index] = float(process10(p));
+    } else if (phase == 1u) {
+        float center = arena[pc.processed + index];
+        bool xeq =
+            p.x + 1u == pc.width || center == arena[pc.processed + index + 1u];
+        bool yeq = p.y + 1u == pc.height ||
+                   center == arena[pc.processed + index + pc.width];
+        arena[pc.derivative + index] = xeq && yeq ? 1.0 : 0.0;
+    }
+}

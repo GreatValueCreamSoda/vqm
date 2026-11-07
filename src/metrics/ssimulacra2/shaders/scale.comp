@@ -1,0 +1,437 @@
+// Derived from Cloudinary SSIMULACRA 2 (Copyright (c) Jon Sneyers, Cloudinary).
+// BSD-3-Clause; see LICENSE.
+
+// Everything one scale needs after XYB, in one dispatch: the five 13-tap
+// blurs (both images and their squares and cross product), the SSIM' map and
+// the ringing/blurring maps, and the partial norm sums of all six norms of one
+// channel.
+//
+// The reason this is one shader is traffic, not arithmetic. Split apart, the
+// five blurs read 11.34 plane sets and write 5, then the two map shaders read
+// 9 more: about 382 bytes per output pixel per channel. Here the two source
+// tiles are read once (4.81 sets, 136 bytes per output) and every intermediate
+// -- the five blurred quantities, the raw centre pixel -- stays in shared
+// memory and registers.
+//
+// Geometry: one workgroup owns a kOutW x kOutH output tile of one channel
+// (gl_WorkGroupID.z) of one level of the pyramid, and one dispatch covers all
+// three channels of that level. The level's planes, size and norm block arrive
+// as push constants: they are what every address in the tile loop hangs off,
+// and a level-table load there measured 0.5 ms of the 4K stage. The 13-tap
+// window adds a 6-pixel halo, so the source tile is (kOutW + 12) x
+// (kOutH + 12).
+//
+// The tile shape is the one thing that follows the device: this source is
+// compiled once per variant in kScaleVariants (metrics/ssimulacra2/layout.cc)
+// and the pipeline picks the first one whose shared-memory footprint and
+// workgroup shape fit VkPhysicalDeviceLimits. Taller and wider tiles read less
+// halo and fewer shared values per output, but the coarser workgroup costs
+// scheduling slots: a 32 x 64 tile measured 4% slower than 32 x 32, so the list
+// holds the two 32-column variants and membership follows measurement. The width
+// must stay a multiple of four: the four-column horizontal groups below depend
+// on it.
+//
+// An invocation owns kRowsPerInvocation consecutive output rows of one column,
+// and the tile divides evenly over the workgroup: 16 x SS2_SCALE_LANES
+// invocations, four output rows each (256 invocations for the 32 x 32 tile, 128
+// for 16 x 32).
+//
+// One shared block is reused three ways, so the budget stays within the
+// device's limit:
+//   [0 .. 2*kSrcH*kSrcW)      both source tiles (image 0, then image 1)
+//   [.. + kSrcH*kOutW)        horizontal scratch, kSrcH rows x kOutW columns
+//   [0 .. 6*kThreads)         the norm ladder, once the tiles are dead
+//
+// Both passes work several output pixels from one shared read. Their windows
+// overlap: the neighbour columns behind four horizontal outputs cover 16
+// values, so the horizontal pass loads 16 values and issues 52 FMAs instead of
+// 52 loads, and the four output rows of a column cover 16 rows, so the
+// vertical pass loads 16 values for 52 FMAs. Without that the stage is bound
+// by shared-memory instructions rather than by DRAM (about 180 shared loads
+// per output pixel per channel, 4.9 ms of the 7.3 ms pair at 4K).
+//
+// The tap order, the rounded float products folded into the tile load and the
+// vertical accumulation order all match the blur dispatch this replaced, so the
+// blurred values are bit-identical; the norm partials are summed here in
+// ascending tap order, which is what keeps the two bit-identical.
+
+#version 450
+
+#include "ssimu2_common.glsl"
+
+layout(local_size_x = 16, local_size_y = SS2_SCALE_LANES) in;
+
+const uint kTapCount = 13u;
+const uint kRadius = 6u;
+const uint kOutW = uint(SS2_SCALE_OUT_W);     // tile width, per variant
+const uint kOutH = uint(SS2_SCALE_ROWS);      // tile height, per variant
+const uint kThreads = 16u * SS2_SCALE_LANES;  // 16 x lanes, from CMake
+const uint kRowsPerInvocation = (kOutW * kOutH) / kThreads;  // 4 at 256 threads
+// A variant whose tile does not divide over its invocations, or does not give
+// every invocation four output rows, fails the compile instead of the run.
+#if (SS2_SCALE_OUT_W * SS2_SCALE_ROWS) % (16 * SS2_SCALE_LANES) != 0
+#error "tile outputs must divide evenly over the invocations"
+#endif
+#if (SS2_SCALE_OUT_W * SS2_SCALE_ROWS) / (16 * SS2_SCALE_LANES) != 4
+#error "four output rows per invocation"
+#endif
+const uint kSrcW = kOutW + 2u * kRadius;
+const uint kSrcH = kOutH + 2u * kRadius;  // kOutH + 12
+const uint kTileFloats = kSrcH * kSrcW;
+const uint kMidOffset = 2u * kTileFloats;
+const uint kWorkFloats = kMidOffset + kSrcH * kOutW;
+const uint kQuad = kOutW / 4u;  // four-column horizontal windows
+const uint kQuads = kSrcH * kQuad;
+const uint kNormCount = 6u;  // two ssim + four edge norms
+const uint kSsimNorms = 6u;  // ReadResult's edge block offset
+const float kC2 = 0.0009;
+
+// One f32 block, reused three ways, so the budget stays within the device's
+// limit. The tile and the scratch must be f32: SSIM' needs the variance
+// s11 - mu1*mu1, a difference of two nearly equal blurs, so rounding either to
+// 16 bits lands directly in the variance of every smooth region. Measured:
+// running the taps in f16 (and the horizontal scratch with them) took the
+// scale stage from 1.58 ms to 1.25 ms at 4K but dropped the 32x32 golden pair
+// from 93.17 to 63.44, and merely storing the *tile* as f16 while keeping the
+// arithmetic f32 measured no gain at all (1.51 ms, inside its own noise),
+// because the stage is not limited by shared-memory bytes and the widening
+// conversion costs what the narrower loads save. Only the planes themselves
+// are 16-bit, and only under SS2_HALF_PLANES.
+shared float pool[kWorkFloats];
+uint tile_index(uint image, uint r, uint c) {
+    return image * kTileFloats + r * kSrcW + c;
+}
+
+uint mid_index(uint r, uint c) { return kMidOffset + r * kOutW + c; }
+
+// Zero-padded tile load, one image per call: the halo outside the image reads
+// as 0.0 exactly as the standalone blur did.
+void LoadTile(uint image, uint tid, uint gx0, uint gy0, uint channel) {
+    const uint offset = pc.plane[image];
+    for (uint i = tid; i < kTileFloats; i += kThreads) {
+        const uint r = i / kSrcW;
+        const uint c = i % kSrcW;
+        const int gx = int(gx0) - int(kRadius) + int(c);
+        const int gy = int(gy0) - int(kRadius) + int(r);
+        float value = 0.0;
+        if (gx >= 0 && uint(gx) < pc.width && gy >= 0 && uint(gy) < pc.height) {
+            value = plane_load(plane_index_pitch(
+                offset, pc.stride, channel, uint(gx), uint(gy), pc.width
+            ));
+        }
+        pool[tile_index(image, r, c)] = value;
+    }
+}
+
+// What quantity q is filtered: 0 = image 0, 1 = image 1, 2 = image 0 squared,
+// 3 = image 1 squared, 4 = their product. q is a literal at every call site,
+// so this folds away; the product is one rounded multiply per value, exactly
+// what the old shader precomputed into shared.
+float QuantitySource(uint q, uint index) {
+    if (q == 0u) return pool[index];
+    if (q == 1u) return pool[kTileFloats + index];
+    if (q == 2u) {
+        const float a = pool[index];
+        return a * a;
+    }
+    if (q == 3u) {
+        const float b = pool[kTileFloats + index];
+        return b * b;
+    }
+    return pool[index] * pool[kTileFloats + index];
+}
+
+// Separable 13-tap blur of one quantity, in its two passes. Invocation `tid`
+// owns column tid % 32 and the four output rows starting at 4 * (tid / 32);
+// the vertical pass's result is those four rows. The scratch is overwritten by
+// the next quantity's horizontal pass, so each pass ends on a barrier: one
+// closes the write side, the other the read side.
+void FilterHorizontal(uint q, uint tid) {
+    // Horizontal pass: four consecutive output columns per window, so the 16
+    // source values behind their 52 taps are read once each.
+    for (uint g = tid; g < kQuads; g += kThreads) {
+        const uint r = g / kQuad;
+        const uint c0 = (g % kQuad) * 4u;
+        const uint base = r * kSrcW + c0;
+        const vec4 w0 = vec4(
+            QuantitySource(q, base + 0u), QuantitySource(q, base + 1u),
+            QuantitySource(q, base + 2u), QuantitySource(q, base + 3u)
+        );
+        const vec4 w1 = vec4(
+            QuantitySource(q, base + 4u), QuantitySource(q, base + 5u),
+            QuantitySource(q, base + 6u), QuantitySource(q, base + 7u)
+        );
+        const vec4 w2 = vec4(
+            QuantitySource(q, base + 8u), QuantitySource(q, base + 9u),
+            QuantitySource(q, base + 10u), QuantitySource(q, base + 11u)
+        );
+        const vec4 w3 = vec4(
+            QuantitySource(q, base + 12u), QuantitySource(q, base + 13u),
+            QuantitySource(q, base + 14u), QuantitySource(q, base + 15u)
+        );
+        const float wt0 = pc.weights[0];
+        const float wt1 = pc.weights[1];
+        const float wt2 = pc.weights[2];
+        const float wt3 = pc.weights[3];
+        const float wt4 = pc.weights[4];
+        const float wt5 = pc.weights[5];
+        const float wt6 = pc.weights[6];
+        const float wt7 = pc.weights[7];
+        const float wt8 = pc.weights[8];
+        const float wt9 = pc.weights[9];
+        const float wt10 = pc.weights[10];
+        const float wt11 = pc.weights[11];
+        const float wt12 = pc.weights[12];
+        // Lane j accumulates output column c0 + j: tap t of that output is
+        // source value t + j, and the taps stay in ascending order.
+        vec4 acc = wt0 * w0;
+        acc += wt1 * vec4(w0.y, w0.z, w0.w, w1.x);
+        acc += wt2 * vec4(w0.z, w0.w, w1.x, w1.y);
+        acc += wt3 * vec4(w0.w, w1.x, w1.y, w1.z);
+        acc += wt4 * w1;
+        acc += wt5 * vec4(w1.y, w1.z, w1.w, w2.x);
+        acc += wt6 * vec4(w1.z, w1.w, w2.x, w2.y);
+        acc += wt7 * vec4(w1.w, w2.x, w2.y, w2.z);
+        acc += wt8 * w2;
+        acc += wt9 * vec4(w2.y, w2.z, w2.w, w3.x);
+        acc += wt10 * vec4(w2.z, w2.w, w3.x, w3.y);
+        acc += wt11 * vec4(w2.w, w3.x, w3.y, w3.z);
+        acc += wt12 * w3;
+        const uint mid = mid_index(r, c0);
+        pool[mid] = acc.x;
+        pool[mid + 1u] = acc.y;
+        pool[mid + 2u] = acc.z;
+        pool[mid + 3u] = acc.w;
+    }
+    barrier();
+}
+
+// Vertical pass: the four output rows of this column share 12 of the 16 rows
+// their windows cover, so 16 shared loads feed 52 taps instead of 52.
+vec4 FilterVertical(uint tid) {
+    const uint ox = tid % kOutW;
+    const uint row = (tid / kOutW) * kRowsPerInvocation;
+    const float wt0 = pc.weights[0];
+    const float wt1 = pc.weights[1];
+    const float wt2 = pc.weights[2];
+    const float wt3 = pc.weights[3];
+    const float wt4 = pc.weights[4];
+    const float wt5 = pc.weights[5];
+    const float wt6 = pc.weights[6];
+    const float wt7 = pc.weights[7];
+    const float wt8 = pc.weights[8];
+    const float wt9 = pc.weights[9];
+    const float wt10 = pc.weights[10];
+    const float wt11 = pc.weights[11];
+    const float wt12 = pc.weights[12];
+    const float m0 = pool[mid_index(row + 0u, ox)];
+    const float m1 = pool[mid_index(row + 1u, ox)];
+    const float m2 = pool[mid_index(row + 2u, ox)];
+    const float m3 = pool[mid_index(row + 3u, ox)];
+    const float m4 = pool[mid_index(row + 4u, ox)];
+    const float m5 = pool[mid_index(row + 5u, ox)];
+    const float m6 = pool[mid_index(row + 6u, ox)];
+    const float m7 = pool[mid_index(row + 7u, ox)];
+    const float m8 = pool[mid_index(row + 8u, ox)];
+    const float m9 = pool[mid_index(row + 9u, ox)];
+    const float m10 = pool[mid_index(row + 10u, ox)];
+    const float m11 = pool[mid_index(row + 11u, ox)];
+    const float m12 = pool[mid_index(row + 12u, ox)];
+    const float m13 = pool[mid_index(row + 13u, ox)];
+    const float m14 = pool[mid_index(row + 14u, ox)];
+    const float m15 = pool[mid_index(row + 15u, ox)];
+    float a0 = 0.0;
+    a0 += wt0 * m0;
+    a0 += wt1 * m1;
+    a0 += wt2 * m2;
+    a0 += wt3 * m3;
+    a0 += wt4 * m4;
+    a0 += wt5 * m5;
+    a0 += wt6 * m6;
+    a0 += wt7 * m7;
+    a0 += wt8 * m8;
+    a0 += wt9 * m9;
+    a0 += wt10 * m10;
+    a0 += wt11 * m11;
+    a0 += wt12 * m12;
+    float a1 = 0.0;
+    a1 += wt0 * m1;
+    a1 += wt1 * m2;
+    a1 += wt2 * m3;
+    a1 += wt3 * m4;
+    a1 += wt4 * m5;
+    a1 += wt5 * m6;
+    a1 += wt6 * m7;
+    a1 += wt7 * m8;
+    a1 += wt8 * m9;
+    a1 += wt9 * m10;
+    a1 += wt10 * m11;
+    a1 += wt11 * m12;
+    a1 += wt12 * m13;
+    float a2 = 0.0;
+    a2 += wt0 * m2;
+    a2 += wt1 * m3;
+    a2 += wt2 * m4;
+    a2 += wt3 * m5;
+    a2 += wt4 * m6;
+    a2 += wt5 * m7;
+    a2 += wt6 * m8;
+    a2 += wt7 * m9;
+    a2 += wt8 * m10;
+    a2 += wt9 * m11;
+    a2 += wt10 * m12;
+    a2 += wt11 * m13;
+    a2 += wt12 * m14;
+    float a3 = 0.0;
+    a3 += wt0 * m3;
+    a3 += wt1 * m4;
+    a3 += wt2 * m5;
+    a3 += wt3 * m6;
+    a3 += wt4 * m7;
+    a3 += wt5 * m8;
+    a3 += wt6 * m9;
+    a3 += wt7 * m10;
+    a3 += wt8 * m11;
+    a3 += wt9 * m12;
+    a3 += wt10 * m13;
+    a3 += wt11 * m14;
+    a3 += wt12 * m15;
+    barrier();
+    return vec4(a0, a1, a2, a3);
+}
+
+// The two maps for one output pixel: the SSIM' error and the ringing/blurring
+// differences, accumulated into the six norms of this channel.
+void AccumulateMaps(
+    uint out_x, uint out_y, uint centre, float mu1, float mu2, float s11,
+    float s22, float s12, inout float sums[kNormCount]
+) {
+    if (out_x >= pc.width || out_y >= pc.height) return;
+
+    const float num_m = 1.0 - (mu1 - mu2) * (mu1 - mu2);
+    const float num_s = 2.0 * (s12 - mu1 * mu2) + kC2;
+    const float denom_s = (s11 - mu1 * mu1) + (s22 - mu2 * mu2) + kC2;
+    // Difference form: identical planes cancel exactly to zero before any
+    // division rounds.
+    const float d = max((denom_s - num_m * num_s) / denom_s, 0.0);
+    sums[0] += d;
+    const float dd = d * d;
+    sums[1] += dd * dd;
+
+    // The raw XYB value is the centre of the source tile.
+    const float img1 = pool[centre];
+    const float img2 = pool[centre + kTileFloats];
+    const float detail_dist = 1.0 + abs(img2 - mu2);
+    const float detail_orig = 1.0 + abs(img1 - mu1);
+    const float d1 = (detail_dist - detail_orig) / detail_orig;
+    const float ring = max(d1, 0.0);
+    const float blur = max(-d1, 0.0);
+    sums[2] += ring;
+    sums[3] += (ring * ring) * (ring * ring);
+    sums[4] += blur;
+    sums[5] += (blur * blur) * (blur * blur);
+}
+
+void main() {
+    const uint tid = gl_LocalInvocationIndex;
+    // One dispatch per level and channel: the level's planes, geometry and
+    // norm block arrive as push constants, and the channel is the grid's z.
+    const uint channel = gl_WorkGroupID.z;
+    // This level's maps for this channel have weights at most the pruning
+    // threshold: the approximation omits them, so the workgroup returns before
+    // it reads a tile. The rule is Vship's -- it prunes one map at a time
+    // (.reference/Vship/src/Vulkan/ssimu2/score.hpp:125-131) and leaves a whole
+    // (plane, scale) dispatch out when all three of its maps go (:181); this
+    // workgroup produces all six norms at once, so the pair is the unit the
+    // mask can drop (Ssimulacra2ChannelPruned in
+    // src/metrics/ssimulacra2/pipeline.cc).
+    if ((pc.channel_mask & (1u << channel)) == 0u) return;
+    const uint gx0 = gl_WorkGroupID.x * kOutW;
+    const uint gy0 = gl_WorkGroupID.y * kOutH;
+    // This workgroup's partial: its tile, row-major over the level's grid.
+    const uint group = gl_WorkGroupID.x + gl_WorkGroupID.y * pc.groups_x;
+
+    LoadTile(0u, tid, gx0, gy0, channel);
+    LoadTile(1u, tid, gx0, gy0, channel);
+    barrier();
+
+    // blurred[q] is quantity q's blur at this invocation's output rows.
+    FilterHorizontal(0u, tid);
+    const vec4 b0 = FilterVertical(tid);  // mu1
+    FilterHorizontal(1u, tid);
+    const vec4 b1 = FilterVertical(tid);  // mu2
+    FilterHorizontal(2u, tid);
+    const vec4 b2 = FilterVertical(tid);  // sigma1
+    FilterHorizontal(3u, tid);
+    const vec4 b3 = FilterVertical(tid);  // sigma2
+    FilterHorizontal(4u, tid);
+    const vec4 b4 = FilterVertical(tid);  // cross
+
+    const uint ox = tid % kOutW;
+    const uint row = (tid / kOutW) * kRowsPerInvocation;
+    float sums[kNormCount];
+    for (uint n = 0u; n < kNormCount; ++n) {
+        sums[n] = 0.0;
+    }
+    const uint out_x = gx0 + ox;
+    // The four rows are unrolled by hand: a component of a vec4 is a register,
+    // an indexed vector component is not.
+    AccumulateMaps(
+        out_x, gy0 + row + 0u, tile_index(0u, row + 0u + kRadius, ox + kRadius),
+        b0.x, b1.x, b2.x, b3.x, b4.x, sums
+    );
+    AccumulateMaps(
+        out_x, gy0 + row + 1u, tile_index(0u, row + 1u + kRadius, ox + kRadius),
+        b0.y, b1.y, b2.y, b3.y, b4.y, sums
+    );
+    AccumulateMaps(
+        out_x, gy0 + row + 2u, tile_index(0u, row + 2u + kRadius, ox + kRadius),
+        b0.z, b1.z, b2.z, b3.z, b4.z, sums
+    );
+    AccumulateMaps(
+        out_x, gy0 + row + 3u, tile_index(0u, row + 3u + kRadius, ox + kRadius),
+        b0.w, b1.w, b2.w, b3.w, b4.w, sums
+    );
+    // The ladder below reuses the tile region.
+    barrier();
+
+    pool[0u * kThreads + tid] = sums[0];
+    pool[1u * kThreads + tid] = sums[1];
+    pool[2u * kThreads + tid] = sums[2];
+    pool[3u * kThreads + tid] = sums[3];
+    pool[4u * kThreads + tid] = sums[4];
+    pool[5u * kThreads + tid] = sums[5];
+    barrier();
+    // Every stage halves the live threads with one barrier between them. A
+    // two-stage reduction (eight blocks of kThreads/8 partials summed by one
+    // thread each, then the eight block sums on thread 0) measured 1.68 ms
+    // against this 1.54 ms on the scale stage at 4K. It saves six barriers but
+    // reads every block at a stride of 32 floats, so all lanes of a warp hit
+    // one bank; the number does not separate the barrier saving from those
+    // conflicts, and this ladder wins either way.
+    for (uint s = kThreads / 2u; s > 0u; s >>= 1) {
+        if (tid < s) {
+            for (uint n = 0u; n < kNormCount; ++n) {
+                pool[n * kThreads + tid] += pool[n * kThreads + tid + s];
+            }
+        }
+        barrier();
+    }
+
+    // One partial per norm, at norm * groups + group. Each workgroup writes
+    // only its own channel's six norms, so the three channels' workgroups
+    // never touch the same slot.
+    if (tid == 0u) {
+        const uint groups = pc.groups;
+        const uint partials = pc.partials;
+        const uint ssim_base = partials + (channel * 2u) * groups + group;
+        arena[ssim_base] = pool[0u * kThreads];
+        arena[ssim_base + groups] = pool[1u * kThreads];
+        const uint edge_base =
+            partials + (kSsimNorms + channel * 4u) * groups + group;
+        arena[edge_base] = pool[2u * kThreads];
+        arena[edge_base + groups] = pool[3u * kThreads];
+        arena[edge_base + 2u * groups] = pool[4u * kThreads];
+        arena[edge_base + 3u * groups] = pool[5u * kThreads];
+    }
+}

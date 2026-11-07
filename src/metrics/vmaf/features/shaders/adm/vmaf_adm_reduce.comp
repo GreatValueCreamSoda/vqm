@@ -1,0 +1,36 @@
+// Copyright 2016-2020 Netflix, Inc. BSD-2-Clause-Patent.
+// See licenses/NETFLIX-VMAF-LICENSE. Per-scale norm follows libvmaf
+// adm_tools.c at revision 4611e47a7330cd342498dcc130e1008efbeab6e4.
+#version 450
+#include "vmaf_adm_common.glsl"
+layout(local_size_x = 256) in;
+shared float sums[6][256];
+void main() {
+    uint lane = gl_LocalInvocationIndex;
+    for (uint c = 0; c < 6; ++c) {
+        float v = 0.0;
+        for (uint i = lane; i < pc.groups; i += 256)
+            v += arena[pc.partials + i * 6 + c];
+        sums[c][lane] = v;
+    }
+    barrier();
+    for (uint step = 128; step > 0; step >>= 1) {
+        if (lane < step)
+            for (uint c = 0; c < 6; ++c) sums[c][lane] += sums[c][lane + step];
+        barrier();
+    }
+    if (lane == 0) {
+        int left = (int(pc.width) - 5) / 10;
+        int top = (int(pc.height) - 5) / 10;
+        float pixels =
+            float(int(pc.width) - 2 * left) * float(int(pc.height) - 2 * top);
+        float noise = pow(pixels * 0.03125, 1.0 / 3.0);
+        float num = 0.0, den = 0.0;
+        for (uint c = 0; c < 3; ++c) {
+            num += pow(sums[c][0], 1.0 / 3.0) + noise;
+            den += pow(sums[c + 3][0], 1.0 / 3.0) + noise;
+        }
+        arena[pc.results + 2 * pc.scale] = num;
+        arena[pc.results + 2 * pc.scale + 1] = den;
+    }
+}

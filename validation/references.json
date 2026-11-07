@@ -1,0 +1,206 @@
+{
+  "ssimulacra2": {
+    "direction": "higher",
+    "reference": "cloudinary",
+    "implementations": [
+      {
+        "name": "ours",
+        "command": [
+          "build/vqm_bench",
+          "--metric",
+          "ssimulacra2",
+          "--score-only",
+          "--pairs-file",
+          "{pairs_file}"
+        ],
+        "batch": true,
+        "jobs": 1,
+        "threads": 3,
+        "decode_threads": 16
+      },
+      {
+        "name": "ours-half-planes",
+        "command": [
+          "build/vqm_bench",
+          "--metric",
+          "ssimulacra2",
+          "--score-only",
+          "--half-planes",
+          "--pairs-file",
+          "{pairs_file}"
+        ],
+        "batch": true,
+        "jobs": 1,
+        "threads": 3,
+        "decode_threads": 16
+      },
+      {
+        "name": "cloudinary",
+        "command": [
+          "build/reference-build/ss2_cloudinary_bench",
+          "--score-only",
+          "--pairs-file",
+          "{pairs_file}"
+        ],
+        "batch": true,
+        "jobs": 1,
+        "threads": 16,
+        "decode_threads": 4
+      },
+      {
+        "name": "libjxl",
+        "command": [
+          "build/libjxl-build/tools/ss2_libjxl_bench",
+          "--metric",
+          "ssimu2",
+          "--score-only",
+          "--pairs-file",
+          "{pairs_file}"
+        ],
+        "batch": true,
+        "jobs": 1,
+        "threads": 16,
+        "decode_threads": 4
+      },
+      {
+        "name": "fssimu2",
+        "command": [
+          "build/fssimu2-build/bin/ssimu2_bench",
+          "--score-only",
+          "--pairs-file",
+          "{pairs_file}"
+        ],
+        "batch": true,
+        "jobs": 1,
+        "threads": 16,
+        "decode_threads": 4
+      },
+      {
+        "name": "vship-cuda",
+        "command": [
+          "build/vship-build-cuda/vship_bench",
+          "--metric",
+          "ssimu2",
+          "--score-only",
+          "--pairs-file",
+          "{pairs_file}"
+        ],
+        "batch": true,
+        "jobs": 1,
+        "threads": 3,
+        "decode_threads": 16
+      },
+      {
+        "name": "vship-vulkan",
+        "command": [
+          "build/vship-build-vulkan/vship_bench",
+          "--metric",
+          "ssimu2",
+          "--score-only",
+          "--pairs-file",
+          "{pairs_file}"
+        ],
+        "batch": true,
+        "jobs": 1,
+        "threads": 3,
+        "decode_threads": 16
+      },
+      {
+        "name": "vship-fast-vulkan",
+        "command": [
+          "build/vship-fast-build-vulkan/vship_bench",
+          "--metric",
+          "ssimu2",
+          "--score-only",
+          "--pairs-file",
+          "{pairs_file}"
+        ],
+        "batch": true,
+        "jobs": 1,
+        "threads": 3,
+        "decode_threads": 16
+      }
+    ]
+  },
+  "butteraugli": {
+    "direction": "lower",
+    "reference": "libjxl",
+    "implementations": [
+      {
+        "name": "ours",
+        "command": [
+          "build/vqm_bench",
+          "--metric",
+          "butteraugli",
+          "--score-only",
+          "--pairs-file",
+          "{pairs_file}"
+        ],
+        "batch": true,
+        "jobs": 1,
+        "threads": 3,
+        "decode_threads": 16
+      },
+      {
+        "name": "libjxl",
+        "command": [
+          "build/libjxl-build/tools/ss2_libjxl_bench",
+          "--metric",
+          "butteraugli",
+          "--score-only",
+          "--pairs-file",
+          "{pairs_file}"
+        ],
+        "batch": true,
+        "jobs": 1,
+        "threads": 16,
+        "decode_threads": 4
+      },
+      {
+        "name": "vship-cuda",
+        "command": [
+          "build/vship-build-cuda/vship_bench",
+          "--metric",
+          "butteraugli",
+          "--score-only",
+          "--pairs-file",
+          "{pairs_file}"
+        ],
+        "batch": true,
+        "jobs": 1,
+        "threads": 3,
+        "decode_threads": 16
+      },
+      {
+        "name": "vship-vulkan",
+        "command": [
+          "build/vship-build-vulkan/vship_bench",
+          "--metric",
+          "butteraugli",
+          "--score-only",
+          "--pairs-file",
+          "{pairs_file}"
+        ],
+        "batch": true,
+        "jobs": 1,
+        "threads": 3,
+        "decode_threads": 16
+      },
+      {
+        "name": "vship-fast-vulkan",
+        "command": [
+          "build/vship-fast-build-vulkan/vship_bench",
+          "--metric",
+          "butteraugli",
+          "--score-only",
+          "--pairs-file",
+          "{pairs_file}"
+        ],
+        "batch": true,
+        "jobs": 1,
+        "threads": 3,
+        "decode_threads": 16
+      }
+    ]
+  }
+}

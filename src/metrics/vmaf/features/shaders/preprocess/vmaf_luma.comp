@@ -1,0 +1,48 @@
+// Derived from Cloudinary SSIMULACRA 2 (Copyright (c) Jon Sneyers, Cloudinary).
+// BSD-3-Clause; see LICENSE.
+// VMAF input scaling: Copyright (c) Netflix, Inc.
+// BSD-2-Clause-Patent; see licenses/NETFLIX-VMAF-LICENSE.
+
+#version 450
+
+#include "bindings.glsl"
+
+layout(local_size_x = 16, local_size_y = 16) in;
+layout(push_constant) uniform Push {
+    uint desc_base;
+    uint destination;
+    uint width;
+    uint height;
+    float scale;
+    uint plane;
+    uint step;
+}
+pc;
+
+void main() {
+    // SourceDesc: selected plane offset, packed pixel type, and row stride.
+    // Binding 3 is selected separately for each image, so external inputs do
+    // not accidentally read the internal arena or the other image's buffer.
+    const uint base = desc[pc.desc_base + pc.plane];
+    const uint type = desc[pc.desc_base + 4u] & 3u;
+    const uint stride = desc[pc.desc_base + 40u + pc.plane];
+    const uint y = gl_GlobalInvocationID.y;
+    const uint first_x = gl_GlobalInvocationID.x * pc.step;
+    if (y >= pc.height) return;
+    for (uint i = 0; i < pc.step; ++i) {
+        const uint x = first_x + i;
+        if (x >= pc.width) return;
+        const uint index = y * stride + x;
+        uint value;
+        if (type == 0u) {
+            value = (source_words[base + (index >> 2u)] >> (8u * (index & 3u))) &
+                    255u;
+        } else {
+            value =
+                (source_words[base + (index >> 1u)] >> (16u * (index & 1u))) &
+                65535u;
+        }
+        arena[pc.destination + y * pc.width + x] =
+            float(value) * pc.scale - 128.0;
+    }
+}

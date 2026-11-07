@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "method": "Lexicographically first 30 original source directory names; exactly cld_avif and mozjpeg q30/q60/q90 chosen from filename quality tokens before candidate scores. No candidate-based filtering.",
+  "data_root": "/home/creamsoda/Documents/ssimulacra2/.cache/validation/ranking-temporal-stills-20261106",
+  "original_corpus": "/home/creamsoda/Documents/ssimulacra2/validation/data/CID22_validation_set",
+  "mcos_sha256": "fbaf42f5031b0c520209e9739a352d3048d711c85c20552679304e9784af0cc6",
+  "sources": [
+    "1025469",
+    "1044329",
+    "1189261",
+    "1279330",
+    "1418519",
+    "1420710",
+    "1475938",
+    "1531677",
+    "1544947",
+    "159550",
+    "1624487",
+    "162520",
+    "164595",
+    "2079234",
+    "21169144185_3f7977cb5a_o",
+    "2190188",
+    "225228",
+    "2253934",
+    "2389166",
+    "2670327",
+    "2736139",
+    "2775196",
+    "2887497",
+    "2936831",
+    "297394",
+    "3156482",
+    "3316926",
+    "3316926_opo25u",
+    "3637739",
+    "3653963"
+  ],
+  "pairs": 180,
+  "codecs": [
+    "cld_avif",
+    "mozjpeg"
+  ],
+  "qualities": [
+    30,
+    60,
+    90
+  ],
+  "subset_csv_sha256": "7f54d321d8eb26e6ed3c0bd6b96c1001e97a83731093078735c98d6f43c52e9a",
+  "promoted_from": "artifacts/reports/ranking-temporal/stills; raw files and logs retain their original locations and commands unchanged"
+}

@@ -1,0 +1,185 @@
+{
+  "schema_version": 1,
+  "domains": [
+    {
+      "domain_id": "hosted-sdr-smoke-ssimulacra2",
+      "reference_file": "temporal/oracles/smoke/ssimulacra2.json",
+      "policy_file": "temporal/oracles/smoke/ssimulacra2-policy.json",
+      "evidence": "bench/notes/system/all-metric-reference-correlation.md",
+      "identity": {
+        "metric": "ssimulacra2",
+        "reference_revision": "81feacf6a5b0bbd7ec11b4a881a4615033ab0b10",
+        "input_manifest_hash": "0198bc63fed098ef9efc0dbc3df0b7aefde9266b09b09596c856810f074c2508",
+        "configuration_hash": "133ef18eeaffb7a54db2c363e6e84b40a3d527349e9d171c9db2129d2306b5c7",
+        "reference_samples_sha256": "31a9d2be8f37ea4ad2e4e6ae4cc5c8cc87f5ffa24de3fcef844bf649b55f12ab",
+        "policy_sha256": "8319de67760c0ef482fe259e0a25a6b479d8196628c7233acc1c9aab5594726a",
+        "effective_policy_sha256": "cfbb239d9da3c21f52ec3b6a36effa458471211e6dfc2d9c7a8f3d99db03a67a"
+      }
+    },
+    {
+      "domain_id": "hosted-sdr-smoke-butteraugli",
+      "reference_file": "temporal/oracles/smoke/butteraugli.json",
+      "policy_file": "temporal/oracles/smoke/butteraugli-policy.json",
+      "evidence": "bench/notes/system/all-metric-reference-correlation.md",
+      "identity": {
+        "metric": "butteraugli",
+        "reference_revision": "e47d2a2b5bb418f2947ce07f36cb048861db3820",
+        "input_manifest_hash": "2265325f6689f0bd1f8a8e68608cf140783ded34a6a57e92e733baeb713f515b",
+        "configuration_hash": "aceaac4a10b5ca1df282447c36b98bce6307c62a54a674bd4221bc4830eb48ee",
+        "reference_samples_sha256": "556fb3db4f4dfc042d1c696f439fb92eda9fdc219c3c15d68b08f96552f4e0a4",
+        "policy_sha256": "47a349dac5d02e0f29bbb99c5dcc6757dbd796a00c69f678b5b3fbacf651e1f4",
+        "effective_policy_sha256": "80de525c7aaa42998820bbf9175931dc1abbbe19dc3c3b762efe377008b11188"
+      }
+    },
+    {
+      "domain_id": "hosted-sdr-smoke-vmaf-v0",
+      "reference_file": "temporal/oracles/smoke/vmaf-v0.json",
+      "policy_file": "temporal/oracles/smoke/vmaf-v0-policy.json",
+      "evidence": "bench/notes/system/all-metric-reference-correlation.md",
+      "identity": {
+        "metric": "vmaf-v0",
+        "reference_revision": "4611e47a7330cd342498dcc130e1008efbeab6e4",
+        "input_manifest_hash": "53d5a1ad72f6a73dfb786576cf87fb95d6ea6e907794b4fdf405c0257e96d75a",
+        "configuration_hash": "ebd685938b1f8522c1b566042c568fed186610f62bef733dfebce9127c42493c",
+        "reference_samples_sha256": "45d9705098ccab8d90ad9da68a2dfbf176d8cf19f96e40c0c549fd588be1cc0b",
+        "policy_sha256": "c1b1b3e91c0849820fe229f62a8f8d0e6b6eaaa6992825e5aba5f474ce5b8594",
+        "effective_policy_sha256": "6a7054c20e7f04af93ac3e7749d19f9d317d75c3d71e380e2150806f5b36b6e3"
+      }
+    },
+    {
+      "domain_id": "hosted-sdr-smoke-vmaf-v1",
+      "reference_file": "temporal/oracles/smoke/vmaf-v1.json",
+      "policy_file": "temporal/oracles/smoke/vmaf-v1-policy.json",
+      "evidence": "bench/notes/system/all-metric-reference-correlation.md",
+      "identity": {
+        "metric": "vmaf-v1",
+        "reference_revision": "4611e47a7330cd342498dcc130e1008efbeab6e4",
+        "input_manifest_hash": "23ba1bdbc11aeb6b42db25abc0ee7056cb0c09285f48d978c2b1a9267e020379",
+        "configuration_hash": "d06bade22b9ec7617a4b686bc22ca75caffc8fc25bef6b8a32d9e7cf7b2a4d89",
+        "reference_samples_sha256": "a7045e1dc2e310bade3b1f350b147aaac8aa670605ecf7f9c858201e431637d4",
+        "policy_sha256": "2fe349086f32c253228a08ce1ad7c9fa3a021544452c99cc32f0898919c439b6",
+        "effective_policy_sha256": "e539efdfb643ba907fd345417969a7e40e1e5fa8a4693ff3ae5eb3a30b016488"
+      }
+    },
+    {
+      "domain_id": "hosted-sdr-smoke-cvvdp",
+      "reference_file": "temporal/oracles/smoke/cvvdp.json",
+      "policy_file": "temporal/oracles/smoke/cvvdp-policy.json",
+      "evidence": "bench/notes/system/all-metric-reference-correlation.md",
+      "identity": {
+        "metric": "cvvdp",
+        "reference_revision": "2a268bce8d56e2f3abde46df3927d8a633707a24",
+        "input_manifest_hash": "5b2ce25b753872b3434f58d63334cb6abe07bb65dbcf25158026957ad2b39873",
+        "configuration_hash": "749dece246d54dbe9131c9291af215a3b9e082c85e57fbd50f525e059decb6d8",
+        "reference_samples_sha256": "6ed1403b47d70d90cf80c61074bb62abfa48e3a030fa818eb9d822f9382f7739",
+        "policy_sha256": "d14bd9bf707630d90cb5cd799452c6dcac780523b76225bc4b8cda1499ae845a",
+        "effective_policy_sha256": "04165b4b4947d52fa4ab39d8236d37ddcc536ee1b021d3a644dc105832d47f27"
+      }
+    },
+    {
+      "domain_id": "hosted-sdr-qualification-ssimulacra2",
+      "reference_file": "temporal/oracles/qualification/ssimulacra2.json",
+      "policy_file": "temporal/oracles/qualification/ssimulacra2-policy.json",
+      "evidence": "bench/notes/system/all-metric-reference-correlation.md",
+      "identity": {
+        "metric": "ssimulacra2",
+        "reference_revision": "81feacf6a5b0bbd7ec11b4a881a4615033ab0b10",
+        "input_manifest_hash": "d9531f485c1dd0204763599fd53ca9e84dcb33a7c5467e71a80120bb81a2aea6",
+        "configuration_hash": "133ef18eeaffb7a54db2c363e6e84b40a3d527349e9d171c9db2129d2306b5c7",
+        "reference_samples_sha256": "956257188b3f55312349a53b98c7fc6d909b7ea2efe9c9c6e4bde28e4d511373",
+        "policy_sha256": "f8cd427f953d060257ba99abc5aad501fbe84f895a339fe49334295782f20d73",
+        "effective_policy_sha256": "83f1266f323da6072c3338897cde3dd2973f7d00348e9605b68e0db026d0f0bb"
+      }
+    },
+    {
+      "domain_id": "hosted-sdr-qualification-butteraugli",
+      "reference_file": "temporal/oracles/qualification/butteraugli.json",
+      "policy_file": "temporal/oracles/qualification/butteraugli-policy.json",
+      "evidence": "bench/notes/system/all-metric-reference-correlation.md",
+      "identity": {
+        "metric": "butteraugli",
+        "reference_revision": "e47d2a2b5bb418f2947ce07f36cb048861db3820",
+        "input_manifest_hash": "bf011f24987e4ab811e0d62d1929af21032e2193442151c006e15a1baa5e56f9",
+        "configuration_hash": "aceaac4a10b5ca1df282447c36b98bce6307c62a54a674bd4221bc4830eb48ee",
+        "reference_samples_sha256": "8d0bac1652ef7c92546207910e5912ff656ddaa7aa96a821080d7c0cb7e3cc98",
+        "policy_sha256": "3e23e659a4c8892a2c804b81ecea8e175e548f1c9f4592f6d70454ebb1b46d95",
+        "effective_policy_sha256": "b44e05e73699a4a52865552828ed0a1187a9ac7258ae0e3cb747bf5ee53c681c"
+      }
+    },
+    {
+      "domain_id": "hosted-sdr-qualification-vmaf-v0",
+      "reference_file": "temporal/oracles/qualification/vmaf-v0.json",
+      "policy_file": "temporal/oracles/qualification/vmaf-v0-policy.json",
+      "evidence": "bench/notes/system/all-metric-reference-correlation.md",
+      "identity": {
+        "metric": "vmaf-v0",
+        "reference_revision": "4611e47a7330cd342498dcc130e1008efbeab6e4",
+        "input_manifest_hash": "8e69c8ce4cd88896423485aa3a18942d26848b78aec17e646636a655bf57af97",
+        "configuration_hash": "ebd685938b1f8522c1b566042c568fed186610f62bef733dfebce9127c42493c",
+        "reference_samples_sha256": "c7f995158e36d018af055ceeccbc841b69e8f174b9740b30f64d65a3cc12649f",
+        "policy_sha256": "7ee9cb3ed256b8a2184841fc28339d1ac92a4e2002c22f6a45d143e6d497a9b3",
+        "effective_policy_sha256": "b4119c8a8a4a70a15ebed23c2f20320d3a9c8f864669bd3ad454eaeaf284b925"
+      }
+    },
+    {
+      "domain_id": "hosted-sdr-qualification-vmaf-v1",
+      "reference_file": "temporal/oracles/qualification/vmaf-v1.json",
+      "policy_file": "temporal/oracles/qualification/vmaf-v1-policy.json",
+      "evidence": "bench/notes/system/all-metric-reference-correlation.md",
+      "identity": {
+        "metric": "vmaf-v1",
+        "reference_revision": "4611e47a7330cd342498dcc130e1008efbeab6e4",
+        "input_manifest_hash": "98097b74473a97b95df38ebb3fa8d2d21148852c2f6210ec41cbcbb7f153696f",
+        "configuration_hash": "d06bade22b9ec7617a4b686bc22ca75caffc8fc25bef6b8a32d9e7cf7b2a4d89",
+        "reference_samples_sha256": "d4fb7f12fd45667e181993b6b6e74898fb5b4733d513ea26021f7a94e233359b",
+        "policy_sha256": "a2b19215f826975e701cea46369d9f6e41d3ea1fc55cfd6acb11047faa81d855",
+        "effective_policy_sha256": "79dfcb60aa1e4a439f046ce728b4995234a8de2982425c838e82c301012e7403"
+      }
+    },
+    {
+      "domain_id": "hosted-sdr-qualification-cvvdp",
+      "reference_file": "temporal/oracles/qualification/cvvdp.json",
+      "policy_file": "temporal/oracles/qualification/cvvdp-policy.json",
+      "evidence": "bench/notes/system/all-metric-reference-correlation.md",
+      "identity": {
+        "metric": "cvvdp",
+        "reference_revision": "2a268bce8d56e2f3abde46df3927d8a633707a24",
+        "input_manifest_hash": "da8018f95b1162423438fed413ce9aa1251f64c792000f4a6c623b2c2ba77ea4",
+        "configuration_hash": "17187fbf21805857eb0815e3aee5f16e63e0a45fac1371bbad5945651b3ee26c",
+        "reference_samples_sha256": "7438f7e8b03bbadcf5a24d227d4504110dc684867f88f71dcf26c8cdc05ba46d",
+        "policy_sha256": "41c9a0294d791bc2d5a105bc3b8485476bc93bb4f1163343b5c092b3ff64be25",
+        "effective_policy_sha256": "01fd39abc6b2247d524754fa28d7892cf369ebed8a4cf0191946fe0982ca8344"
+      }
+    },
+    {
+      "domain_id": "cid22-balanced-ssimulacra2",
+      "reference_file": "fixtures/cid22-balanced/ssimulacra2-original.json",
+      "policy_file": "fixtures/cid22-balanced/ssimulacra2-policy.json",
+      "evidence": "bench/notes/system/ranking-temporal-validation-results.md",
+      "identity": {
+        "metric": "ssimulacra2",
+        "reference_revision": "81feacf6a5b0bbd7ec11b4a881a4615033ab0b10",
+        "input_manifest_hash": "27244e276ffaf890378f4f899eeff6c7de73cf56aaf9ee9359a33758f9d31a2e",
+        "configuration_hash": null,
+        "reference_samples_sha256": "70a1aa58deae6ef899b749219156a474578288c06c736ace6e17dd88e744b734",
+        "policy_sha256": "5402741f31c719a3933529cd0d39a80c2211e1f7b2e0eaea2673ebd63f47ab47",
+        "effective_policy_sha256": "4258615919d54ae82b8886391ae3234918b221d00c190d4e17d661e9fad46bdd"
+      }
+    },
+    {
+      "domain_id": "cid22-balanced-butteraugli",
+      "reference_file": "fixtures/cid22-balanced/butteraugli-original.json",
+      "policy_file": "fixtures/cid22-balanced/butteraugli-policy.json",
+      "evidence": "bench/notes/system/ranking-temporal-validation-results.md",
+      "identity": {
+        "metric": "butteraugli",
+        "reference_revision": "e47d2a2b5bb418f2947ce07f36cb048861db3820",
+        "input_manifest_hash": "460b2ed7d2b678db90c2b87b6fe2ab7a7d002f8496ddabcf6190f58a8ec1468f",
+        "configuration_hash": null,
+        "reference_samples_sha256": "b24fd1fa28424a941c312df6792eb3c34ef693130dc5c751f8fc53f111249b8c",
+        "policy_sha256": "d74d4c1b2e650de1cbe16dcb837253e7f869112f33fb3d1c29c588e7371163e1",
+        "effective_policy_sha256": "d66dae7c8f233531cf0a4d21bb94fbfde6f59afded4b6d88c5daa195619bad0f"
+      }
+    }
+  ]
+}

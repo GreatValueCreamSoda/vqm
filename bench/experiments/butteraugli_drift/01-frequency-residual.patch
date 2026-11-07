@@ -1,0 +1,26 @@
+diff --git a/src/metrics/butteraugli/shaders/butter_blur.comp b/src/metrics/butteraugli/shaders/butter_blur.comp
+--- a/src/metrics/butteraugli/shaders/butter_blur.comp
++++ b/src/metrics/butteraugli/shaders/butter_blur.comp
+@@ -15,7 +15,7 @@
+ //   op 1 LF     out0 = blur(in) (raw; XybLowFreqToVals runs where it is read)
+ //               out1 = in - out0        (mf = xyb - lf)
+ //   op 2 MF     out0 = range(blur(in))  (X remove 0.29, Y amplify 0.1)
+-//               out1 = in - out0        (hf = mf_before - mf_after)
++//               out1 = in - blur(in)    (hf = mf_before - raw_blur)
+ //               the B channel (z == 2) has no hf and takes the plain blur.
+ //   op 3 UHF    out0 = hf after the UHF range rule, out1 = uhf
+ //               (X: hf = remove(blur, 1.5), uhf = remove(in - blur, 0.04);
+@@ -68,11 +68,11 @@
+     if (op == 2u) {
+         if (z == 0u) {
+             value = remove_range(blurred, 0.29);
+-            aux = pre - value;
++            aux = pre - blurred;
+             write_aux = true;
+         } else if (z == 1u) {
+             value = amplify_range(blurred, 0.1);
+-            aux = pre - value;
++            aux = pre - blurred;
+             write_aux = true;
+         }
+     } else if (op == 3u) {

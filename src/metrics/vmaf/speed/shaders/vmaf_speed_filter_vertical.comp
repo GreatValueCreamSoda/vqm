@@ -1,0 +1,34 @@
+// VMAF SpEED: Copyright 2016-2025 Netflix, Inc.
+// BSD-2-Clause-Patent; see licenses/NETFLIX-VMAF-LICENSE.
+#version 450
+#include "vmaf_speed_filter_common.glsl"
+layout(local_size_x = 16, local_size_y = 16) in;
+
+void main() {
+    uvec2 p = gl_GlobalInvocationID.xy;
+    const uint width = pc.op == 0u ? 9u * (pc.width / 16u) : pc.width / 16u;
+    const uint input_height = pc.op == 0u ? pc.height : pc.height / 16u;
+    const uint input_width = pc.op == 0u ? pc.width : width;
+    const uint height = pc.height / 16u;
+    if (p.x >= width || p.y >= height) return;
+    const uint source = pc.op == 0u ? pc.input_offset[gl_WorkGroupID.z]
+                                    : pc.down_offset[gl_WorkGroupID.z];
+    const int taps = pc.op == 0u ? 9 : 3;
+    const int center = pc.op == 0u ? int(p.y * 16u) : int(p.y);
+    // The horizontal downsampler uses nine columns at each sixteen-column
+    // center. Filter only those columns and keep their original tap order;
+    // the first center's mirrored columns are materialized in this scratch.
+    const uint source_x =
+        pc.op == 0u
+            ? uint(speed_mirror(
+                  int((p.x / 9u) * 16u) + int(p.x % 9u) - 4, int(pc.width)
+              ))
+            : p.x;
+    float value = 0.0;
+    for (int k = 0; k < taps; ++k) {
+        int y = speed_mirror(center + k - taps / 2, int(input_height));
+        float weight = pc.op == 0u ? kAntialias[k] : kMean[k];
+        value += weight * arena[source + uint(y) * input_width + source_x];
+    }
+    arena[pc.scratch_offset[gl_WorkGroupID.z] + p.y * width + p.x] = value;
+}

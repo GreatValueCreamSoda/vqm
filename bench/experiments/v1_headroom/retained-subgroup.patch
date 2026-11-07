@@ -1,0 +1,301 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -194,6 +194,8 @@
+ vqm_add_shader(vmaf_cambi_prepare metrics/vmaf/cambi/shaders/vmaf_cambi_prepare.comp)
+ vqm_add_shader(vmaf_cambi_contrast metrics/vmaf/cambi/shaders/vmaf_cambi_contrast.comp)
+ vqm_add_shader(vmaf_cambi_contrast_half metrics/vmaf/cambi/shaders/vmaf_cambi_contrast.comp -DVQM_CAMBI_HALF_SOURCE=1)
++vqm_add_shader(vmaf_cambi_contrast_subgroup metrics/vmaf/cambi/shaders/vmaf_cambi_contrast.comp -DVQM_CAMBI_SUBGROUP_ROWS=1)
++vqm_add_shader(vmaf_cambi_contrast_subgroup_half metrics/vmaf/cambi/shaders/vmaf_cambi_contrast.comp -DVQM_CAMBI_SUBGROUP_ROWS=1 -DVQM_CAMBI_HALF_SOURCE=1)
+ vqm_add_shader(vmaf_cambi_decimate metrics/vmaf/cambi/shaders/vmaf_cambi_decimate.comp)
+ vqm_add_shader(vmaf_cambi_combine metrics/vmaf/cambi/shaders/vmaf_cambi_combine.comp)
+ vqm_add_shader(vmaf_cambi_pool_clear metrics/vmaf/cambi/shaders/pool/vmaf_cambi_pool_clear.comp)
+--- a/src/metrics/vmaf/cambi/vmaf_cambi.cc
++++ b/src/metrics/vmaf/cambi/vmaf_cambi.cc
+@@ -158,6 +158,19 @@
+ // 4611e47a7330cd342498dcc130e1008efbeab6e4.
+ 
+ namespace {
++bool SupportsCambiSubgroupRows(VulkanRuntime& runtime) {
++    VkPhysicalDeviceSubgroupProperties subgroup{};
++    subgroup.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_PROPERTIES;
++    VkPhysicalDeviceProperties2 properties{};
++    properties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
++    properties.pNext = &subgroup;
++    vkGetPhysicalDeviceProperties2(
++        runtime.context().physical_device, &properties
++    );
++    // BASIC subgroup operations are core Vulkan 1.1, without an enabled-device
++    // feature. Float16 storage remains independently negotiated below.
++    return VmafCambiContrast::SupportsSubgroupRows(subgroup);
++}
+ struct CambiContrastPush {
+     std::uint32_t width, height, input, mask, horizontal, filtered, contrast,
+         radius, phase, row_base;
+@@ -165,13 +178,20 @@
+ static_assert(sizeof(CambiContrastPush) == VmafCambiContrast::PushBytes());
+ }  // namespace
+ 
+-VmafCambiContrast::VmafCambiContrast(VulkanRuntime& runtime, bool allow_half)
++VmafCambiContrast::VmafCambiContrast(
++    VulkanRuntime& runtime, bool allow_half, bool allow_subgroups
++)
+     : runtime_(&runtime),
+       // Float16 workgroup storage needs the enabled shaderFloat16 feature,
+       // independently of buffer storage or the physical device's support.
+       half_source_(allow_half && runtime.context().shader_float16),
++      subgroup_pipeline_(allow_subgroups && SupportsCambiSubgroupRows(runtime)),
+       pipeline_(runtime.CreatePipeline(
+-          half_source_ ? "vmaf_cambi_contrast_half" : "vmaf_cambi_contrast"
++          subgroup_pipeline_
++              ? (half_source_ ? "vmaf_cambi_contrast_subgroup_half"
++                              : "vmaf_cambi_contrast_subgroup")
++              : (half_source_ ? "vmaf_cambi_contrast_half"
++                              : "vmaf_cambi_contrast")
+       )) {}
+ VmafCambiContrast::~VmafCambiContrast() {
+     runtime_->DestroyPipelines(std::array{pipeline_});
+--- a/src/metrics/vmaf/cambi/vmaf_cambi.h
++++ b/src/metrics/vmaf/cambi/vmaf_cambi.h
+@@ -105,7 +105,10 @@
+ // 4K input using v1's 1080p high-resolution speedup.
+ class VmafCambiContrast {
+ public:
+-    explicit VmafCambiContrast(VulkanRuntime& runtime, bool allow_half = true);
++    explicit VmafCambiContrast(
++        VulkanRuntime& runtime, bool allow_half = true,
++        bool allow_subgroups = true
++    );
+     ~VmafCambiContrast();
+     VmafCambiContrast(const VmafCambiContrast&) = delete;
+     VmafCambiContrast& operator=(const VmafCambiContrast&) = delete;
+@@ -115,10 +118,22 @@
+     }
+     void Record(Size size, unsigned window, const VmafCambiContrastBuffers& b);
+     [[nodiscard]] bool UsesHalfSource() const noexcept { return half_source_; }
++    [[nodiscard]] bool UsesSubgroupPipeline() const noexcept {
++        return subgroup_pipeline_;
++    }
++    [[nodiscard]] static constexpr bool SupportsSubgroupRows(
++        const VkPhysicalDeviceSubgroupProperties& properties
++    ) noexcept {
++        return properties.subgroupSize == 32 &&
++               (properties.supportedStages & VK_SHADER_STAGE_COMPUTE_BIT) != 0 &&
++               (properties.supportedOperations &
++                VK_SUBGROUP_FEATURE_BASIC_BIT) != 0;
++    }
+ 
+ private:
+     VulkanRuntime* runtime_;
+     bool half_source_ = false;
++    bool subgroup_pipeline_ = false;
+     VkPipeline pipeline_ = VK_NULL_HANDLE;
+ };
+ 
+--- a/src/metrics/vmaf/cambi/shaders/vmaf_cambi_contrast.comp
++++ b/src/metrics/vmaf/cambi/shaders/vmaf_cambi_contrast.comp
+@@ -3,6 +3,12 @@
+ // Mode filter and local contrast: libvmaf/src/feature/cambi.c, pinned
+ // 4611e47a7330cd342498dcc130e1008efbeab6e4.
+ #version 450
++#ifdef VQM_CAMBI_SUBGROUP_ROWS
++#extension GL_KHR_shader_subgroup_basic : require
++#define CAMBI_LOGICAL_INDEX logical_index
++#else
++#define CAMBI_LOGICAL_INDEX gl_LocalInvocationIndex
++#endif
+ #ifdef VQM_CAMBI_HALF_SOURCE
+ #extension GL_EXT_shader_explicit_arithmetic_types_float16 : require
+ #define CAMBI_SOURCE_TYPE float16_t
+@@ -65,13 +71,23 @@
+ }
+ 
+ void contrast_map() {
++#ifdef VQM_CAMBI_SUBGROUP_ROWS
++    // All 256 invocations reach this workgroup-uniform test before any
++    // pixel-bound return. Eight 32-slot subgroups therefore form full rows.
++    bool subgroup_rows = gl_SubgroupSize == 32u && gl_NumSubgroups == 8u;
++    uint lane =
++        subgroup_rows ? gl_SubgroupInvocationID : gl_LocalInvocationIndex % 32u;
++    uint row = subgroup_rows ? gl_SubgroupID : gl_LocalInvocationIndex / 32u;
++    uint logical_index = row * 32u + lane;
++#else
+     uint lane = gl_LocalInvocationIndex % 32u;
+     uint row = gl_LocalInvocationIndex / 32u;
++#endif
+     uint extent = 16u + 2u * pc.radius;
+     uint window = 1u + 2u * pc.radius;
+     int x0 = int(gl_WorkGroupID.x * 16u) - int(pc.radius);
+     int y0 = int(gl_WorkGroupID.y * 8u) - int(pc.radius);
+-    if (gl_LocalInvocationIndex == 0u) active_rows = 0u;
++    if (CAMBI_LOGICAL_INDEX == 0u) active_rows = 0u;
+     barrier();
+     // Probe the output centers before clearing histograms or loading their
+     // halo. A group with no eligible center has an exactly zero contrast map.
+@@ -94,9 +110,9 @@
+         }
+         return;
+     }
+-    for (uint i = gl_LocalInvocationIndex; i < 8u * 256u; i += 256u)
++    for (uint i = CAMBI_LOGICAL_INDEX; i < 8u * 256u; i += 256u)
+         histograms[i] = 0u;
+-    for (uint i = gl_LocalInvocationIndex; i < extent * (8u + 2u * pc.radius);
++    for (uint i = CAMBI_LOGICAL_INDEX; i < extent * (8u + 2u * pc.radius);
+          i += 256u) {
+         uint x = i % extent, y = i / extent;
+         // The 16x8 output center rectangle is already in the shared tile.
+@@ -113,7 +129,7 @@
+         // derive each next row by removing its top and adding its bottom.
+         // The row slide follows libvmaf/src/feature/cambi.c:1172-1179; our
+         // packed counter copies and barriers are independent of subgroup size.
+-        for (uint i = gl_LocalInvocationIndex; i < window * window; i += 256u) {
++        for (uint i = CAMBI_LOGICAL_INDEX; i < window * window; i += 256u) {
+             uint packed = CAMBI_SOURCE_LOAD(
+                 source_tile[(i / window) * extent + i % window]
+             );
+@@ -121,10 +137,10 @@
+         }
+         barrier();
+         for (uint target = 1u; target < 8u; ++target) {
+-            histograms[target * 256u + gl_LocalInvocationIndex] =
+-                histograms[(target - 1u) * 256u + gl_LocalInvocationIndex];
+-            barrier();
+-            for (uint x = gl_LocalInvocationIndex; x < window; x += 256u) {
++            histograms[target * 256u + CAMBI_LOGICAL_INDEX] =
++                histograms[(target - 1u) * 256u + CAMBI_LOGICAL_INDEX];
++            barrier();
++            for (uint x = CAMBI_LOGICAL_INDEX; x < window; x += 256u) {
+                 uint leaving =
+                     CAMBI_SOURCE_LOAD(source_tile[(target - 1u) * extent + x]);
+                 uint entering = CAMBI_SOURCE_LOAD(
+@@ -178,7 +194,12 @@
+             contrast_terms[row * 4u + lane] = result;
+         }
+         // All histogram readers and term writers complete before updates.
+-        barrier();
++#ifdef VQM_CAMBI_SUBGROUP_ROWS
++        if (subgroup_rows)
++            subgroupBarrier();
++        else
++#endif
++            barrier();
+         if (lane == 0u) {
+             uint out_x = gl_WorkGroupID.x * 16u + x;
+             uint out_y = gl_WorkGroupID.y * 8u + row;
+@@ -201,7 +222,12 @@
+                 }
+             }
+         }
+-        barrier();
++#ifdef VQM_CAMBI_SUBGROUP_ROWS
++        if (subgroup_rows)
++            subgroupBarrier();
++        else
++#endif
++            barrier();
+     }
+ }
+ 
+--- a/tests/metrics/vmaf/cambi/vmaf_cambi_contrast_test.cc
++++ b/tests/metrics/vmaf/cambi/vmaf_cambi_contrast_test.cc
+@@ -61,7 +61,8 @@
+ class ContrastDevice {
+ public:
+     explicit ContrastDevice(
+-        vqm::Size size, bool allow_half = true, bool enabled_float16 = true
++        vqm::Size size, bool allow_half = true, bool enabled_float16 = true,
++        bool allow_subgroups = true
+     )
+         : size_(size),
+           pixels_(size.width * size.height),
+@@ -74,7 +75,7 @@
+         runtime_.CreateStaging(vqm::internal::Bytes(4 * pixels_));
+         runtime_.CreateCommandObjects();
+         runtime_.CreateDescriptors(0, vqm::internal::Bytes(5 * pixels_));
+-        contrast_.emplace(runtime_, allow_half);
++        contrast_.emplace(runtime_, allow_half, allow_subgroups);
+     }
+     std::vector<float> Compute(unsigned test_case, unsigned window) {
+         FillHistogramEdgesFixture(size_, test_case, runtime_.staging_map());
+@@ -94,6 +95,9 @@
+         return {result, result + 2 * pixels_};
+     }
+     bool UsesHalfSource() const { return contrast_->UsesHalfSource(); }
++    bool UsesSubgroupPipeline() const {
++        return contrast_->UsesSubgroupPipeline();
++    }
+ 
+ private:
+     static std::shared_ptr<vqm::internal::VulkanContext> Context(bool enabled) {
+@@ -362,3 +366,72 @@
+         }
+     }
+ }
++
++VQM_TEST(TestVmafCambiSubgroupEligibility) {
++    using vqm::internal::VmafCambiContrast;
++    VkPhysicalDeviceSubgroupProperties properties{};
++    CHECK(!VmafCambiContrast::SupportsSubgroupRows(properties));
++    properties.subgroupSize = 32;
++    properties.supportedStages = VK_SHADER_STAGE_COMPUTE_BIT;
++    properties.supportedOperations = VK_SUBGROUP_FEATURE_BASIC_BIT;
++    CHECK(VmafCambiContrast::SupportsSubgroupRows(properties));
++    for (const std::uint32_t size : {1u, 16u, 64u, 128u}) {
++        properties.subgroupSize = size;
++        CHECK(!VmafCambiContrast::SupportsSubgroupRows(properties));
++    }
++    properties.subgroupSize = 32;
++    properties.supportedStages = VK_SHADER_STAGE_VERTEX_BIT;
++    CHECK(!VmafCambiContrast::SupportsSubgroupRows(properties));
++    properties.supportedStages = VK_SHADER_STAGE_COMPUTE_BIT;
++    properties.supportedOperations = VK_SUBGROUP_FEATURE_ARITHMETIC_BIT;
++    CHECK(!VmafCambiContrast::SupportsSubgroupRows(properties));
++    properties.supportedOperations |= VK_SUBGROUP_FEATURE_BASIC_BIT;
++    CHECK(VmafCambiContrast::SupportsSubgroupRows(properties));
++}
++
++VQM_TEST(TestVmafCambiSubgroupAndPortableModulesMatchExactly) {
++    if (!vqm::test::GpuAvailable()) return;
++    constexpr vqm::Size size{65, 37};
++    ContrastDevice portable_uint(size, false, true, false);
++    ContrastDevice portable_half(size, true, true, false);
++    ContrastDevice subgroup_uint(size, false, true, true);
++    ContrastDevice subgroup_half(size, true, true, true);
++    ContrastDevice borrowed_uint(size, true, false, true);
++    ContrastDevice borrowed_portable(size, true, false, false);
++    const auto context = vqm::internal::AcquireVulkanContext();
++    VkPhysicalDeviceSubgroupProperties properties{};
++    properties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_PROPERTIES;
++    VkPhysicalDeviceProperties2 physical{};
++    physical.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
++    physical.pNext = &properties;
++    vkGetPhysicalDeviceProperties2(context->physical_device, &physical);
++    const bool eligible =
++        vqm::internal::VmafCambiContrast::SupportsSubgroupRows(properties);
++    CHECK(!portable_uint.UsesSubgroupPipeline());
++    CHECK(!portable_half.UsesSubgroupPipeline());
++    CHECK(subgroup_uint.UsesSubgroupPipeline() == eligible);
++    CHECK(subgroup_half.UsesSubgroupPipeline() == eligible);
++    CHECK(borrowed_uint.UsesSubgroupPipeline() == eligible);
++    CHECK(!borrowed_portable.UsesSubgroupPipeline());
++    CHECK(!portable_uint.UsesHalfSource());
++    CHECK(portable_half.UsesHalfSource() == context->shader_float16);
++    CHECK(subgroup_half.UsesHalfSource() == context->shader_float16);
++    CHECK(!borrowed_uint.UsesHalfSource());
++    CHECK(!borrowed_portable.UsesHalfSource());
++    for (unsigned test_case = 0; test_case < 8; ++test_case) {
++        const unsigned window = test_case == 0                       ? 1u
++                                : (test_case == 1 || test_case == 6) ? 17u
++                                                                     : 33u;
++        const auto expected = portable_uint.Compute(test_case, window);
++        for (auto* device : {&portable_half, &subgroup_uint, &subgroup_half,
++                             &borrowed_uint, &borrowed_portable}) {
++            const auto actual = device->Compute(test_case, window);
++            CHECK(actual.size() == expected.size());
++            for (std::size_t i = 0; i < actual.size(); ++i)
++                CHECK(
++                    std::bit_cast<std::uint32_t>(actual[i]) ==
++                    std::bit_cast<std::uint32_t>(expected[i])
++                );
++        }
++    }
++}

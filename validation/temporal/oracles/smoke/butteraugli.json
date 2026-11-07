@@ -1,0 +1,361 @@
+{
+  "schema_version": 1,
+  "metric": "butteraugli",
+  "implementation": "pinned-original",
+  "revision": "e47d2a2b5bb418f2947ce07f36cb048861db3820",
+  "configuration_hash": "aceaac4a10b5ca1df282447c36b98bce6307c62a54a674bd4221bc4830eb48ee",
+  "input_manifest_hash": "2265325f6689f0bd1f8a8e68608cf140783ded34a6a57e92e733baeb713f515b",
+  "samples": [
+    {
+      "sample_id": "bus_cif/quantize8",
+      "source_id": "bus",
+      "stratum": "sdr-spatial-srgb444",
+      "distortion_family": "quantization",
+      "configuration_id": "butteraugli-srgb444-8bit-frame-mean",
+      "input_hash": "f1dc29739df9b051623a7c752ef7701fa744a9d98d76f1d0a178de37de44b0fc",
+      "score": 2.523567020833333
+    },
+    {
+      "sample_id": "bus_cif/quantize32",
+      "source_id": "bus",
+      "stratum": "sdr-spatial-srgb444",
+      "distortion_family": "quantization",
+      "configuration_id": "butteraugli-srgb444-8bit-frame-mean",
+      "input_hash": "cd7275af735b3404031ce05f4a451b268b29bddf4f6653c42ffd8de838372360",
+      "score": 10.828799485833335
+    },
+    {
+      "sample_id": "bus_cif/flicker8",
+      "source_id": "bus",
+      "stratum": "sdr-spatial-srgb444",
+      "distortion_family": "flicker",
+      "configuration_id": "butteraugli-srgb444-8bit-frame-mean",
+      "input_hash": "3ac89f0ad3fb67b0fc333046d86d7b8cb016e09e59523e9aa3f85019349b4807",
+      "score": 6.288500745833333
+    },
+    {
+      "sample_id": "bus_cif/flicker24",
+      "source_id": "bus",
+      "stratum": "sdr-spatial-srgb444",
+      "distortion_family": "flicker",
+      "configuration_id": "butteraugli-srgb444-8bit-frame-mean",
+      "input_hash": "3f01e06224b1e6b3001c05a5c39a0c3df923043d3a40b4445cf89007df63a7f3",
+      "score": 18.430344265833334
+    },
+    {
+      "sample_id": "bus_cif/flicker64",
+      "source_id": "bus",
+      "stratum": "sdr-spatial-srgb444",
+      "distortion_family": "flicker",
+      "configuration_id": "butteraugli-srgb444-8bit-frame-mean",
+      "input_hash": "df57a555e31fc4b6fec3657c4263d372058fa960601d6715b732fa4762c63c16",
+      "score": 49.1570825575
+    },
+    {
+      "sample_id": "bus_cif/flicker96",
+      "source_id": "bus",
+      "stratum": "sdr-spatial-srgb444",
+      "distortion_family": "flicker",
+      "configuration_id": "butteraugli-srgb444-8bit-frame-mean",
+      "input_hash": "34622e1eda8135ccdc5cc700d492e084c26f685b1eafa99706ffea2c7dc5ae60",
+      "score": 71.40408388833333
+    },
+    {
+      "sample_id": "bus_cif/freeze3",
+      "source_id": "bus",
+      "stratum": "sdr-spatial-srgb444",
+      "distortion_family": "freeze",
+      "configuration_id": "butteraugli-srgb444-8bit-frame-mean",
+      "input_hash": "575d7f87b2954c200eaa67347de1b35b89b38ae24bb57d69ce8895fc72e99070",
+      "score": 67.99858156833334
+    },
+    {
+      "sample_id": "bus_cif/freeze8",
+      "source_id": "bus",
+      "stratum": "sdr-spatial-srgb444",
+      "distortion_family": "freeze",
+      "configuration_id": "butteraugli-srgb444-8bit-frame-mean",
+      "input_hash": "4255475745dafabfb2ea1b5f65b826892da6e23f4551d39f13ee55c701c0d903",
+      "score": 85.38286082083334
+    },
+    {
+      "sample_id": "bus_cif/pulse12",
+      "source_id": "bus",
+      "stratum": "sdr-spatial-srgb444",
+      "distortion_family": "impulse",
+      "configuration_id": "butteraugli-srgb444-8bit-frame-mean",
+      "input_hash": "43ae2ea84cba095f66f2cfe972ce86d3637bdcaa560383c38cbc6e988a91b774",
+      "score": 0.7973079683333334
+    },
+    {
+      "sample_id": "bus_cif/pulse32",
+      "source_id": "bus",
+      "stratum": "sdr-spatial-srgb444",
+      "distortion_family": "impulse",
+      "configuration_id": "butteraugli-srgb444-8bit-frame-mean",
+      "input_hash": "ce2d0f943daa3155256d019e62de64066aeb41b7115891a5888ddd07f7174dbc",
+      "score": 2.0498646099999998
+    },
+    {
+      "sample_id": "bus_cif/pulse64",
+      "source_id": "bus",
+      "stratum": "sdr-spatial-srgb444",
+      "distortion_family": "impulse",
+      "configuration_id": "butteraugli-srgb444-8bit-frame-mean",
+      "input_hash": "bc7be5b9535ac176476c1e7e8551b371a9f9279906363fe54f5a6d5023eb577e",
+      "score": 4.3557408650000005
+    },
+    {
+      "sample_id": "bus_cif/pulse128",
+      "source_id": "bus",
+      "stratum": "sdr-spatial-srgb444",
+      "distortion_family": "impulse",
+      "configuration_id": "butteraugli-srgb444-8bit-frame-mean",
+      "input_hash": "ba80cba55d8972932ed3886472b2099790132281a16106f35db4a43d98d1b1cf",
+      "score": 8.76259613
+    },
+    {
+      "sample_id": "bus_cif/pulse224",
+      "source_id": "bus",
+      "stratum": "sdr-spatial-srgb444",
+      "distortion_family": "impulse",
+      "configuration_id": "butteraugli-srgb444-8bit-frame-mean",
+      "input_hash": "b44e64705cfa8aa6d3cd17fef3f3b1d8ce1f2b90f4940d55aecac0bccb588262",
+      "score": 12.229398091666667
+    },
+    {
+      "sample_id": "foreman_cif/quantize8",
+      "source_id": "foreman",
+      "stratum": "sdr-spatial-srgb444",
+      "distortion_family": "quantization",
+      "configuration_id": "butteraugli-srgb444-8bit-frame-mean",
+      "input_hash": "7320b03a291e2cb4ddfef58f789983bfb3a4d3eae092e7fd61e1e900127de5f9",
+      "score": 3.17894405
+    },
+    {
+      "sample_id": "foreman_cif/quantize32",
+      "source_id": "foreman",
+      "stratum": "sdr-spatial-srgb444",
+      "distortion_family": "quantization",
+      "configuration_id": "butteraugli-srgb444-8bit-frame-mean",
+      "input_hash": "683bd603fa229fe916e9749b6e9e2d90633f4ed13cccac5f87cda783e1e45f88",
+      "score": 20.267132441666668
+    },
+    {
+      "sample_id": "foreman_cif/flicker8",
+      "source_id": "foreman",
+      "stratum": "sdr-spatial-srgb444",
+      "distortion_family": "flicker",
+      "configuration_id": "butteraugli-srgb444-8bit-frame-mean",
+      "input_hash": "7947bf82f6e7165e1d50be8c92290f3c3f60a4602df81ea08d5f9559a4bc71b8",
+      "score": 7.171257495
+    },
+    {
+      "sample_id": "foreman_cif/flicker24",
+      "source_id": "foreman",
+      "stratum": "sdr-spatial-srgb444",
+      "distortion_family": "flicker",
+      "configuration_id": "butteraugli-srgb444-8bit-frame-mean",
+      "input_hash": "2ec346e557517852104d5ed60cc4f2e8fa343b5edca0b1e8d9110cfc7af9d4a6",
+      "score": 21.532639979166664
+    },
+    {
+      "sample_id": "foreman_cif/flicker64",
+      "source_id": "foreman",
+      "stratum": "sdr-spatial-srgb444",
+      "distortion_family": "flicker",
+      "configuration_id": "butteraugli-srgb444-8bit-frame-mean",
+      "input_hash": "08a19bf9f3ebc6b0aa747fbc12b0eb8d3a1ee434dd7da98642caf224fcdaceed",
+      "score": 58.59311358083334
+    },
+    {
+      "sample_id": "foreman_cif/flicker96",
+      "source_id": "foreman",
+      "stratum": "sdr-spatial-srgb444",
+      "distortion_family": "flicker",
+      "configuration_id": "butteraugli-srgb444-8bit-frame-mean",
+      "input_hash": "0255675c193b6c830c6ce1d2d1b4f5cdcde2577a0c087569bb85b92930e4cee6",
+      "score": 89.06559181166666
+    },
+    {
+      "sample_id": "foreman_cif/freeze3",
+      "source_id": "foreman",
+      "stratum": "sdr-spatial-srgb444",
+      "distortion_family": "freeze",
+      "configuration_id": "butteraugli-srgb444-8bit-frame-mean",
+      "input_hash": "53f7fa180489ae0329c2ac2dee733c48e186d3523f51846da4aa3b4f24f4e5ed",
+      "score": 35.02684752166667
+    },
+    {
+      "sample_id": "foreman_cif/freeze8",
+      "source_id": "foreman",
+      "stratum": "sdr-spatial-srgb444",
+      "distortion_family": "freeze",
+      "configuration_id": "butteraugli-srgb444-8bit-frame-mean",
+      "input_hash": "dd7ad76056f81a099bc2f7b3dfb378362c342ac15bbae8894c695f1e16c07678",
+      "score": 54.994176545833334
+    },
+    {
+      "sample_id": "foreman_cif/pulse12",
+      "source_id": "foreman",
+      "stratum": "sdr-spatial-srgb444",
+      "distortion_family": "impulse",
+      "configuration_id": "butteraugli-srgb444-8bit-frame-mean",
+      "input_hash": "ad05115fa14d28a9f91f272debe76253de759729714ddb6cede1d9528da88d3f",
+      "score": 0.8628481225
+    },
+    {
+      "sample_id": "foreman_cif/pulse32",
+      "source_id": "foreman",
+      "stratum": "sdr-spatial-srgb444",
+      "distortion_family": "impulse",
+      "configuration_id": "butteraugli-srgb444-8bit-frame-mean",
+      "input_hash": "d0cd8c786815732afb48facce9713bb532330b74148042799b3b845f0c6d0a44",
+      "score": 2.2879994708333333
+    },
+    {
+      "sample_id": "foreman_cif/pulse64",
+      "source_id": "foreman",
+      "stratum": "sdr-spatial-srgb444",
+      "distortion_family": "impulse",
+      "configuration_id": "butteraugli-srgb444-8bit-frame-mean",
+      "input_hash": "e054f22f976fd328196e56feff4c9cfb00be254da55a1a75c7d3c9ef516bfcc0",
+      "score": 4.408193588333334
+    },
+    {
+      "sample_id": "foreman_cif/pulse128",
+      "source_id": "foreman",
+      "stratum": "sdr-spatial-srgb444",
+      "distortion_family": "impulse",
+      "configuration_id": "butteraugli-srgb444-8bit-frame-mean",
+      "input_hash": "66fd7c3927822145ff5cbfc0c7ac552aa7e034f5c8d888bc2b3d1864a8c6b20d",
+      "score": 7.949910481666667
+    },
+    {
+      "sample_id": "foreman_cif/pulse224",
+      "source_id": "foreman",
+      "stratum": "sdr-spatial-srgb444",
+      "distortion_family": "impulse",
+      "configuration_id": "butteraugli-srgb444-8bit-frame-mean",
+      "input_hash": "cc9322f958e296d0286c830ad69757a028032b3d09eec0f15d5131ce5a6f71f4",
+      "score": 9.126383463333333
+    },
+    {
+      "sample_id": "mobile_cif/quantize8",
+      "source_id": "mobile",
+      "stratum": "sdr-spatial-srgb444",
+      "distortion_family": "quantization",
+      "configuration_id": "butteraugli-srgb444-8bit-frame-mean",
+      "input_hash": "05adf451d212f4dac0111af3b444c04e89068506d0f76cb6741a1c4df4065bbd",
+      "score": 4.449077249166667
+    },
+    {
+      "sample_id": "mobile_cif/quantize32",
+      "source_id": "mobile",
+      "stratum": "sdr-spatial-srgb444",
+      "distortion_family": "quantization",
+      "configuration_id": "butteraugli-srgb444-8bit-frame-mean",
+      "input_hash": "5bf42d96e8f93f872976bc9ee076893ff760349d99f80e0497ec12134562055e",
+      "score": 11.691750368333333
+    },
+    {
+      "sample_id": "mobile_cif/flicker8",
+      "source_id": "mobile",
+      "stratum": "sdr-spatial-srgb444",
+      "distortion_family": "flicker",
+      "configuration_id": "butteraugli-srgb444-8bit-frame-mean",
+      "input_hash": "f04298fd92fafdba617d1e18072922c6bfd35eaeec45feaf4231177f111417db",
+      "score": 7.473668298333333
+    },
+    {
+      "sample_id": "mobile_cif/flicker24",
+      "source_id": "mobile",
+      "stratum": "sdr-spatial-srgb444",
+      "distortion_family": "flicker",
+      "configuration_id": "butteraugli-srgb444-8bit-frame-mean",
+      "input_hash": "81d5459e94ba8596a984abab3bb1fd73ba9d1889d1761518940110f37ae8b4f5",
+      "score": 21.671252728333332
+    },
+    {
+      "sample_id": "mobile_cif/flicker64",
+      "source_id": "mobile",
+      "stratum": "sdr-spatial-srgb444",
+      "distortion_family": "flicker",
+      "configuration_id": "butteraugli-srgb444-8bit-frame-mean",
+      "input_hash": "e62bc65ad2748d814ca4a90b8e92fec6ef33a6166c25af9866b0fcb4f7c5464a",
+      "score": 58.1719490675
+    },
+    {
+      "sample_id": "mobile_cif/flicker96",
+      "source_id": "mobile",
+      "stratum": "sdr-spatial-srgb444",
+      "distortion_family": "flicker",
+      "configuration_id": "butteraugli-srgb444-8bit-frame-mean",
+      "input_hash": "41d041c8dfd3e98cfc59e31db9fb37609a2539eacf4f874e62a5fbea03391c94",
+      "score": 95.55986786
+    },
+    {
+      "sample_id": "mobile_cif/freeze3",
+      "source_id": "mobile",
+      "stratum": "sdr-spatial-srgb444",
+      "distortion_family": "freeze",
+      "configuration_id": "butteraugli-srgb444-8bit-frame-mean",
+      "input_hash": "6769685732c203ba35e750368fe57029c1850260c2266ba204c37ab3737bbd60",
+      "score": 48.744855245
+    },
+    {
+      "sample_id": "mobile_cif/freeze8",
+      "source_id": "mobile",
+      "stratum": "sdr-spatial-srgb444",
+      "distortion_family": "freeze",
+      "configuration_id": "butteraugli-srgb444-8bit-frame-mean",
+      "input_hash": "82d2dcfef113951403813fb4484a7215ea26fbd3291b292248616c8d7fb702e9",
+      "score": 74.14028422083334
+    },
+    {
+      "sample_id": "mobile_cif/pulse12",
+      "source_id": "mobile",
+      "stratum": "sdr-spatial-srgb444",
+      "distortion_family": "impulse",
+      "configuration_id": "butteraugli-srgb444-8bit-frame-mean",
+      "input_hash": "85631cbfd3dac6a0d02e8047ec7c9a3e2e7fa3b6fa75632c5c625896ea2c30f4",
+      "score": 0.9898322425
+    },
+    {
+      "sample_id": "mobile_cif/pulse32",
+      "source_id": "mobile",
+      "stratum": "sdr-spatial-srgb444",
+      "distortion_family": "impulse",
+      "configuration_id": "butteraugli-srgb444-8bit-frame-mean",
+      "input_hash": "0128cdd4a909c7b97305362998e2b769acfa218833ece4fec6155f1b2621a9f1",
+      "score": 2.007349490833333
+    },
+    {
+      "sample_id": "mobile_cif/pulse64",
+      "source_id": "mobile",
+      "stratum": "sdr-spatial-srgb444",
+      "distortion_family": "impulse",
+      "configuration_id": "butteraugli-srgb444-8bit-frame-mean",
+      "input_hash": "3326006a5fde66a60f944218300cd663086e77c0cc95fe2f45782eae62f7ca00",
+      "score": 3.8873074849999996
+    },
+    {
+      "sample_id": "mobile_cif/pulse128",
+      "source_id": "mobile",
+      "stratum": "sdr-spatial-srgb444",
+      "distortion_family": "impulse",
+      "configuration_id": "butteraugli-srgb444-8bit-frame-mean",
+      "input_hash": "9e15eae9c69c2e12db84e024cd3dad0c753ed59c33069bba5d6835c0e65e92d4",
+      "score": 9.154670079166666
+    },
+    {
+      "sample_id": "mobile_cif/pulse224",
+      "source_id": "mobile",
+      "stratum": "sdr-spatial-srgb444",
+      "distortion_family": "impulse",
+      "configuration_id": "butteraugli-srgb444-8bit-frame-mean",
+      "input_hash": "8b31cb700e050873a53008413b72d5deb65bf0d3db94f23050f6723b0ae818f2",
+      "score": 15.065594990833333
+    }
+  ]
+}

@@ -1,0 +1,1810 @@
+{
+  "schema_version": 1,
+  "metric": "butteraugli",
+  "implementation": "libjxl",
+  "revision": "e47d2a2b5bb418f2947ce07f36cb048861db3820",
+  "configuration_hash": "344e1aa5998071572895546889706adef1da10d5f09abc13bc00f6b0d2fadca6",
+  "input_manifest_hash": "460b2ed7d2b678db90c2b87b6fe2ab7a7d002f8496ddabcf6190f58a8ec1468f",
+  "samples": [
+    {
+      "sample_id": "e34329b98006e13abc140a0d8108ea87690570a5efe9f8375943cd0d2b5f5249",
+      "source_id": "c7b8f38aa309b7e32d7387dff4fb82aeeba3ede32116130600a05825b9966f18",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "697b5a8ca710769addb7b471715e287db7d35308fe61433a2a6160d44e7ac0be",
+      "mos": 40.4874,
+      "score": 6.6714735
+    },
+    {
+      "sample_id": "c08b62e931c6279512d4cdee2da14d5155d46a46e4689292cd2dfadf2eade949",
+      "source_id": "c7b8f38aa309b7e32d7387dff4fb82aeeba3ede32116130600a05825b9966f18",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "87d5f592f06612d2f41608053b17b565be055287005d03ae227c825ef68bf6d5",
+      "mos": 53.3475,
+      "score": 4.67824888
+    },
+    {
+      "sample_id": "86b9703e6711e52269eacacb8d02daa3d048e90fc83a1c9d618c050729de0e6e",
+      "source_id": "c7b8f38aa309b7e32d7387dff4fb82aeeba3ede32116130600a05825b9966f18",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "9f1decdc79ec7b184da3cbe4b4aa79d09d5e2e5fa99bdc560020923c2724dc9a",
+      "mos": 82.0685,
+      "score": 2.94523144
+    },
+    {
+      "sample_id": "d97dc84133281b5c5cec9789dcb2f378e1fba33b775a3054eb3529d187371b84",
+      "source_id": "c7b8f38aa309b7e32d7387dff4fb82aeeba3ede32116130600a05825b9966f18",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "d53905cbafb618c2e3153b8a7f8d6bb67fbc2b01138690ce320493662703bcbb",
+      "mos": 31.3444,
+      "score": 5.15999603
+    },
+    {
+      "sample_id": "f4664a1711b4bc5c1e9f96d78fa6f5383f431a63004f4a9e68ff4927d2dedcd1",
+      "source_id": "c7b8f38aa309b7e32d7387dff4fb82aeeba3ede32116130600a05825b9966f18",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "c87d56b1ca104158a6bf45325d22fdb9ae861b741d6f0b75a3db1a123d0d5058",
+      "mos": 51.3074,
+      "score": 4.45135641
+    },
+    {
+      "sample_id": "4a1d36d843f944d3c8dbb9669f5d074ed2872931f1c90447af7c20376655b0e4",
+      "source_id": "c7b8f38aa309b7e32d7387dff4fb82aeeba3ede32116130600a05825b9966f18",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "7d822290e2a7fc4c13cb14166500a708ae19a90fef650d315ed62a001c9f4e51",
+      "mos": 85.7399,
+      "score": 2.61059761
+    },
+    {
+      "sample_id": "93ebd4f110a08b15e0333a0d7e794bc9a994dd3192a6c333e79cf4230dfef401",
+      "source_id": "3b7f5480e106b76e3a1a6d05bb664b28640f09834a88b2b354ed0abc1cd7ece9",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "6f24efc736b6bd9e2def3d9b4541bf4fcba732df993dab32187ab7ddb89279b5",
+      "mos": 55.6174,
+      "score": 5.42159843
+    },
+    {
+      "sample_id": "b4fcb6c9c03355d449e30b94aab0b183306c21d1825cee710c96a7448f53c4b1",
+      "source_id": "3b7f5480e106b76e3a1a6d05bb664b28640f09834a88b2b354ed0abc1cd7ece9",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "700a1681d6e4ab1e9f31eada14020e95fdca65e2d4a9df82d0c09181d75075ab",
+      "mos": 65.5799,
+      "score": 4.90343571
+    },
+    {
+      "sample_id": "039de6e40c06dd9d1f90eb50b91f88949ebcf4b7742acc0d5c199c531c9ec59b",
+      "source_id": "3b7f5480e106b76e3a1a6d05bb664b28640f09834a88b2b354ed0abc1cd7ece9",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "e3506f1826c198affb18ed2dca89243826f1f6129c5016613f9167766295edf3",
+      "mos": 86.8021,
+      "score": 4.75309038
+    },
+    {
+      "sample_id": "54b7b2cdfed2130739650b44dc4600765c684912753618d6e729e9aa5cda9167",
+      "source_id": "3b7f5480e106b76e3a1a6d05bb664b28640f09834a88b2b354ed0abc1cd7ece9",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "867b32a0de5715f03cc484610fd5871b15722121dc11b2858a52054434f3d5d1",
+      "mos": 34.3931,
+      "score": 6.38398981
+    },
+    {
+      "sample_id": "a8f949f7af5156dfb53e35686880f7f7066b16f68e5155316a4abd287c794c83",
+      "source_id": "3b7f5480e106b76e3a1a6d05bb664b28640f09834a88b2b354ed0abc1cd7ece9",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "681c0eb08045f411550150a9ffa0af87d20f58b51828d1250281697c2cc92a06",
+      "mos": 52.7762,
+      "score": 5.44189692
+    },
+    {
+      "sample_id": "8ac7fc869e075c27ae59259be229303df76f8069ea67709569a361edd0171834",
+      "source_id": "3b7f5480e106b76e3a1a6d05bb664b28640f09834a88b2b354ed0abc1cd7ece9",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "0a3f28890abbd717a5898e09ee8ed15c9aee9f5189f871a67efede9f28b900ef",
+      "mos": 88.1594,
+      "score": 2.66353893
+    },
+    {
+      "sample_id": "0127e6e723842ec6b2358648fda298560da372c02078f00d16eb2e760e5f7d6f",
+      "source_id": "db1e507a05e3291e665252d788aada8e8fbc225832db072a378717b4483e2d17",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "458cb1728a26af436a2de69a05ce8a94cf12c08c539d2fc3729927d4f323b0a9",
+      "mos": 50.3338,
+      "score": 7.13956499
+    },
+    {
+      "sample_id": "840679a8f206c6c72bd2c91b644631f222a635df7661999aa259057b6e643a58",
+      "source_id": "db1e507a05e3291e665252d788aada8e8fbc225832db072a378717b4483e2d17",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "56f636cf1257fd8ae148c946fb7c0c83dcfc9a7aab62b81067ef446fbf92bfae",
+      "mos": 59.2029,
+      "score": 5.00677967
+    },
+    {
+      "sample_id": "720f9e0268fbf7c96b90874e4b66fa6c5ec77cf82080aac0479a502e114a6f0a",
+      "source_id": "db1e507a05e3291e665252d788aada8e8fbc225832db072a378717b4483e2d17",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "64bbb7044346c899b4d5e2e372c726377eb9057fe4934ad1f8b1960cb3759312",
+      "mos": 85.1259,
+      "score": 4.63351202
+    },
+    {
+      "sample_id": "d118c23e5d077fd4e82f63f669817fa86b6664e67f47a2bd83eba9e5f2c4a5f2",
+      "source_id": "db1e507a05e3291e665252d788aada8e8fbc225832db072a378717b4483e2d17",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "a8858f14c8075db0dd2ca519612822e257d7dcb63d74a73ff0058a60f2c30a6e",
+      "mos": 38.1007,
+      "score": 8.76691914
+    },
+    {
+      "sample_id": "45840d9d0f32a95a8a1ab5427da56b76d59a1fb322eae1b231744e4528b388f2",
+      "source_id": "db1e507a05e3291e665252d788aada8e8fbc225832db072a378717b4483e2d17",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "132100ddf6f25e8334862b52fc79aa80836d3ee0d7a6ec6b9e030b570808fec0",
+      "mos": 56.8695,
+      "score": 5.34191895
+    },
+    {
+      "sample_id": "2d83c1e2a93e65459cc1790b16ba4e8194f16fac15c4233dc8901b0d53d5ccd9",
+      "source_id": "db1e507a05e3291e665252d788aada8e8fbc225832db072a378717b4483e2d17",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "5f642e3ff9155caf38d65d6c6f6ba4c0b9e3a954fa8e681b0e2b55b72f6af10e",
+      "mos": 84.8543,
+      "score": 2.08581948
+    },
+    {
+      "sample_id": "7ad06976d81b346c975245746ed89e0a12f45469940a4616a372a75819319c53",
+      "source_id": "33ce4e7f54dc88497b1d4cef5fd10389c4cd383bc549a80fce5a57b3a20887d8",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "1dc952d596f11d03e39bc3b880ba522af4f7c3570d90c516a07c418d699f31ac",
+      "mos": 58.7856,
+      "score": 6.24691153
+    },
+    {
+      "sample_id": "e3b8487877f58252867c98ded099ddd2803a73c5e31494ee9bd57895b2d6e904",
+      "source_id": "33ce4e7f54dc88497b1d4cef5fd10389c4cd383bc549a80fce5a57b3a20887d8",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "5490500cf9b84b05223853bfce58fc5d29c059424e5ce993d4aebe048de21120",
+      "mos": 74.02,
+      "score": 3.59834647
+    },
+    {
+      "sample_id": "caaceb5fc5915706e1a68b49a83dd23777bb5c9d2b1e2a596855712721b0037e",
+      "source_id": "33ce4e7f54dc88497b1d4cef5fd10389c4cd383bc549a80fce5a57b3a20887d8",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "5683d3574f94993e904fb3f556754e4263afe5327fb376ccb150d1b38eccf80c",
+      "mos": 87.9087,
+      "score": 2.03875589
+    },
+    {
+      "sample_id": "0f2dad463dd7201a3745238f597212ad75179c5642e1f8edcd5590022a78d70e",
+      "source_id": "33ce4e7f54dc88497b1d4cef5fd10389c4cd383bc549a80fce5a57b3a20887d8",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "d3f5e8b785fe52b6730d712023b2c875a7c46075c7eb741ce1723eb37f014847",
+      "mos": 42.1354,
+      "score": 5.08165884
+    },
+    {
+      "sample_id": "21b711cae7fed505b533266f56d4be91aee070e5b15ea01af2d471de32da4ee1",
+      "source_id": "33ce4e7f54dc88497b1d4cef5fd10389c4cd383bc549a80fce5a57b3a20887d8",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "12c034b99877edbb30f7cbf2f760b0ecc2b22006b91aefbff8c317bc64d82fdd",
+      "mos": 72.8142,
+      "score": 3.41387391
+    },
+    {
+      "sample_id": "5b918c4c4cbc3830ca685a845d4ed3055f91796cc3f94dc127b94d9e4c651596",
+      "source_id": "33ce4e7f54dc88497b1d4cef5fd10389c4cd383bc549a80fce5a57b3a20887d8",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "331843469208ccff3c034b0fee0ddf99244e0f941e767edcd380070159bb4692",
+      "mos": 88.6636,
+      "score": 2.00062323
+    },
+    {
+      "sample_id": "2d6ffddad574d65645f219fd2678b0837bca6b21caa9c0748d0059b352938fd7",
+      "source_id": "6703b5f4017b3310e940c5dd4a95e84f918eba3aa428165e52d16c028dc97375",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "2391104bda0d985b2424f0fc3617910550262ed5bf70cab548efde69caf74a64",
+      "mos": 56.6143,
+      "score": 5.47464848
+    },
+    {
+      "sample_id": "dac96b78dff5cf8c443be19327f281061d9076e35ccb55373ec3e409c3ef40d9",
+      "source_id": "6703b5f4017b3310e940c5dd4a95e84f918eba3aa428165e52d16c028dc97375",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "0c64201737bbcd078b056814b9584b044ca327d5a897ebca3393d27eed9873b1",
+      "mos": 70.6253,
+      "score": 3.28295255
+    },
+    {
+      "sample_id": "468ccd8119c0783570ca715281ac76b429a8312f03fb7b867dddb1f87886b34a",
+      "source_id": "6703b5f4017b3310e940c5dd4a95e84f918eba3aa428165e52d16c028dc97375",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "b898c102b1a0541c029ef65d06166669a248485a7c3c53abe647de87cbfac567",
+      "mos": 85.405,
+      "score": 2.00899673
+    },
+    {
+      "sample_id": "86f64bfe7127e0353d3b7e9c8f04f9a434294975827648e21c7860ab35e37d8b",
+      "source_id": "6703b5f4017b3310e940c5dd4a95e84f918eba3aa428165e52d16c028dc97375",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "4d0ead7e09faba419474e5b4e12c8838ad1bf8a9238e1e28fe71212bcba9b680",
+      "mos": 30.3374,
+      "score": 5.02620888
+    },
+    {
+      "sample_id": "4bed55b3f1e6e8e3eb219e8e864594f14b29aaf75b946eb874beadaeef161682",
+      "source_id": "6703b5f4017b3310e940c5dd4a95e84f918eba3aa428165e52d16c028dc97375",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "a0c7c385a4850e06ea55ef97fb081745a17f19bb8fd5b0e5a986456acd7dac5d",
+      "mos": 58.8343,
+      "score": 3.4611783
+    },
+    {
+      "sample_id": "8a744509a4b786f0928cc23b128d27b852abe103815330063073a0006311bfa1",
+      "source_id": "6703b5f4017b3310e940c5dd4a95e84f918eba3aa428165e52d16c028dc97375",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "af24952e9337ee6716d26000291dc8a30b91759daa644a4117bb39bd77f739df",
+      "mos": 82.1171,
+      "score": 1.80466104
+    },
+    {
+      "sample_id": "528b02c256a66c6cb4fa18731f4294aac897f7e88759a453c599501d752ef2c5",
+      "source_id": "b17fa904662062bf13339a6f289edfba19c57c68859407796e27a57b4c7a254a",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "b42abc445ad19afc38a421a331bd24c419b30e775a9eaf3b07499add90e50b2f",
+      "mos": 68.9757,
+      "score": 3.37482047
+    },
+    {
+      "sample_id": "357fb86d48d6a001ac31e70092d6790f8b1f6b5dc257f3c3670d6ae3b772ac4b",
+      "source_id": "b17fa904662062bf13339a6f289edfba19c57c68859407796e27a57b4c7a254a",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "332581b86296b23d12b8ac349c3c00dc006bb540fd161a4357c6e309bb226102",
+      "mos": 79.1312,
+      "score": 2.12791276
+    },
+    {
+      "sample_id": "f8fe004ace1c7e860ba34d8bffd06697dafe0aff5674066d2bbda9c1dbea2202",
+      "source_id": "b17fa904662062bf13339a6f289edfba19c57c68859407796e27a57b4c7a254a",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "9c9a4bbaa510d81f4cc641debc5c6e0412c66b033ecd2a22a631aecdd961ef3d",
+      "mos": 87.1238,
+      "score": 1.28361595
+    },
+    {
+      "sample_id": "bc1533a5cde733afe7313dda94a86d412449a2d43da2c3d00b40fb428073390d",
+      "source_id": "b17fa904662062bf13339a6f289edfba19c57c68859407796e27a57b4c7a254a",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "a5b43d7b3c4b1debf5dffaa0d6be42a3acc3b3ed2a9392ea61f3c0e3842974c1",
+      "mos": 46.1772,
+      "score": 4.56438875
+    },
+    {
+      "sample_id": "1ad0e6c8eed7b745d7f8543207e5000c4866348976031e132f7a76870ddf1257",
+      "source_id": "b17fa904662062bf13339a6f289edfba19c57c68859407796e27a57b4c7a254a",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "baa3012e8e37e8e7fc47c49fa7dd367e74cfffac1ddf4855a03a9765ad466610",
+      "mos": 70.1107,
+      "score": 3.2402246
+    },
+    {
+      "sample_id": "eaf81ec09a4f548c545f56decffc13815bdd570df57b221e3d46d2c1c0502526",
+      "source_id": "b17fa904662062bf13339a6f289edfba19c57c68859407796e27a57b4c7a254a",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "8ae3037091e47ea4d935089102bdaa1422ffb30586de74a74bcc27d3755b9586",
+      "mos": 86.3785,
+      "score": 1.70612168
+    },
+    {
+      "sample_id": "e61f1bd5c6a0f6c76f2fda3ab7226d87ed6a44359247a6e072a4924b03b17121",
+      "source_id": "f9e7d4ba8e0a7dfe18c1c1c5dd89e7d40820f8f9c8b1266dbbdcbb77c473413c",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "cf5e992a71c83e5d54d37fae4d7be5be4e33a4b91d839f014df5bb7fb4baee2c",
+      "mos": 49.1862,
+      "score": 4.92337418
+    },
+    {
+      "sample_id": "2e8f54672f1fffa92cb16e10ace4eb8058902f51a672bb43bd08454c8fbd2fc9",
+      "source_id": "f9e7d4ba8e0a7dfe18c1c1c5dd89e7d40820f8f9c8b1266dbbdcbb77c473413c",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "65b7372eab747ce6e0bd3a9f41b569a5bce00e635cf89ecbdf8a4b3e4531a5f5",
+      "mos": 64.6483,
+      "score": 3.4555552
+    },
+    {
+      "sample_id": "25a06426ff7eb2ee6eac8c7859b8712276ca9f4e433516c80465ef77fa250b5d",
+      "source_id": "f9e7d4ba8e0a7dfe18c1c1c5dd89e7d40820f8f9c8b1266dbbdcbb77c473413c",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "80570cb2a4f47523f0567e75ebe10c3fc2cf1cb0cb210ef6a0a6b416eed8bb0b",
+      "mos": 85.0674,
+      "score": 2.81226444
+    },
+    {
+      "sample_id": "e3eb76f08b100d9715dcbd55c2f3976fa3dd06abafe06892d4619b55652e6c92",
+      "source_id": "f9e7d4ba8e0a7dfe18c1c1c5dd89e7d40820f8f9c8b1266dbbdcbb77c473413c",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "834e607317374d4f48fd6bb1dab47ba8c3fbb75087ce3a64069ddf914cf5f86c",
+      "mos": 43.7844,
+      "score": 5.69360733
+    },
+    {
+      "sample_id": "c2a472e8dc62da66bf2e2c09d1504ba7cf714ca22ff91d59586d0e73a43293ce",
+      "source_id": "f9e7d4ba8e0a7dfe18c1c1c5dd89e7d40820f8f9c8b1266dbbdcbb77c473413c",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "7caccc0c38e80b783667b8889195889e80bb4aa5a0a119548df188bc92704db6",
+      "mos": 57.6648,
+      "score": 3.89082956
+    },
+    {
+      "sample_id": "896743a34acb09c8661456ba47405dbe2bb4b184078bd9326da7075f2f5905d7",
+      "source_id": "f9e7d4ba8e0a7dfe18c1c1c5dd89e7d40820f8f9c8b1266dbbdcbb77c473413c",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "2606731c3f278f472cc1d0914299bed84462508d81035b1267120556a64bc8dd",
+      "mos": 84.351,
+      "score": 2.04313135
+    },
+    {
+      "sample_id": "0ecf3805238fae01fe079b59a5192fc5d46e70736e0b2e8bf13599951ee2a6c0",
+      "source_id": "79839f2b47c000f49e41a1eaec6f46c9035a866d5a61d1163bade1ef3c758535",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "b1bc8f74e07e71ef4aaa1fdfd0c192f4119c1fb2e3fb686468da02b3b3379924",
+      "mos": 57.1603,
+      "score": 4.14920902
+    },
+    {
+      "sample_id": "004b9083f9e0dcaa75ac685b6c2fc4762e4325b3cb33bf397e0b55daa1231f71",
+      "source_id": "79839f2b47c000f49e41a1eaec6f46c9035a866d5a61d1163bade1ef3c758535",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "c134e50d18a6baf7c635622eb08b964a2577b10d49a3917fa2603647dc45a4fa",
+      "mos": 76.5653,
+      "score": 2.42971182
+    },
+    {
+      "sample_id": "5204a6ad32da51b262f44fb1261be81ce12d20e7adfc30d4c6d6009a0f9d63db",
+      "source_id": "79839f2b47c000f49e41a1eaec6f46c9035a866d5a61d1163bade1ef3c758535",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "5627222e9258fbb2355ed5fe85c749616e39d74bf6f49653db7905ef36b7a515",
+      "mos": 87.6565,
+      "score": 1.70066464
+    },
+    {
+      "sample_id": "034e7c8059a15a1fd3c3051c54ac7ec6c64af5d3a04173a60fe4439bc91b48b8",
+      "source_id": "79839f2b47c000f49e41a1eaec6f46c9035a866d5a61d1163bade1ef3c758535",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "709efc3a774cc69484243eed5c9eb70a4d5a69f506a8cfc7bf68fef7bf9d4f9b",
+      "mos": 42.3393,
+      "score": 4.61866283
+    },
+    {
+      "sample_id": "f9c5ed19da80b028b4b5c843c3ddfa4c6bf340109f8faa8332011d5873aefb81",
+      "source_id": "79839f2b47c000f49e41a1eaec6f46c9035a866d5a61d1163bade1ef3c758535",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "1cc11159d11a1ffb3ac7862ace6d73cb9d6c04a931caf0aa140cce2653ceead3",
+      "mos": 61.2641,
+      "score": 3.53905916
+    },
+    {
+      "sample_id": "13de5e3b246906748c5b3edff601e8e0844973b209d8a938a3e68d33e79433e8",
+      "source_id": "79839f2b47c000f49e41a1eaec6f46c9035a866d5a61d1163bade1ef3c758535",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "0ce7dbcd5a6c23c3223f88edc8e69772bc165b674276cdcc220c874da1c8ea39",
+      "mos": 86.8845,
+      "score": 1.83269441
+    },
+    {
+      "sample_id": "d7fab69e48257464456f3fcdd33b9c4fca896c9a37f090ea7b72c5154f5a778e",
+      "source_id": "3baf56bf0c40d3c62d1bf7eca07aeddb203d1827c82b1ca74a80929f70929092",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "f9d3d307498deb24d05bc08a78440a2565cce7ede7b1ccdc73b1be9404a7df1b",
+      "mos": 46.4579,
+      "score": 3.95031691
+    },
+    {
+      "sample_id": "c7be5181ad19a8bd0da3354c3da7e64afe85aba43fd56639ca8cfb5a07333239",
+      "source_id": "3baf56bf0c40d3c62d1bf7eca07aeddb203d1827c82b1ca74a80929f70929092",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "0e0b24c1a8dddc9f51051051fec2494c94748c7132a09be867cbf82d952d7db4",
+      "mos": 58.759,
+      "score": 3.08564711
+    },
+    {
+      "sample_id": "4e7e73fadefe6be9010eca9a93e00ea9f17a7faa359502089146af155b3c6ae9",
+      "source_id": "3baf56bf0c40d3c62d1bf7eca07aeddb203d1827c82b1ca74a80929f70929092",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "da089321593c45612bb608c0a1035b7c2b0aebcf66f8c836ca0a7ecf9121c328",
+      "mos": 79.4146,
+      "score": 1.96807945
+    },
+    {
+      "sample_id": "cd33423d03919102b540b823d183c76b609318d153d97e9c588cbf1bc83a2bf1",
+      "source_id": "3baf56bf0c40d3c62d1bf7eca07aeddb203d1827c82b1ca74a80929f70929092",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "32209c9eab8c8382f4600ba110dd1e7ea7ff80afbd864824bca96cb8753010ec",
+      "mos": 39.2356,
+      "score": 5.62820721
+    },
+    {
+      "sample_id": "bc965fb463ff05d523b4a5088120524231975f35da013d040991d62983055abd",
+      "source_id": "3baf56bf0c40d3c62d1bf7eca07aeddb203d1827c82b1ca74a80929f70929092",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "1bb6bceb93e6dab783242f62213510ee6c914236ba305811ade5c468acc50800",
+      "mos": 58.7789,
+      "score": 4.05494881
+    },
+    {
+      "sample_id": "927733b7abeea60bd42eee9c2ca582b4ff08a2883b99126a6a929383ce0c8b2c",
+      "source_id": "3baf56bf0c40d3c62d1bf7eca07aeddb203d1827c82b1ca74a80929f70929092",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "018e93b4e810033f9f06a4f6283dd109625dbb60151ad8b470a9fea6f2aefc78",
+      "mos": 84.5415,
+      "score": 2.14149737
+    },
+    {
+      "sample_id": "7d0121efc16e9b558816947adc05b8d68abba6b52df65e0e5ae30de8f0a3fbae",
+      "source_id": "a499a6c20fb44a603d9547c9b1129cd7ad6155a369681a424ef998eb0500b734",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "956949b856dc05d27e96ba483d3cb90f9b92f8e18adca338356d1bdb9bb6e08c",
+      "mos": 53.3235,
+      "score": 4.94437456
+    },
+    {
+      "sample_id": "b25f520d69f5ca263169f2791082fa19bcd310067a596a2450783b9fd4f3faab",
+      "source_id": "a499a6c20fb44a603d9547c9b1129cd7ad6155a369681a424ef998eb0500b734",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "80f950d2466aef8a824eea9790591b1b052507b631c0f296311e25d7f64004ca",
+      "mos": 71.2081,
+      "score": 5.94326067
+    },
+    {
+      "sample_id": "3e472fd415481deab8a1ae0c3b2dd50cf0db8c354c91be12298dc2c5eb215639",
+      "source_id": "a499a6c20fb44a603d9547c9b1129cd7ad6155a369681a424ef998eb0500b734",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "18ce379bef98f1651c751bd5a3b707bb40463f8ae257fae3d806551a178be021",
+      "mos": 88.3267,
+      "score": 2.56454277
+    },
+    {
+      "sample_id": "c8ed8a314fffccf2fc4244029c3d5d3cfb10272ac5980fcce668dcae0101ac4f",
+      "source_id": "a499a6c20fb44a603d9547c9b1129cd7ad6155a369681a424ef998eb0500b734",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "ac10576e7d6136497deff8cdf1fa8cdaa91d5c1f1beed02680d46cd8fd538429",
+      "mos": 42.8717,
+      "score": 6.28643179
+    },
+    {
+      "sample_id": "29d8dde90dccc81a7d611b557e33d3420788984a1e81c65dc8fa53fb141128ee",
+      "source_id": "a499a6c20fb44a603d9547c9b1129cd7ad6155a369681a424ef998eb0500b734",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "3f8e746dea0ec8512dda1181e23bfc342274ccd72033380b335c36055b4371c4",
+      "mos": 68.3115,
+      "score": 5.04195976
+    },
+    {
+      "sample_id": "3335b2504aea663748e09daa6f3e57385da81cb1733ee161e1555466430cda9a",
+      "source_id": "a499a6c20fb44a603d9547c9b1129cd7ad6155a369681a424ef998eb0500b734",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "27ec9036d9c29c3878e3e7a533952cefb56787341704879b764ac7c182bae0ed",
+      "mos": 89.2817,
+      "score": 2.28207517
+    },
+    {
+      "sample_id": "8a4cf59151e600b11706183bf369f313589dfa71b8916864189999696f588821",
+      "source_id": "1915f6ac27631a087166ebb42be7788accfcd05363b3ecfe0f87f11aaef682a8",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "41a6087b682dfadfc4268cd382c85ca82a66954919f84039dda0e593148f3a56",
+      "mos": 72.7133,
+      "score": 5.32802916
+    },
+    {
+      "sample_id": "71e6832cf710fd4dee6665a7f95cfbed266eb7a00c3aaa4b06eb7fec2c7a9ae0",
+      "source_id": "1915f6ac27631a087166ebb42be7788accfcd05363b3ecfe0f87f11aaef682a8",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "d4a1e8193b66a6145baa710867d6e8ac713730217a1f80a54406bc9fa33f3daf",
+      "mos": 83.041,
+      "score": 4.07198572
+    },
+    {
+      "sample_id": "f96164502e3e0d9db6ec42d9f1c937075e3c953375a1618d39672dbc3166189c",
+      "source_id": "1915f6ac27631a087166ebb42be7788accfcd05363b3ecfe0f87f11aaef682a8",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "031f02e0ad1eed79a669f53450e48bd74f1b47698c379d28540ecd9f519b4b15",
+      "mos": 89.5288,
+      "score": 3.29454184
+    },
+    {
+      "sample_id": "c6b182ad8e17da6d83620f29bac42c3083898ccf0762dc389e85435f841074d1",
+      "source_id": "1915f6ac27631a087166ebb42be7788accfcd05363b3ecfe0f87f11aaef682a8",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "b2634efcd30a39066f0ec4073342ee33c69db29e44b9f54d54c0292a73fd8c26",
+      "mos": 49.8945,
+      "score": 5.36481524
+    },
+    {
+      "sample_id": "aeffdf91705bf473b7a1c2497f62b7b2cfaba7e19ff2cd09698a265c49bd05dd",
+      "source_id": "1915f6ac27631a087166ebb42be7788accfcd05363b3ecfe0f87f11aaef682a8",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "23e625b3772899fbde8240f46207aba59b018cf27db4c5b4f4edd3c25a7577ba",
+      "mos": 71.5973,
+      "score": 4.74024296
+    },
+    {
+      "sample_id": "b67fde53671506dd1fba9c1a01fce1c2cb27ed28aa67e04ed3a71526807c4f04",
+      "source_id": "1915f6ac27631a087166ebb42be7788accfcd05363b3ecfe0f87f11aaef682a8",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "e2e76de86a5a0a4cbeff275e24608979d5281ba8d0a44ce0ae3f1db56248bb4a",
+      "mos": 89.1793,
+      "score": 1.94709766
+    },
+    {
+      "sample_id": "6d0bfe00df63a432ee4c3a53f9fc3b47c25016bd5d2277bdfb2fc55090101382",
+      "source_id": "2b7280cc6f4564a2fc7dc9c7f7cfad1030a4f24afef3614277ba2576eb748748",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "a77601d6f79e44066e3ddc7b5a5013646527cab9edf437f5e746a03cb507c808",
+      "mos": 53.0874,
+      "score": 5.13877964
+    },
+    {
+      "sample_id": "5d9b4b2e437c14f51d232d4992df26285ca808965867652bfd043332df8eedd6",
+      "source_id": "2b7280cc6f4564a2fc7dc9c7f7cfad1030a4f24afef3614277ba2576eb748748",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "cbca29078f4c3e78aa3f5dd0038d5b80293a175da26b8c839154a45cb5d6a66c",
+      "mos": 71.3092,
+      "score": 4.41281414
+    },
+    {
+      "sample_id": "3b94ff60877cc6bc48de48c592daed4991e3ad02200f0a4f934198b7c08eb79e",
+      "source_id": "2b7280cc6f4564a2fc7dc9c7f7cfad1030a4f24afef3614277ba2576eb748748",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "f076b85dc42d1d8c636374c272909828faa41206c2d0e9a691eb26160f32deef",
+      "mos": 86.5306,
+      "score": 2.45990515
+    },
+    {
+      "sample_id": "6b75ad7dc05fa2b6df75049d99aa96b618cd2dfcb514baa483b71fbb18938d24",
+      "source_id": "2b7280cc6f4564a2fc7dc9c7f7cfad1030a4f24afef3614277ba2576eb748748",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "90d523c402fbb607038f3e2857e35097670b0451f687afb1b02afce2a99427ec",
+      "mos": 32.9467,
+      "score": 4.79227114
+    },
+    {
+      "sample_id": "30f514f0b922a0c016c62558d10532601b7260904331c05b42c7b40ed13b834f",
+      "source_id": "2b7280cc6f4564a2fc7dc9c7f7cfad1030a4f24afef3614277ba2576eb748748",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "15fd761b4dea0ae28eeb53f1eced68cdc927929604674d3dc36fda2c6c8959dc",
+      "mos": 63.6636,
+      "score": 3.83710933
+    },
+    {
+      "sample_id": "f8c380c0372c32a23626aea72c25888dea72fb639cd44e2808e74e5c6489e83f",
+      "source_id": "2b7280cc6f4564a2fc7dc9c7f7cfad1030a4f24afef3614277ba2576eb748748",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "24d4a0fd24284372874d12e5353578f36344b156e86220e0b89a5fbd82eb6a1f",
+      "mos": 86.9258,
+      "score": 1.88985705
+    },
+    {
+      "sample_id": "7057bb23b4758962866a9c4bc5badff3ba63fe668fd30c3d0ecf0ea70858c5ec",
+      "source_id": "e608906b4f19f6f33ef7b6eaa85381a0f6c4256972f2b8d908f43a9574a27cb7",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "74761edb26d8f8d1fc3450e343c570793cb0bd62abd95be75421ed0dae6c8397",
+      "mos": 56.6937,
+      "score": 4.31829023
+    },
+    {
+      "sample_id": "f197a47c14d2bc15c4c805b546d37230980eb388f0f1275b129d7721ee1e675e",
+      "source_id": "e608906b4f19f6f33ef7b6eaa85381a0f6c4256972f2b8d908f43a9574a27cb7",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "6c081688a5f6dfb63d8e7a6c763e882cd2369f69760e4048796a3bfa6222c32f",
+      "mos": 64.838,
+      "score": 4.30092812
+    },
+    {
+      "sample_id": "c3ba920c109153408527716bfc539cd8192afb779d8d371e2a7095aea7825848",
+      "source_id": "e608906b4f19f6f33ef7b6eaa85381a0f6c4256972f2b8d908f43a9574a27cb7",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "ec0bf1618dd6fd72e8a1babba86d08e41331e1eb31376b1cc36def380f618884",
+      "mos": 83.3129,
+      "score": 2.32582688
+    },
+    {
+      "sample_id": "d59f1928d2f7bdc21bc6b6d0d76113ae28ea69d887e89c50eed951c2a566e6bb",
+      "source_id": "e608906b4f19f6f33ef7b6eaa85381a0f6c4256972f2b8d908f43a9574a27cb7",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "6b616aab17a00fcfbe9c31ed8db2d5bcd4b27eaca39118e2977c62f6b3ef523d",
+      "mos": 41.9272,
+      "score": 6.58713722
+    },
+    {
+      "sample_id": "8f73e17df9ec152f2c6c926ab0089c05c0a3461b6b4b32ca57eebe21bb2dd32a",
+      "source_id": "e608906b4f19f6f33ef7b6eaa85381a0f6c4256972f2b8d908f43a9574a27cb7",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "2465c32c1efb4302214586a995e487a87ffcbece72bf9de2d6a7b13b5003bb09",
+      "mos": 60.0055,
+      "score": 4.7589097
+    },
+    {
+      "sample_id": "fdc0a7df62b5245a0dbe512125373cfe15dc3ed628345a77752d010b218fe4c3",
+      "source_id": "e608906b4f19f6f33ef7b6eaa85381a0f6c4256972f2b8d908f43a9574a27cb7",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "b2518e3b95ee23fc8c11a2f21ceeebaf84fba55e2351af370c38d0a29618853c",
+      "mos": 82.5941,
+      "score": 2.20004654
+    },
+    {
+      "sample_id": "04c587e4f4d90770695fcacafcabfac30482b0c2d321313a90955ce1012a2a3b",
+      "source_id": "1d3e0c7957081c1da5c4b9e885aa77c5dd4a05b34b616d78c16489ff37da8add",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "4a0b994b05e31a49e93443b67aef1217f2670eed15c2bf996d8bc3cab3b9ffc5",
+      "mos": 59.882,
+      "score": 4.82400656
+    },
+    {
+      "sample_id": "c65bb82795055960bdde474b809952e5c60274d49cca6f0fdf1028dc577ce92b",
+      "source_id": "1d3e0c7957081c1da5c4b9e885aa77c5dd4a05b34b616d78c16489ff37da8add",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "2dc301084a734fc515d00b681e38dcff3f2ed99e423b8ce59b49ae5130fdfe5b",
+      "mos": 73.7978,
+      "score": 3.03709292
+    },
+    {
+      "sample_id": "6431818ac3c0d7d7a6930a7770644a2e2bb15a8c755b89cfebc165c9a2d212e3",
+      "source_id": "1d3e0c7957081c1da5c4b9e885aa77c5dd4a05b34b616d78c16489ff37da8add",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "5a4fc5e7ace62f88f2ca1d3b0d39cb0a679e0513ae122b9859f3fdc61251dc44",
+      "mos": 88.3216,
+      "score": 1.99447608
+    },
+    {
+      "sample_id": "12f1f7ce5e580c961e779c638ca14b2c04df0356481fd0f850d9d3da8c9d3715",
+      "source_id": "1d3e0c7957081c1da5c4b9e885aa77c5dd4a05b34b616d78c16489ff37da8add",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "013c6316d40cecf15baa40858cffd7345216cbdbc9fcd899785e861b4fa8fb54",
+      "mos": 37.5699,
+      "score": 4.9186039
+    },
+    {
+      "sample_id": "c6621bf8c0e45c81660e4bc394af48cac452a1e0170fa0e1cd4f4621465d86ca",
+      "source_id": "1d3e0c7957081c1da5c4b9e885aa77c5dd4a05b34b616d78c16489ff37da8add",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "f56e994e01e820f270640f45f24bcf2671a0ac461744064649fe0ae69f2d6200",
+      "mos": 64.0421,
+      "score": 3.79682803
+    },
+    {
+      "sample_id": "5f016f452df55d200f9fbd7e35e787297d30259c6f8472f5e9550c8cdc3a3cb5",
+      "source_id": "1d3e0c7957081c1da5c4b9e885aa77c5dd4a05b34b616d78c16489ff37da8add",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "e85c6031811127aaa9763b21560bc2edfde7e4d1cb040997e89eb283759c471e",
+      "mos": 85.9669,
+      "score": 2.14769268
+    },
+    {
+      "sample_id": "b71bd9954147c365b876f9bf34d02b9c34e68a9e97fae8e1d9854c8c7f9562fd",
+      "source_id": "cb60e0d1dd80a644d0e708bfb6796cd90e57b90b345919b60b7b9b2497cd3ead",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "c6081642080fe6c900aa7d052177c943c61d5c142ec9c2cfc6c5fa6b376d3261",
+      "mos": 63.4361,
+      "score": 6.83901215
+    },
+    {
+      "sample_id": "d7fed161cd2e9a753f4a0bd49f7ea46fed57de1fe9a2528535637bd30e64ac2f",
+      "source_id": "cb60e0d1dd80a644d0e708bfb6796cd90e57b90b345919b60b7b9b2497cd3ead",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "236a367e53f3cdf1dccbbd64ed6ec7b25772db67e1c1c09cccd3b58bae202dc7",
+      "mos": 74.6355,
+      "score": 4.60652113
+    },
+    {
+      "sample_id": "85c8f69f46d3968458b6714e890c192af9f600ae9678657fd94f78747ab5d931",
+      "source_id": "cb60e0d1dd80a644d0e708bfb6796cd90e57b90b345919b60b7b9b2497cd3ead",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "667fb0a9a1d355005ecde5c6b6f135ad23a6945ec61f5461c931ab7d63fd0780",
+      "mos": 87.5834,
+      "score": 4.13464832
+    },
+    {
+      "sample_id": "66f16fac2ec7d5a275719d38063480e7df3018e65b391472fab361e91016ca3b",
+      "source_id": "cb60e0d1dd80a644d0e708bfb6796cd90e57b90b345919b60b7b9b2497cd3ead",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "ebe025cc7d77b6a32de2b4d7d4a106d28d3ee653722337f6eccc9c3d16b6eb42",
+      "mos": 35.0128,
+      "score": 7.58053207
+    },
+    {
+      "sample_id": "aed1689f684f8dc1164db46175577ea5b9ce8c2f5249555c98c002105d02b67a",
+      "source_id": "cb60e0d1dd80a644d0e708bfb6796cd90e57b90b345919b60b7b9b2497cd3ead",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "df394360a8fbc38b7e09fa349d63c5c840ad92fdd41ca1e5ac43e363bfedb00e",
+      "mos": 57.137,
+      "score": 5.51546478
+    },
+    {
+      "sample_id": "dc13eec3c027b062b4ecfa9cf9727d6c6e4d44a929532c920c3a2c9015dfae22",
+      "source_id": "cb60e0d1dd80a644d0e708bfb6796cd90e57b90b345919b60b7b9b2497cd3ead",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "b8971267cce2c1b448b6110685c2c300f3c415ff9655c2e499f2ab33f810747e",
+      "mos": 86.8429,
+      "score": 2.61191487
+    },
+    {
+      "sample_id": "d4227e3485f65e0d2876b01720ebfed70139da887ab967f2150fa2c540366c6c",
+      "source_id": "044122f96c5f7796ca8179f84949d8b51317d053688115676987891532290a83",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "c2be3002373b766eacd118d9aae26bc87f7004ecada41c460a61e0e8557fefd2",
+      "mos": 58.5071,
+      "score": 4.05017328
+    },
+    {
+      "sample_id": "ea1bfb79441ef5afc1386884e9ace852524daf532fde61fe6c58b11979b72535",
+      "source_id": "044122f96c5f7796ca8179f84949d8b51317d053688115676987891532290a83",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "f053f9352fedccd40209aeca2bf60c51d82cb751f5ab1319b223a3042a48f24d",
+      "mos": 73.2542,
+      "score": 3.48235202
+    },
+    {
+      "sample_id": "58ba3af13827da55aa3ae70ccc4de03e424c5059f16a7fcd7a9faf076afe4e0c",
+      "source_id": "044122f96c5f7796ca8179f84949d8b51317d053688115676987891532290a83",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "aa5ee03437a6d3c5e228f1e39858d7a6b60f4e75beff87fd38bfc379fa0ecfaa",
+      "mos": 86.4979,
+      "score": 2.09201026
+    },
+    {
+      "sample_id": "84664a9987caa0548f6a50cfe04d7a2e5f76320aa0e9d3b0d6b2ac4688fac172",
+      "source_id": "044122f96c5f7796ca8179f84949d8b51317d053688115676987891532290a83",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "df667f3009676ad076ae21aa6c9212fe07b248cda6073d7a683b3bf349c2d35c",
+      "mos": 42.9112,
+      "score": 4.92554998
+    },
+    {
+      "sample_id": "f073842e6ba1ae4ecaa09af5bd2a17976d42caa5509c090208306892e3e439d5",
+      "source_id": "044122f96c5f7796ca8179f84949d8b51317d053688115676987891532290a83",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "b88da98aa7cc04d5a6f3c8f4c269c85bd0a1cdf0e27f657991297ec6adcdd423",
+      "mos": 67.2347,
+      "score": 3.66650939
+    },
+    {
+      "sample_id": "88fcbfcf16ed6551078be223c865971a95d6e083574829c7708a119f20bf5e4f",
+      "source_id": "044122f96c5f7796ca8179f84949d8b51317d053688115676987891532290a83",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "678902a398003d67667e638a23ebbf0a415a9ec991d5a3a9e54a962156af2e9e",
+      "mos": 87.1526,
+      "score": 1.75484824
+    },
+    {
+      "sample_id": "7a2cac7b4d62cb584ef1bd9d464d034a726ac0a332cb87dceb106638ceb14476",
+      "source_id": "a86c7671c38660eeb5c97162ef5f9eed1163ca430a936a391430e3d382038199",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "90fd2d1aa9c48c0630eef652a21bf6975cf108698a0fecb947b6f8746ea8d49b",
+      "mos": 56.2823,
+      "score": 5.28114557
+    },
+    {
+      "sample_id": "b51cc9857d1e9324f214889cbf063ebaa24222c4ae9ccb53b369044d58576472",
+      "source_id": "a86c7671c38660eeb5c97162ef5f9eed1163ca430a936a391430e3d382038199",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "276ac9fbe7333f62c9875e459e81c78c668a921a0b841afd7642864cc6dfd4e6",
+      "mos": 69.5578,
+      "score": 3.88721156
+    },
+    {
+      "sample_id": "39ebf1e39b40b141a336cdbe3b5f3c8d2b4ac934a0a668992daac5d471036390",
+      "source_id": "a86c7671c38660eeb5c97162ef5f9eed1163ca430a936a391430e3d382038199",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "218689a79fcc770b9246f7ff7f59acefe419b1c01e25de51790e9450daa2ec07",
+      "mos": 86.8722,
+      "score": 2.33155322
+    },
+    {
+      "sample_id": "2f46357d1e99ef34aa9e1ac0cb4892ea30ba7e1ae260504177aa34ba9e5fe2d6",
+      "source_id": "a86c7671c38660eeb5c97162ef5f9eed1163ca430a936a391430e3d382038199",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "93abb695617da8c1bb3baee7712151365a45181ab452cb399389a43309905365",
+      "mos": 46.3657,
+      "score": 4.82177973
+    },
+    {
+      "sample_id": "ed6073adcd3ab5d76a661c1efa3ca4de9d35e7e6d176e00478f8ae5dcfc72e80",
+      "source_id": "a86c7671c38660eeb5c97162ef5f9eed1163ca430a936a391430e3d382038199",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "1b796d2002ea3dffb278d2c76dbf9ec2f09eaf96a4c97a9f770a084a6a7b1016",
+      "mos": 66.7442,
+      "score": 3.54491639
+    },
+    {
+      "sample_id": "2539a5442daaa7071d5a6a09f4b78af697f5767a0a5ba64a26e89c01f1a7107f",
+      "source_id": "a86c7671c38660eeb5c97162ef5f9eed1163ca430a936a391430e3d382038199",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "17eca812466192d86ee2b98ee3b114f41f8c244c7f521b883d54cd96ac7471e5",
+      "mos": 88.4068,
+      "score": 1.92817867
+    },
+    {
+      "sample_id": "0fb19667c0a83c8199b28c26627770977027f41b200b967f8286c7b51b6ea5a6",
+      "source_id": "374b036d5fa19efcfeefdc27fec593cece425c9e6142b7b24e95d16a7d23f4fc",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "44e706b37d764bf8efa3972908ef81aac2f7626fa0d5c8d33c18c83880c5139d",
+      "mos": 44.6516,
+      "score": 5.8768878
+    },
+    {
+      "sample_id": "2b4b0f37e626b0c828ffcb8a9f00025aeee84b116227b2420e98d57a50bb4a3d",
+      "source_id": "374b036d5fa19efcfeefdc27fec593cece425c9e6142b7b24e95d16a7d23f4fc",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "2264b529c26501f6c16ef590b67709d9cbcebb7682ef6fded0cd9d01ead9e6fc",
+      "mos": 52.3674,
+      "score": 4.10150528
+    },
+    {
+      "sample_id": "734cbabc0ba9916310359e46bd20ffab2479fa66710c02bccc1981a0b6a30103",
+      "source_id": "374b036d5fa19efcfeefdc27fec593cece425c9e6142b7b24e95d16a7d23f4fc",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "d33eee5b4358b0a3b11e3eba5a93bda148d7d454bf53ae7d4c2a6c01ddee9201",
+      "mos": 80.8679,
+      "score": 2.8037467
+    },
+    {
+      "sample_id": "2798903c062d4239daf48f5d2aaf911b5607a8d08c77e9cb16d5099663edc1d2",
+      "source_id": "374b036d5fa19efcfeefdc27fec593cece425c9e6142b7b24e95d16a7d23f4fc",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "1d62aa466722e65d07833229965ea5f00c314bbbea8f5b9d2343ac7aaa65083c",
+      "mos": 36.9656,
+      "score": 5.70714331
+    },
+    {
+      "sample_id": "be6d7c82979c0baa5ddca64d0e803cbc4a0b73038c64927b47f2a670aacb7f63",
+      "source_id": "374b036d5fa19efcfeefdc27fec593cece425c9e6142b7b24e95d16a7d23f4fc",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "9a8db94eabbf78feeeb207d99277bb323abb51659930b67129e116b343574a29",
+      "mos": 54.4495,
+      "score": 3.92372656
+    },
+    {
+      "sample_id": "5ecbe1cab747eceb99c54aed4a7a8c2d5ebd5f06a6e1a913fd1fa12a38b05b31",
+      "source_id": "374b036d5fa19efcfeefdc27fec593cece425c9e6142b7b24e95d16a7d23f4fc",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "f1f3b75025b6a1fd154f0b32ec7b5869ed7de3f3db634fc6128e6a41c486d6b2",
+      "mos": 85.1085,
+      "score": 2.08283424
+    },
+    {
+      "sample_id": "cf682211c9bc23824c34e6aba1c379384fc577999b98e0f370a73b2448128eaa",
+      "source_id": "13fd8e1a4639a88ad13d5fa73de7c95084fa42310931b2e09b9aec973f44329e",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "0f8f4501b1ef34127e77e47920b23b4fd7fbe61572c74c715b9a35f815f7a70e",
+      "mos": 44.1408,
+      "score": 5.13963604
+    },
+    {
+      "sample_id": "ce0dc15d30d22f4ef9de778d23c96bdbd9ceb4167ccb8be4aa934ad86df5d666",
+      "source_id": "13fd8e1a4639a88ad13d5fa73de7c95084fa42310931b2e09b9aec973f44329e",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "24e1ff7299df3f682467306951514f78987aa72eb69651c7e1ecc890e5f3f034",
+      "mos": 55.7729,
+      "score": 4.05774164
+    },
+    {
+      "sample_id": "f74c1cedcb9b5dae3db1f708fb3b522e366304a2561e265a4a4b22079442a404",
+      "source_id": "13fd8e1a4639a88ad13d5fa73de7c95084fa42310931b2e09b9aec973f44329e",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "803d26bbbec5b072cf80a44dca7bcbacdd2158eb5291005809ad85d4853654c0",
+      "mos": 81.6027,
+      "score": 2.24190331
+    },
+    {
+      "sample_id": "86b799290ebff4e4ca9e12fa2c8a06c6a0199743aea7e7fc0c0033b19e2c87be",
+      "source_id": "13fd8e1a4639a88ad13d5fa73de7c95084fa42310931b2e09b9aec973f44329e",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "f67324e0163df05cbd24581710c1358e9935c352997c99f96d628128654b2d5e",
+      "mos": 32.4587,
+      "score": 6.14059877
+    },
+    {
+      "sample_id": "0b76288a64fc073857ff815fe854cea18086b50f3585a3e88f8029a6b69a6527",
+      "source_id": "13fd8e1a4639a88ad13d5fa73de7c95084fa42310931b2e09b9aec973f44329e",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "250caf5a0f0ab148cf6ba2841cab79845d0e2aacd469f675954270e861cbc123",
+      "mos": 52.6285,
+      "score": 4.78229713
+    },
+    {
+      "sample_id": "ee91e48a904f3060fdd2564d785ff05d1b5c95c39c64557482ece81b92e30562",
+      "source_id": "13fd8e1a4639a88ad13d5fa73de7c95084fa42310931b2e09b9aec973f44329e",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "ff69614dbd125c3e864494450a56bc68fc6593c4f458c38a045fdb0fd6396e0f",
+      "mos": 81.7906,
+      "score": 2.20769262
+    },
+    {
+      "sample_id": "9ddf5a862353ff1bf165ecd00a8f774c0e795ec9bff4c0442f62613f7a284236",
+      "source_id": "b4819c302af09435670cec7befecf98eb5a897dc951970a7734c06c6463dbf3a",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "f3dd86ccc3cebe222b07151d920ea43b62b60649681f842dc6e367ea34c55fef",
+      "mos": 45.8139,
+      "score": 5.66082859
+    },
+    {
+      "sample_id": "ec85b82d1fb50142694edb6a9fc7b4e6ba08ad7313cebc880a6cce30aacef5f0",
+      "source_id": "b4819c302af09435670cec7befecf98eb5a897dc951970a7734c06c6463dbf3a",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "78eec22813a42e64c094c76d66622458a6c24236233ea8634756fe6d7e955588",
+      "mos": 61.2011,
+      "score": 3.76307535
+    },
+    {
+      "sample_id": "02833f181bb875e880ca87fe6b26c10017f736f04bfbcfb5b5286a702a2326d6",
+      "source_id": "b4819c302af09435670cec7befecf98eb5a897dc951970a7734c06c6463dbf3a",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "61df44aa28b9a4455de67af0677be24dea581ca9eeed47bfbacea3b8815ea1bb",
+      "mos": 85.3428,
+      "score": 2.83832431
+    },
+    {
+      "sample_id": "2907eedc8c713e6f3f27768c948ae68d8020e43fc51ee80a5a78294f6dd6a838",
+      "source_id": "b4819c302af09435670cec7befecf98eb5a897dc951970a7734c06c6463dbf3a",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "f544611dae7d2d651adc4b029c728a7b25e9c65a719831acb2e87a1e45327a83",
+      "mos": 38.1293,
+      "score": 5.07370472
+    },
+    {
+      "sample_id": "1c2218c711b05e3174e1d0cb011870d62a5a674fbeef7530d1b97fb7638d3d95",
+      "source_id": "b4819c302af09435670cec7befecf98eb5a897dc951970a7734c06c6463dbf3a",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "0902c87248cb334bd728328b810dfb3fcdb3ede41a41f5e2d1d172c1355ea415",
+      "mos": 58.0445,
+      "score": 4.26099968
+    },
+    {
+      "sample_id": "2afd0ef2b7787014e9452fc419ddcfe587d29d3296cff7ca59abdf396b14f5cc",
+      "source_id": "b4819c302af09435670cec7befecf98eb5a897dc951970a7734c06c6463dbf3a",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "16e282ed2078df6466a4d01774b80db9d9a9be12d92494629b709fc769e12081",
+      "mos": 85.3092,
+      "score": 2.37396598
+    },
+    {
+      "sample_id": "3e9025902e718c221be9150fb4932ba213b15363a53aa97e8c4b3e4d25fa33c2",
+      "source_id": "461dc3027106aa5e574ce482ab0ae7fc4c97790c1f6e02832fced0bc66326bb2",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "2937d8062eea1b843e25e3a3da03a1237012f43c78e35e7b33508bb638fdc9b1",
+      "mos": 55.7336,
+      "score": 5.04336977
+    },
+    {
+      "sample_id": "6213dc15105b3003968f40d44a4f0395f89512b5158e2ab4b0d8807c698e5996",
+      "source_id": "461dc3027106aa5e574ce482ab0ae7fc4c97790c1f6e02832fced0bc66326bb2",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "952dbce7ef310bb771a19546a7f31b1d10854533901d2f5a11b20b1397e0e0f6",
+      "mos": 70.6202,
+      "score": 4.30290174
+    },
+    {
+      "sample_id": "80d0235667dcf86800a024a17dbcb3a6283874cc200ce29c0f8d1414a0bcafb6",
+      "source_id": "461dc3027106aa5e574ce482ab0ae7fc4c97790c1f6e02832fced0bc66326bb2",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "c57f012e707723e302b3bd57c02cda277e88035bac9a329a37eb3cb85b273c15",
+      "mos": 85.5233,
+      "score": 3.7410183
+    },
+    {
+      "sample_id": "fc11e68d77c1ad0113fc056a71e1506e7438f14baece8bb3a2745e467d019f7e",
+      "source_id": "461dc3027106aa5e574ce482ab0ae7fc4c97790c1f6e02832fced0bc66326bb2",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "b0f279e177aea6675772811bda5a8927e1adbceedeea68bb08263725deeeb1ad",
+      "mos": 40.5122,
+      "score": 6.94006062
+    },
+    {
+      "sample_id": "c33dc36689d837c9a09f1a65cf3802eff9721df55f33a2e84fdfb3e3c81ec73e",
+      "source_id": "461dc3027106aa5e574ce482ab0ae7fc4c97790c1f6e02832fced0bc66326bb2",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "eed726fbf5a563c8fe4c90277472b49a8e93fa7b6de2cd3a4997cbdf410f2d8a",
+      "mos": 62.4252,
+      "score": 4.75648022
+    },
+    {
+      "sample_id": "01db682057c6ce1a14cd84c2bce31329eb379c473e1f0d06474467efb8ea7c26",
+      "source_id": "461dc3027106aa5e574ce482ab0ae7fc4c97790c1f6e02832fced0bc66326bb2",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "c6a18676a2db1ff842932d851ec8ccb105ad80b2e4d3b5efbe64c92c39717ebe",
+      "mos": 85.9678,
+      "score": 2.14312029
+    },
+    {
+      "sample_id": "fdd14c905577bf4aa77373c040ab014583785e981de4e1df44dee416d7134918",
+      "source_id": "15da9fd204e09d9053ce8b547c4cca111b558e1e4cb8546fdac380de07ac2583",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "72cd6704e0973651f3650037b0e55bef4f66136eca840ad58a26a10e77e5337d",
+      "mos": 41.723,
+      "score": 5.87115145
+    },
+    {
+      "sample_id": "1fd47b53722500e59cd812a4ebd2e60acb76eb18de8ab346848fd0f37ddeccf7",
+      "source_id": "15da9fd204e09d9053ce8b547c4cca111b558e1e4cb8546fdac380de07ac2583",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "8a9e9aa70920a85b531f9934c5b5196c768bb49bff93f9a0b9a4a37a429aacb1",
+      "mos": 53.5216,
+      "score": 3.74385595
+    },
+    {
+      "sample_id": "e479e7bc56d82c1411adb10197f123ed60ba3cac77cc1a462585ecaf1b83557c",
+      "source_id": "15da9fd204e09d9053ce8b547c4cca111b558e1e4cb8546fdac380de07ac2583",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "3549e5fcc0df3c01db0212d7c58e504cda9601911947c87e0f46dbd30a6857df",
+      "mos": 80.5724,
+      "score": 2.56825447
+    },
+    {
+      "sample_id": "ef92660c1c231d0a3b7880f5aa01f43dd0b24ab5117f50610549c75774e12a8c",
+      "source_id": "15da9fd204e09d9053ce8b547c4cca111b558e1e4cb8546fdac380de07ac2583",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "7314de78d6d8e4aa1805ad1291bad0eed697ac33f362408e32452fb4ac1b2d2e",
+      "mos": 30.8041,
+      "score": 4.72461557
+    },
+    {
+      "sample_id": "324877a41fd302dc27a4d674f5081525ae3eed18d01385ec780a5d6d8bc5bbe6",
+      "source_id": "15da9fd204e09d9053ce8b547c4cca111b558e1e4cb8546fdac380de07ac2583",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "e42d00fcca4a7f9614cfdede5575ce0ce8ec11b8bf23d9c0a3ea542091ca21ee",
+      "mos": 55.509,
+      "score": 3.91744781
+    },
+    {
+      "sample_id": "429fda74fcc7c273068cefc9d316274f86690df06fe951220a14115fd48703c3",
+      "source_id": "15da9fd204e09d9053ce8b547c4cca111b558e1e4cb8546fdac380de07ac2583",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "3c5aaf5b354c07084da5a99cf2bd0051c13e5ba79142152bda29f11d306c74b2",
+      "mos": 86.5622,
+      "score": 1.8282913
+    },
+    {
+      "sample_id": "0c56f85a96f2a64a630c573594feda7b726cf21798259620dd4e8083b3bd92ba",
+      "source_id": "5c809ea96225be249f8575a3e1544a6578e694a47bfddabd918eee0c927d4927",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "a5b150465b68068bc994dc03d06595d54e21ad7a457b95cc3f0d4139febb5035",
+      "mos": 46.0059,
+      "score": 4.68484735
+    },
+    {
+      "sample_id": "668476e8362cbd8226977f9c2555f905434f9468eb1dac7548b167bbc0fb192d",
+      "source_id": "5c809ea96225be249f8575a3e1544a6578e694a47bfddabd918eee0c927d4927",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "f36aa3e302cff09166bd411888a2af8b8afc640dc46ff834d865a3cc5a984e2d",
+      "mos": 63.0227,
+      "score": 3.05980158
+    },
+    {
+      "sample_id": "bd2a4802a84618d35c82635f517a5d765fe3f2eb7a7c397d958e40e4749c60ba",
+      "source_id": "5c809ea96225be249f8575a3e1544a6578e694a47bfddabd918eee0c927d4927",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "ab7bb7743971db4a0b7c5379b4bc0c303714775185984f9786af10168f10aa19",
+      "mos": 81.8685,
+      "score": 2.35969234
+    },
+    {
+      "sample_id": "fa0f46f86b39c28a657860f324d96794728617e5e8e065a15623c81e54c5c9e4",
+      "source_id": "5c809ea96225be249f8575a3e1544a6578e694a47bfddabd918eee0c927d4927",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "d2c38b4bb6496b89dc145dfa1ada5fd2a3c5cd4ebd0c5d5e5d0bc96554704fa5",
+      "mos": 37.2838,
+      "score": 4.632164
+    },
+    {
+      "sample_id": "d818437b0826fdfc86f972c206cf3678454c30f98b10f34533b91f7366605274",
+      "source_id": "5c809ea96225be249f8575a3e1544a6578e694a47bfddabd918eee0c927d4927",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "20a6473801e164a20a23f69691d2437f770dc346b6c07f91cb01471081bef507",
+      "mos": 57.4997,
+      "score": 3.54057097
+    },
+    {
+      "sample_id": "0a7f06eb59f5ccedda3bf949d69b7cddf3c130aa409a2edaddd14db6a05446cb",
+      "source_id": "5c809ea96225be249f8575a3e1544a6578e694a47bfddabd918eee0c927d4927",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "348825a444adff4bf8fd09751f0d379ba1eec00d4e7abb9b383c8989047c1945",
+      "mos": 80.8583,
+      "score": 1.60084605
+    },
+    {
+      "sample_id": "7b98ed2481dcd6c76d6a565b77614d719a3738dbe6110a20ab9a0fa7885f518c",
+      "source_id": "be4bfd85b5c7bcfca45090271b3750ec548b2c6f9bee0883c2374d1592d7e667",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "bddf4a156826ec2c98c36f5acdf181022a522adb02c3cd9a8ea1e7bdce65aa99",
+      "mos": 50.3266,
+      "score": 5.01244068
+    },
+    {
+      "sample_id": "aba687bb147556848a3b47255045a35c0488af577afe5dd0de51aebd3b49241d",
+      "source_id": "be4bfd85b5c7bcfca45090271b3750ec548b2c6f9bee0883c2374d1592d7e667",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "bdffc6306799845acdd1464b0fb8d16397643bf7ec5f788f491bb17db6ad0f5c",
+      "mos": 66.7238,
+      "score": 3.1020236
+    },
+    {
+      "sample_id": "0f08aef4551214981ef215a71cd62aca8c155a0f55850a61348d1ac033afb3b4",
+      "source_id": "be4bfd85b5c7bcfca45090271b3750ec548b2c6f9bee0883c2374d1592d7e667",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "a928268eae80c7dedbd11281089f40f1d4dda4d4d4fbbf3321173267f07140d6",
+      "mos": 86.3764,
+      "score": 2.22568297
+    },
+    {
+      "sample_id": "1a3890cbacd9a95f74844906daee76e90d50e463d8d7d47c6da817d6dba56b26",
+      "source_id": "be4bfd85b5c7bcfca45090271b3750ec548b2c6f9bee0883c2374d1592d7e667",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "b86a4bd2401b13b0b420098593c2ad0833311d3c14e7224dc605140cb6bcae2d",
+      "mos": 38.2313,
+      "score": 5.86237717
+    },
+    {
+      "sample_id": "0069a45018c359e5983eadda7698c6a4375ad880fdcd9c134319c882555e8b41",
+      "source_id": "be4bfd85b5c7bcfca45090271b3750ec548b2c6f9bee0883c2374d1592d7e667",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "56b9071aa91f3bc5da229307d43d66a6e59ec36add3452373033b6b8d3decdea",
+      "mos": 65.8122,
+      "score": 4.07388973
+    },
+    {
+      "sample_id": "55af764ee45b93e93cf1a4fbb140feee6312b0acf5a7df3d90190f2b32ad9efd",
+      "source_id": "be4bfd85b5c7bcfca45090271b3750ec548b2c6f9bee0883c2374d1592d7e667",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "bee1395601300e26c814138ad301b84dd4a71cee8e2abe74f0c7150220096464",
+      "mos": 89.0187,
+      "score": 2.15236974
+    },
+    {
+      "sample_id": "065acdfffc285c3e00a5af31fd716938b27dad59eb760118786bd5bbffb57089",
+      "source_id": "227173d9b5dd5d60caa697110af4e6689a8d9fe229f306d5ec2908fd17e9d6bd",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "e8acc1cfc985999fd8eaebf2d85d02da39718800de537d63de4cd7d4f58bbe06",
+      "mos": 45.0771,
+      "score": 9.05920315
+    },
+    {
+      "sample_id": "06d87b5ced36505742f351d86ba969918fabe14211a2b2e332e718109109923e",
+      "source_id": "227173d9b5dd5d60caa697110af4e6689a8d9fe229f306d5ec2908fd17e9d6bd",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "dce108ebc603ed39013c86163d04c6d11e4b7e6a9f7f5448941ec2b88eb3ff56",
+      "mos": 52.6534,
+      "score": 7.59960413
+    },
+    {
+      "sample_id": "5c3e9e8039b4188302a863a8f820cd800d47ccbaa649fdc788ff8e6fd5e84756",
+      "source_id": "227173d9b5dd5d60caa697110af4e6689a8d9fe229f306d5ec2908fd17e9d6bd",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "738c4a5b03aa89d0c3f5cfa62011cb81233fa2f1cacdb4a8dfaa825b32faee45",
+      "mos": 78.1831,
+      "score": 7.0141983
+    },
+    {
+      "sample_id": "bdfab888dc6a23adc69b33c42064378b7046bbd4dfb2b8c8f5928eb1a5f3b3aa",
+      "source_id": "227173d9b5dd5d60caa697110af4e6689a8d9fe229f306d5ec2908fd17e9d6bd",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "8527454742246f438cc974bf301bb506e72f2c3bba9fffb5be9d1c982ea4cd3c",
+      "mos": 36.4475,
+      "score": 10.67677021
+    },
+    {
+      "sample_id": "0a3507162e7f62a378ffb9b184387129d29bf90131c9e9c1f87025e8d489c6a1",
+      "source_id": "227173d9b5dd5d60caa697110af4e6689a8d9fe229f306d5ec2908fd17e9d6bd",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "8a3ff24e892e01eab2777c028029a3d8e08e6bcc44d64894a0292be936b227e0",
+      "mos": 49.8735,
+      "score": 7.6100564
+    },
+    {
+      "sample_id": "149ad7e7139b4801a84a326534e2714a787a93ddc429351ddfebc4b2d0efc9cc",
+      "source_id": "227173d9b5dd5d60caa697110af4e6689a8d9fe229f306d5ec2908fd17e9d6bd",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "c530323ad4e91f3052ebce3549b2013c141f1420d4e24b9f41295dc9aec87394",
+      "mos": 83.5782,
+      "score": 2.26698613
+    },
+    {
+      "sample_id": "9c6a4e34b0ba5d4d776f0f016af98f95acbdf271995ff187e71cc94526f01e79",
+      "source_id": "4d91fdc558efa46a4bca45c0550fc0c2aee0468c90cc8ac2f65be190c9bc0ca4",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "dd89ea194c8bb3ca34b3faad7fa37aba34b9cedba1ccaccdb2f06f336f277add",
+      "mos": 59.5527,
+      "score": 5.11861658
+    },
+    {
+      "sample_id": "cf9cc8855732fcf78589c4acc8b24c49a8f03dfa94b7455d5de93016fb2bd848",
+      "source_id": "4d91fdc558efa46a4bca45c0550fc0c2aee0468c90cc8ac2f65be190c9bc0ca4",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "0fa43b4475c1d8267ef3568f0aa05e83933834de7dfc5c62e64344b78e184bf1",
+      "mos": 69.9166,
+      "score": 3.44960046
+    },
+    {
+      "sample_id": "e84928d8df6561325226d43c6706078068b9cdf75f6bfcda26e8e21814966dab",
+      "source_id": "4d91fdc558efa46a4bca45c0550fc0c2aee0468c90cc8ac2f65be190c9bc0ca4",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "b426392418013defd8b9769e405ad9bc78a75df5ba64cbee7a8271777b7a503e",
+      "mos": 85.6312,
+      "score": 2.2831502
+    },
+    {
+      "sample_id": "dc29aa8c8c4e119a091a81f22aa27a0754a557dc7b87f5581f5eff9bbd714b10",
+      "source_id": "4d91fdc558efa46a4bca45c0550fc0c2aee0468c90cc8ac2f65be190c9bc0ca4",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "fc1e391c122f84ec9403114786f614ad6ea1eae222cdb9a00f8852b0c774e003",
+      "mos": 38.8693,
+      "score": 6.12752247
+    },
+    {
+      "sample_id": "47388c60374f45037eeb3d3f8c33a2c28b9f6069ef98c4c3c1d65285d4445b21",
+      "source_id": "4d91fdc558efa46a4bca45c0550fc0c2aee0468c90cc8ac2f65be190c9bc0ca4",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "30ac7550c11c927abc64163ddd24b2683ad2c9451c83c25fa120c98ee38caae0",
+      "mos": 63.858,
+      "score": 4.57685566
+    },
+    {
+      "sample_id": "62caad62df67b545783fb7fbb4da9fe37091c6e5cf843199fa3a0eaa896e416c",
+      "source_id": "4d91fdc558efa46a4bca45c0550fc0c2aee0468c90cc8ac2f65be190c9bc0ca4",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "9eb1292ee27d692ed9e430ff6294f2254e545b1837059bc4c5de28c11584ed67",
+      "mos": 85.6029,
+      "score": 2.30706739
+    },
+    {
+      "sample_id": "e1d9e3b85dec9c2f731cfe7ca351fe81b7f8a86c8e03da67d8da4b9390a4ab66",
+      "source_id": "ccbf68801a05baa30bb4fba85b99adbb4eb2f4f63cdadd5af768f926c11a3731",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "f052d547e6c65fb054b07665e8f0c34b0cbde529ca80f5a37d44c175a42c6700",
+      "mos": 55.4024,
+      "score": 4.93261814
+    },
+    {
+      "sample_id": "a1a858c8d1eb300ab3603afb9ef21de1f6e1d435b4bc08540883384b54dc25ce",
+      "source_id": "ccbf68801a05baa30bb4fba85b99adbb4eb2f4f63cdadd5af768f926c11a3731",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "a5e96767f4cc66a0df72ead3970b0a4b6f7d2c33bc93e733a9f4b174dcb3ab55",
+      "mos": 70.0219,
+      "score": 3.73161149
+    },
+    {
+      "sample_id": "bae1f21cc454727ae3e8f2f7758beb723952439286cf8953129b90fa2b5453a8",
+      "source_id": "ccbf68801a05baa30bb4fba85b99adbb4eb2f4f63cdadd5af768f926c11a3731",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "0e8e230d21f39d2d3c974e1122fe1e5679ed97060e30a00b3bcf08323047fbab",
+      "mos": 84.7317,
+      "score": 2.60286927
+    },
+    {
+      "sample_id": "f622fb42121ed2b6e64a54c1d31fd25bb958a91c82d1431dedd84111c9c4c657",
+      "source_id": "ccbf68801a05baa30bb4fba85b99adbb4eb2f4f63cdadd5af768f926c11a3731",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "795ea69f0d5b8a25ac15c0f3dd24281ad73814ff616152fc250576bfeaad1d7b",
+      "mos": 37.5669,
+      "score": 5.28570223
+    },
+    {
+      "sample_id": "7288f3f3adbde59347a8fa692234e2d890f3ecc219d67404800c11d7534ef3b0",
+      "source_id": "ccbf68801a05baa30bb4fba85b99adbb4eb2f4f63cdadd5af768f926c11a3731",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "c3d7347bdc3747c311b1dd16c3d726c56f5dd1e1500fb8c619467f874c16ef34",
+      "mos": 60.421,
+      "score": 4.14848995
+    },
+    {
+      "sample_id": "aa891cc168139b369911bc497c84cc2300d15296d2bfa098a8f36be14fcdffaa",
+      "source_id": "ccbf68801a05baa30bb4fba85b99adbb4eb2f4f63cdadd5af768f926c11a3731",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "708c128f3f92ff0ebd77c4f56858a0d791296c40eb917ac71515cec31d68b48c",
+      "mos": 84.8081,
+      "score": 1.95521188
+    },
+    {
+      "sample_id": "fabc77d9673b8dceb02214fb13b6696ca1cef0da3f47436673a9889af69fedb2",
+      "source_id": "8e6f7333dc04110a220309bae6f5303205208eb52599ff71c5cb8101e7cbb399",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "e85a924afbeea3d6d8ff6230c2f4993afc5846d93461d2f89f80a5f8f6f163c9",
+      "mos": 39.6662,
+      "score": 5.58754778
+    },
+    {
+      "sample_id": "ec2ad727159b4697689a1d5ea26cb6794644025dbe0513be41498cae42cc8a3f",
+      "source_id": "8e6f7333dc04110a220309bae6f5303205208eb52599ff71c5cb8101e7cbb399",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "ceaade29eba8f99fced67d845c982d24b690da0a7ba038b1d5f10235ef57702a",
+      "mos": 54.7393,
+      "score": 3.69646645
+    },
+    {
+      "sample_id": "aa8340ed06374cf55b9f14c05e6361a8586f18b00b9722001d22ede67e1f0356",
+      "source_id": "8e6f7333dc04110a220309bae6f5303205208eb52599ff71c5cb8101e7cbb399",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "bc6100c2d5de0e16d868e2941138a7822d3b0684d4e8a1a08d9d9e02134d158d",
+      "mos": 74.6407,
+      "score": 2.2967658
+    },
+    {
+      "sample_id": "be3fb4c9a00d7609492f66f102c395d64d41e02e939e75477a6bfcb9d42f8657",
+      "source_id": "8e6f7333dc04110a220309bae6f5303205208eb52599ff71c5cb8101e7cbb399",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "778bcac0689870130cf2d097e341cd16d38d7a39f5fb8f6af15e82570558ff38",
+      "mos": 34.7684,
+      "score": 4.74264812
+    },
+    {
+      "sample_id": "2839461329de3b399cb9661a78e4428b63afe4d006104e35f4ee03ac227c179e",
+      "source_id": "8e6f7333dc04110a220309bae6f5303205208eb52599ff71c5cb8101e7cbb399",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "64395cc39ddfe5c91bdfd79b0f1412f94869cc7185b7d33939050fb567e6409e",
+      "mos": 61.4406,
+      "score": 2.80359435
+    },
+    {
+      "sample_id": "91be141ce2bcc5c7b101618d4cf34129a4ac4a109675cfccb6c0ac908c6acba7",
+      "source_id": "8e6f7333dc04110a220309bae6f5303205208eb52599ff71c5cb8101e7cbb399",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "06887dd0adb1fca2a582608f76c36e65d9a3cda1b4cdf7c61838e07e7dd7fe6d",
+      "mos": 82.3899,
+      "score": 1.51032162
+    },
+    {
+      "sample_id": "1953f9e99c729d9c7921bdb2956ede96187cdef3db51f1f2232f7255bff87351",
+      "source_id": "1e9d00c6827039d6f1dcce8093b5ec3ec9cbe4f149a84c3cabe39058ce1ca5fe",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "b6249aa285cf5d9a11e18a261c7f3191f9dd8345be0e715020430d1dd00018c2",
+      "mos": 52.1465,
+      "score": 4.23908567
+    },
+    {
+      "sample_id": "ef8a4168020b717651f14b15b3e5563e7d91ffabfdf59ee54492e5a0111d1ed9",
+      "source_id": "1e9d00c6827039d6f1dcce8093b5ec3ec9cbe4f149a84c3cabe39058ce1ca5fe",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "017f1b4a9cd28e3a26c20d21e94ea0793900598632711bcfa4747fd73bbddd8c",
+      "mos": 64.9916,
+      "score": 3.46854019
+    },
+    {
+      "sample_id": "13e91d4b78ee1e2ec77d0b429ae5bf0089991076e004df87a346597554f2e688",
+      "source_id": "1e9d00c6827039d6f1dcce8093b5ec3ec9cbe4f149a84c3cabe39058ce1ca5fe",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "e80d24b5958d9396e18ed9d3160ae6fd9bc1411b98cde543f53195fab8458149",
+      "mos": 85.0037,
+      "score": 2.23899484
+    },
+    {
+      "sample_id": "584e46431aa99eb8a1da495c1c8aae4b62b4164a3075a5fad9690b93fafa0a2d",
+      "source_id": "1e9d00c6827039d6f1dcce8093b5ec3ec9cbe4f149a84c3cabe39058ce1ca5fe",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "6ea50e3dcc9d7fde684e85f99bec6c2f9d1022691c08082fc2e07264d95ed883",
+      "mos": 38.6686,
+      "score": 6.13241768
+    },
+    {
+      "sample_id": "4c61536afc6ed5720e59ded588d4e66af9f8ee418dcb5082030db8ad1da88b8f",
+      "source_id": "1e9d00c6827039d6f1dcce8093b5ec3ec9cbe4f149a84c3cabe39058ce1ca5fe",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "131b7302e2360828bbe5ff079b5af967f272005598f79ca93993bf90c730f022",
+      "mos": 61.3435,
+      "score": 3.98976612
+    },
+    {
+      "sample_id": "25e2f568304821dfefb4f75c160d776a93d68beeaafb197620f04d9113c9c1cc",
+      "source_id": "1e9d00c6827039d6f1dcce8093b5ec3ec9cbe4f149a84c3cabe39058ce1ca5fe",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "ec783a56ae9dad79d2cbffd90e861fd54de0ab93aaef4449bd7d6c477070890e",
+      "mos": 86.0185,
+      "score": 2.26741147
+    },
+    {
+      "sample_id": "0f28a7ec01ea4aafb3cf25fa882fa0892ffc7534636526ba0cbc26c49c0a1c62",
+      "source_id": "fdc8cff3de2ae439a8f9468b7110006cb50b9c775e1034e765aa9c0bf4e704ec",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "7bb6e0855cdfb96853de2c7c300b4964cbce33f2f16c56bd59ceaf02736ae487",
+      "mos": 45.5913,
+      "score": 4.41903257
+    },
+    {
+      "sample_id": "fef3667c8d401526961b6a286e1c10ab8a37c666a6bf4ffe75554ac2b3725c98",
+      "source_id": "fdc8cff3de2ae439a8f9468b7110006cb50b9c775e1034e765aa9c0bf4e704ec",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "bc26eebda1697cd8a57a0a22d88bab68ebb49113480a8e19ea71c2c620e094d4",
+      "mos": 63.7101,
+      "score": 3.25725031
+    },
+    {
+      "sample_id": "c95d56bb4bd8d760be32b0cb2c6693e74983bebdb45838acac220e3f55d6b5cf",
+      "source_id": "fdc8cff3de2ae439a8f9468b7110006cb50b9c775e1034e765aa9c0bf4e704ec",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "cld_avif",
+      "input_hash": "942caf6847b2faf6870644b908fd90cbc58af73c7426fbae0bc73ea0a1a9fe9f",
+      "mos": 81.2458,
+      "score": 2.08018327
+    },
+    {
+      "sample_id": "4ff90b0b8a4afe018517652606cad71e468a3488230159fb54f4cac17938242c",
+      "source_id": "fdc8cff3de2ae439a8f9468b7110006cb50b9c775e1034e765aa9c0bf4e704ec",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "e0c522d9119ce231d5db50e0351147368d53bbe94a9b9c3a48bd698bd4837206",
+      "mos": 42.0262,
+      "score": 4.47232246
+    },
+    {
+      "sample_id": "72ccbc97477d8ac981b6fd05e144b7908fd9c82f05ced3a272f483f72fcf244c",
+      "source_id": "fdc8cff3de2ae439a8f9468b7110006cb50b9c775e1034e765aa9c0bf4e704ec",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "af33cd13418777ff45722756d7e3d70e7f11c8cabc172cc502286e3003a63c77",
+      "mos": 64.7917,
+      "score": 3.28891468
+    },
+    {
+      "sample_id": "95640cb745ba3e1debcfca1c2dcd61a93fa0b72f7022c85f9170d9d19a715dde",
+      "source_id": "fdc8cff3de2ae439a8f9468b7110006cb50b9c775e1034e765aa9c0bf4e704ec",
+      "configuration_id": "butteraugli:cid22",
+      "stratum": "cid22",
+      "distortion_family": "mozjpeg",
+      "input_hash": "0898503aed926b32cfe26445c0a7050384d2068e0697cb1c40815765215d9842",
+      "mos": 84.7711,
+      "score": 1.6886344
+    }
+  ]
+}

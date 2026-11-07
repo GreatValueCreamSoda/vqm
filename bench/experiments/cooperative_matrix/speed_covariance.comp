@@ -1,0 +1,119 @@
+// VMAF SpEED: Copyright 2016-2025 Netflix, Inc.
+// BSD-2-Clause-Patent; see licenses/NETFLIX-VMAF-LICENSE.
+// Research implementation of the centered Gram matrix, not a production path.
+#version 450
+#extension GL_KHR_cooperative_matrix : require
+#extension GL_EXT_shader_explicit_arithmetic_types_float16 : require
+#extension GL_KHR_memory_scope_semantics : require
+#pragma use_vulkan_memory_model
+#include "vmaf_speed_stats_common.glsl"
+#ifndef COOP_SPLIT_K
+#define COOP_SPLIT_K 8
+#endif
+#ifndef COOP_PRODUCTS
+#define COOP_PRODUCTS 1
+#endif
+#ifndef COOP_TRIANGULAR
+#define COOP_TRIANGULAR 0
+#endif
+layout(local_size_x = 32) in;
+shared float16_t high_a[256];
+shared float16_t high_b[256];
+#if COOP_PRODUCTS > 1
+shared float16_t low_a[256];
+shared float16_t low_b[256];
+#endif
+shared float output_tile[256];
+
+float centered(uint channel, uint component, uint sample_index) {
+    uint sw = (pc.width / 5u) * 5u - 4u;
+    uint sh = (pc.height / 5u) * 5u - 4u;
+    if (component >= 25u || sample_index >= sw * sh) return 0.0;
+    uint row = sample_index / sw + component / 5u;
+    uint col = sample_index % sw + component % 5u;
+    return arena[source(channel) + row * pc.width + col] -
+           arena[means(channel, component)];
+}
+void main() {
+    uint tile = gl_WorkGroupID.x, channel = gl_WorkGroupID.y;
+#if COOP_TRIANGULAR
+    // Lower tile 2 is unused unless the two-product merge needs its HL term.
+    if (tile == 2u) tile = 3u;
+#endif
+    uint slice = gl_WorkGroupID.z;
+    uint samples = ((pc.width / 5u) * 5u - 4u) * ((pc.height / 5u) * 5u - 4u);
+    uint chunks = (samples + 15u) / 16u;
+    uint begin = chunks * slice / COOP_SPLIT_K;
+    uint end = chunks * (slice + 1u) / COOP_SPLIT_K;
+    coopmat<float, gl_ScopeSubgroup, 16, 16, gl_MatrixUseAccumulator> hh =
+        coopmat<float, gl_ScopeSubgroup, 16, 16, gl_MatrixUseAccumulator>(0.0);
+#if COOP_PRODUCTS > 1
+    coopmat<float, gl_ScopeSubgroup, 16, 16, gl_MatrixUseAccumulator> hl = hh;
+#endif
+#if COOP_PRODUCTS > 2
+    coopmat<float, gl_ScopeSubgroup, 16, 16, gl_MatrixUseAccumulator> lh = hh;
+#endif
+#if COOP_PRODUCTS > 3
+    coopmat<float, gl_ScopeSubgroup, 16, 16, gl_MatrixUseAccumulator> ll = hh;
+#endif
+    for (uint chunk = begin; chunk < end; ++chunk) {
+        for (uint at = gl_LocalInvocationIndex; at < 256u; at += 32u) {
+            uint component = at / 16u, k = at % 16u;
+            float a = centered(
+                channel, (tile / 2u) * 16u + component, chunk * 16u + k
+            );
+            float b = centered(
+                channel, (tile % 2u) * 16u + component, chunk * 16u + k
+            );
+            high_a[at] = float16_t(a);
+            high_b[at] = float16_t(b);
+#if COOP_PRODUCTS > 1
+            // The scaled residual preserves small FP32 values that would
+            // otherwise underflow in binary16. Scale is an exact power of two.
+            low_a[at] = float16_t((a - float(high_a[at])) * 2048.0);
+            low_b[at] = float16_t((b - float(high_b[at])) * 2048.0);
+#endif
+        }
+        barrier();
+        coopmat<float16_t, gl_ScopeSubgroup, 16, 16, gl_MatrixUseA> ah;
+        coopmat<float16_t, gl_ScopeSubgroup, 16, 16, gl_MatrixUseB> bh;
+        coopMatLoad(ah, high_a, 0u, 16u, gl_CooperativeMatrixLayoutRowMajor);
+        coopMatLoad(bh, high_b, 0u, 16u, gl_CooperativeMatrixLayoutColumnMajor);
+        hh = coopMatMulAdd(ah, bh, hh);
+#if COOP_PRODUCTS > 1
+        coopmat<float16_t, gl_ScopeSubgroup, 16, 16, gl_MatrixUseA> al;
+        coopmat<float16_t, gl_ScopeSubgroup, 16, 16, gl_MatrixUseB> bl;
+        coopMatLoad(al, low_a, 0u, 16u, gl_CooperativeMatrixLayoutRowMajor);
+        coopMatLoad(bl, low_b, 0u, 16u, gl_CooperativeMatrixLayoutColumnMajor);
+        hl = coopMatMulAdd(ah, bl, hl);
+#if COOP_PRODUCTS > 2
+        lh = coopMatMulAdd(al, bh, lh);
+#endif
+#endif
+#if COOP_PRODUCTS > 3
+        ll = coopMatMulAdd(al, bl, ll);
+#endif
+        barrier();
+    }
+#if COOP_PRODUCTS > 2
+    hh += (hl + lh) * (1.0 / 2048.0);
+#endif
+#if COOP_PRODUCTS > 3
+    hh += ll * (1.0 / 4194304.0);
+#endif
+    coopMatStore(hh, output_tile, 0u, 16u, gl_CooperativeMatrixLayoutRowMajor);
+    barrier();
+    // pc.op carries the number of U/V pairs only for the two research passes.
+    uint partial = pc.scratch + pc.op * 2604u +
+                   ((channel * COOP_SPLIT_K + slice) * 4u + tile) * 256u;
+    for (uint at = gl_LocalInvocationIndex; at < 256u; at += 32u)
+        arena[partial + at] = output_tile[at];
+#if COOP_PRODUCTS == 2
+    barrier();
+    coopMatStore(hl, output_tile, 0u, 16u, gl_CooperativeMatrixLayoutRowMajor);
+    barrier();
+    partial += 2u * pc.op * COOP_SPLIT_K * 4u * 256u;
+    for (uint at = gl_LocalInvocationIndex; at < 256u; at += 32u)
+        arena[partial + at] = output_tile[at];
+#endif
+}

@@ -1,0 +1,146 @@
+{
+  "date": "2026-11-05",
+  "status": "implementation plan and source research only; no CVVDP implementation/oracle execution/build/GPU benchmark",
+  "repository_head": "a949b6177efb88890dd44860cc30dff45486a25d",
+  "original": {
+    "url": "https://github.com/gfxdisp/ColorVideoVDP",
+    "release": "v0.5.7",
+    "commit": "2a268bce8d56e2f3abde46df3927d8a633707a24",
+    "matlab_interface": "Wrapper over original Python implementation; not independent metric oracle",
+    "base_model": "cvvdp_mult_mutual / weber_g1 / weber_fixed_size",
+    "files_sha256": {
+      "LICENSE": "9113cc5fe40365e47fe11dee73c99eec648d1da4b3f560bd72cc0f1c9bb7faed",
+      "matlab/README.md": "a66177731332c7e85f3c428b8f9ccc79666b12ffaf7213826ecf27d874b884c9",
+      "matlab/cvvdp.m": "4f4c511d028621682546703ebc5126840c617143dc8fa91f1ea617c204a3331a",
+      "pycvvdp/cvvdp_metric.py": "55b8bfdb0a0f2364886cc5f583c8f9fbc98296d0658d58a8f3907beef3acc0c4",
+      "pycvvdp/display_model.py": "c6962332d64dde6c05b242a096c7b03a8766513761edf9da9355c63b604f6555",
+      "pycvvdp/lpyr_dec.py": "f19aab59418e9faa057f44abb8ab70f9867d9eae561dfc86c541a37fcbac1490",
+      "pycvvdp/csf.py": "499856d784e1a7f22f9e45a2431c9129889798d0665c486cafae0f00c1812831",
+      "pycvvdp/utils.py": "4772eae6e971bf6f3feca5c7fab8e5db1c1f4b88c05ddc231a617e6637bbd167",
+      "pycvvdp/vvdp_data/cvvdp_parameters.json": "ef4dedb44f11f33f509ea3d6d204bb23b03917259b8efbc077009ce53211762b",
+      "pycvvdp/vvdp_data/csf_lut_weber_fixed_size.json": "df39c869c0c53a9a2cb757811ecaf4ce0d44b4151f5ff9590f5bfe1ede940c18",
+      "pycvvdp/vvdp_data/display_models.json": "653979727e809fcd9e44424aff2615d54edde026d9feb17d8f07b7f0ff61b517",
+      "pycvvdp/vvdp_data/color_spaces.json": "30ce6752d35672d97a9d7fb7286170915a2ddfe4307782693f9ee176ef9491d1"
+    }
+  },
+  "vship": {
+    "url": "https://codeberg.org/Line-fr/Vship",
+    "release_label": "5.1.2",
+    "commit": "91d03ec2f2e03e4817b64655a5ea58ab7ab3d3ba",
+    "role": "Read-only GPU organization and peer C API comparison; no code copied",
+    "files_sha256": {
+      "LICENSE": "574a79b2f43d1e22f7b3347238921ee3cb1b27bf6f4828d53f348e6ad2d3e6cb",
+      "doc/CVVDP.md": "95fad7a6f9ffaf2d01ac5f2173676c872d2a55d5eead9b6dcd89c5285f6eee53",
+      "src/Vulkan/cvvdp/main.hpp": "221fba1ca12682f8e9512ba639f2ae91df61409725c6cb747f12be5f788b046e",
+      "src/Vulkan/cvvdp/temporalFilter.hpp": "f6dec343292b3491f31695c60a96f11b000cc58bdc5e65e7d4cbe0d6ecd76ae3",
+      "src/Vulkan/cvvdp/shaders/temporalFilter.slang": "3f45aafaf5b8d43b11f6c8b14a4dcc0efba51695a0f591dbb2a0784e61468294",
+      "src/Vulkan/cvvdp/shaders/maskingModel.slang": "afa7e4e8444886f87be2ff4d5fd3c0fdf0322dfca33662df856f797bb984ddcd",
+      "src/Vulkan/cvvdp/shaders/pooling.slang": "e299138552a0a0b0b24ae1daaef9a00f16054a661a4d845566611d49fbb1affc"
+    }
+  },
+  "analytical_temporal_ring_sizes": [
+    {
+      "frames_per_second": 24,
+      "fir_taps": 7,
+      "geometry": [
+        1920,
+        1080
+      ],
+      "two_input_dkl_ring_slots_including_current": 7,
+      "ring_bytes": 348364800,
+      "ring_MiB": 332.2265625,
+      "scope": "Analytical naive full-resolution FP32 ring only; excludes pyramids, sources, staging, outputs, allocation padding and diagnostics; not actual memory query or performance measurement"
+    },
+    {
+      "frames_per_second": 24,
+      "fir_taps": 7,
+      "geometry": [
+        3840,
+        2160
+      ],
+      "two_input_dkl_ring_slots_including_current": 7,
+      "ring_bytes": 1393459200,
+      "ring_MiB": 1328.90625,
+      "scope": "Analytical naive full-resolution FP32 ring only; excludes pyramids, sources, staging, outputs, allocation padding and diagnostics; not actual memory query or performance measurement"
+    },
+    {
+      "frames_per_second": 30,
+      "fir_taps": 9,
+      "geometry": [
+        1920,
+        1080
+      ],
+      "two_input_dkl_ring_slots_including_current": 9,
+      "ring_bytes": 447897600,
+      "ring_MiB": 427.1484375,
+      "scope": "Analytical naive full-resolution FP32 ring only; excludes pyramids, sources, staging, outputs, allocation padding and diagnostics; not actual memory query or performance measurement"
+    },
+    {
+      "frames_per_second": 30,
+      "fir_taps": 9,
+      "geometry": [
+        3840,
+        2160
+      ],
+      "two_input_dkl_ring_slots_including_current": 9,
+      "ring_bytes": 1791590400,
+      "ring_MiB": 1708.59375,
+      "scope": "Analytical naive full-resolution FP32 ring only; excludes pyramids, sources, staging, outputs, allocation padding and diagnostics; not actual memory query or performance measurement"
+    },
+    {
+      "frames_per_second": 60,
+      "fir_taps": 17,
+      "geometry": [
+        1920,
+        1080
+      ],
+      "two_input_dkl_ring_slots_including_current": 17,
+      "ring_bytes": 846028800,
+      "ring_MiB": 806.8359375,
+      "scope": "Analytical naive full-resolution FP32 ring only; excludes pyramids, sources, staging, outputs, allocation padding and diagnostics; not actual memory query or performance measurement"
+    },
+    {
+      "frames_per_second": 60,
+      "fir_taps": 17,
+      "geometry": [
+        3840,
+        2160
+      ],
+      "two_input_dkl_ring_slots_including_current": 17,
+      "ring_bytes": 3384115200,
+      "ring_MiB": 3227.34375,
+      "scope": "Analytical naive full-resolution FP32 ring only; excludes pyramids, sources, staging, outputs, allocation padding and diagnostics; not actual memory query or performance measurement"
+    },
+    {
+      "frames_per_second": 120,
+      "fir_taps": 31,
+      "geometry": [
+        1920,
+        1080
+      ],
+      "two_input_dkl_ring_slots_including_current": 31,
+      "ring_bytes": 1542758400,
+      "ring_MiB": 1471.2890625,
+      "scope": "Analytical naive full-resolution FP32 ring only; excludes pyramids, sources, staging, outputs, allocation padding and diagnostics; not actual memory query or performance measurement"
+    },
+    {
+      "frames_per_second": 120,
+      "fir_taps": 31,
+      "geometry": [
+        3840,
+        2160
+      ],
+      "two_input_dkl_ring_slots_including_current": 31,
+      "ring_bytes": 6171033600,
+      "ring_MiB": 5885.15625,
+      "scope": "Analytical naive full-resolution FP32 ring only; excludes pyramids, sources, staging, outputs, allocation padding and diagnostics; not actual memory query or performance measurement"
+    }
+  ],
+  "oracle_environment_observed": {
+    "matlab": false,
+    "octave": false,
+    "torch": false,
+    "pycvvdp": false,
+    "note": "Prerequisites were inspected by reference review; no installations performed during planning."
+  }
+}

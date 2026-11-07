@@ -1,0 +1,63 @@
+// Derived from Cloudinary SSIMULACRA 2 (Copyright (c) Jon Sneyers, Cloudinary).
+// BSD-3-Clause; see LICENSE.
+
+// Total of one norm over every workgroup partial written by scale.comp. One
+// workgroup per norm and level: group x is the norm index, group y the level,
+// and the level table (src/metrics/ssimulacra2/shaders/ssimu2_common.glsl) gives
+// that level's partial block, its workgroup count and its norm slots. One
+// dispatch therefore reduces all six levels.
+//
+// Plain float accumulation: a Kahan-compensated version was measured and
+// changed none of the 108 norms, so plain accumulation stays.
+
+#version 450
+
+#include "ssimu2_common.glsl"
+
+layout(local_size_x = 256) in;
+
+shared float red[256];
+
+void main() {
+    const uint level = gl_WorkGroupID.y;
+    if (level >= pc.scale_count) return;
+    const uint norm = gl_WorkGroupID.x;
+    // A pruned (channel, level) pair has no partials to sum -- scale returned
+    // before writing them -- so its norm is zero rather than stale memory.
+    // Vship zeroes the same entries on the CPU after its scoring pass
+    // (.reference/Vship/src/Vulkan/ssimu2/score.hpp:233-249, decided per map at
+    // :125-131); doing it here keeps the readback at 108 floats.
+    // The channel of norm x: the first six norms are two per channel (SSIM'
+    // 1-norm and 4-norm), the remaining twelve four per channel. Those 6 and 4
+    // are the host's kSsimSums and kEdgeNorms (metrics/ssimulacra2/vulkan.cc),
+    // also spelled kNormCount and kSsimNorms in scale.comp: one layout, three
+    // spellings across the host/shader boundary.
+    const uint channel = norm < 6u ? norm / 2u : (norm - 6u) / 4u;
+    if ((pc.channel_mask & (1u << (level * 3u + channel))) == 0u) {
+        if (gl_LocalInvocationIndex == 0u) {
+            arena[level_u(level, 3u) + norm] = 0.0;
+        }
+        return;
+    }
+    const uint groups = level_u(level, 6u);
+    const uint partials = level_u(level, 2u);
+
+    float s = 0.0;
+    for (uint i = gl_LocalInvocationIndex; i < groups; i += 256u) {
+        s += arena[partials + norm * groups + i];
+    }
+
+    red[gl_LocalInvocationIndex] = s;
+    barrier();
+    for (uint stride = 128u; stride > 0u; stride >>= 1) {
+        if (gl_LocalInvocationIndex < stride) {
+            red[gl_LocalInvocationIndex] +=
+                red[gl_LocalInvocationIndex + stride];
+        }
+        barrier();
+    }
+
+    if (gl_LocalInvocationIndex == 0u) {
+        arena[level_u(level, 3u) + norm] = red[0];
+    }
+}

@@ -1,0 +1,151 @@
+{
+  "metric": "ssimulacra2",
+  "direction": "higher",
+  "reference_revision": "81feacf6a5b0bbd7ec11b4a881a4615033ab0b10",
+  "input": "native-source-files",
+  "implementations": {
+    "ours": {
+      "command": [
+        "build/vqm_bench",
+        "--metric",
+        "ssimulacra2",
+        "--score-only",
+        "--pairs-file",
+        "{pairs_file}"
+      ],
+      "binary_sha256": "155eda72e223cdb87b08a300f99e9d6959c7228c2c28b75580854b6adff87ee0"
+    },
+    "cloudinary": {
+      "command": [
+        "build/reference-build/ss2_cloudinary_bench",
+        "--score-only",
+        "--pairs-file",
+        "{pairs_file}"
+      ],
+      "binary_sha256": "c66a3d7cada0de986c920568c85ab31327f035c6d7d4c6c0db70146e4280dc08"
+    }
+  },
+  "manifest": {
+    "direction": "higher",
+    "reference": "cloudinary",
+    "implementations": [
+      {
+        "name": "ours",
+        "command": [
+          "build/vqm_bench",
+          "--metric",
+          "ssimulacra2",
+          "--score-only",
+          "--pairs-file",
+          "{pairs_file}"
+        ],
+        "batch": true,
+        "jobs": 1,
+        "threads": 3,
+        "decode_threads": 16
+      },
+      {
+        "name": "ours-half-planes",
+        "command": [
+          "build/vqm_bench",
+          "--metric",
+          "ssimulacra2",
+          "--score-only",
+          "--half-planes",
+          "--pairs-file",
+          "{pairs_file}"
+        ],
+        "batch": true,
+        "jobs": 1,
+        "threads": 3,
+        "decode_threads": 16
+      },
+      {
+        "name": "cloudinary",
+        "command": [
+          "build/reference-build/ss2_cloudinary_bench",
+          "--score-only",
+          "--pairs-file",
+          "{pairs_file}"
+        ],
+        "batch": true,
+        "jobs": 1,
+        "threads": 16,
+        "decode_threads": 4
+      },
+      {
+        "name": "libjxl",
+        "command": [
+          "build/libjxl-build/tools/ss2_libjxl_bench",
+          "--metric",
+          "ssimu2",
+          "--score-only",
+          "--pairs-file",
+          "{pairs_file}"
+        ],
+        "batch": true,
+        "jobs": 1,
+        "threads": 16,
+        "decode_threads": 4
+      },
+      {
+        "name": "fssimu2",
+        "command": [
+          "build/fssimu2-build/bin/ssimu2_bench",
+          "--score-only",
+          "--pairs-file",
+          "{pairs_file}"
+        ],
+        "batch": true,
+        "jobs": 1,
+        "threads": 16,
+        "decode_threads": 4
+      },
+      {
+        "name": "vship-cuda",
+        "command": [
+          "build/vship-build-cuda/vship_bench",
+          "--metric",
+          "ssimu2",
+          "--score-only",
+          "--pairs-file",
+          "{pairs_file}"
+        ],
+        "batch": true,
+        "jobs": 1,
+        "threads": 3,
+        "decode_threads": 16
+      },
+      {
+        "name": "vship-vulkan",
+        "command": [
+          "build/vship-build-vulkan/vship_bench",
+          "--metric",
+          "ssimu2",
+          "--score-only",
+          "--pairs-file",
+          "{pairs_file}"
+        ],
+        "batch": true,
+        "jobs": 1,
+        "threads": 3,
+        "decode_threads": 16
+      },
+      {
+        "name": "vship-fast-vulkan",
+        "command": [
+          "build/vship-fast-build-vulkan/vship_bench",
+          "--metric",
+          "ssimu2",
+          "--score-only",
+          "--pairs-file",
+          "{pairs_file}"
+        ],
+        "batch": true,
+        "jobs": 1,
+        "threads": 3,
+        "decode_threads": 16
+      }
+    ]
+  }
+}

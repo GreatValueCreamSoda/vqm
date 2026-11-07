@@ -1,0 +1,25 @@
+// VMAF CAMBI: Copyright 2016-2020 Netflix, Inc.
+// BSD-2-Clause-Patent; see licenses/NETFLIX-VMAF-LICENSE.
+// Decimation follows libvmaf/src/feature/cambi.c:888-898 at revision
+// 4611e47a7330cd342498dcc130e1008efbeab6e4.
+#version 450
+#include "bindings.glsl"
+layout(local_size_x = 16, local_size_y = 16) in;
+layout(push_constant) uniform Push {
+    uint width;
+    uint height;
+    uint pixels;
+    uint mask;
+    uint pixels_out;
+    uint mask_out;
+}
+pc;
+void main() {
+    uvec2 p = gl_GlobalInvocationID.xy;
+    uint ow = (pc.width + 1u) / 2u, oh = (pc.height + 1u) / 2u;
+    if (p.x >= ow || p.y >= oh) return;
+    uint source = (2u * p.y) * pc.width + 2u * p.x;
+    uint target = p.y * ow + p.x;
+    arena[pc.pixels_out + target] = arena[pc.pixels + source];
+    arena[pc.mask_out + target] = arena[pc.mask + source];
+}

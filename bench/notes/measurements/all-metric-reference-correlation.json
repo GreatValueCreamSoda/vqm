@@ -1,0 +1,1462 @@
+{
+  "date": "2026-11-06",
+  "question": "Does the normal video CLI preserve pinned original ordering for the five established metrics, with numerical gates retained?",
+  "scope": "SDR hosted video, default metric/model configurations; excludes concurrent PSNR-HVS work",
+  "command": "python3 -m validation.temporal.run --profile qualification --gate-mode both --offline --out-dir artifacts/reports/all-metric-correlation/qualification-all-both",
+  "matrix": {
+    "sources": 30,
+    "variants_per_source": 13,
+    "frames_per_clip": 40,
+    "clips_per_metric": 390,
+    "metric_clip_comparisons": 1950
+  },
+  "source_manifest": "validation/temporal/sources.json",
+  "source_manifest_sha256": "02d44580888ad3bb34a44aeecb8ce04c4931ccf529386a2b790eebc998e0e2a7",
+  "candidate": {
+    "binary": "build/vqm",
+    "sha256": "ec5c9eeefbc55f2b2c168d66afc19f887c0ed9de32e4d3e93b292d3bc8f8d541",
+    "repository_head": "a949b6177efb88890dd44860cc30dff45486a25d",
+    "working_tree_dirty": true,
+    "gpu": "NVIDIA GeForce RTX 5070",
+    "driver": "615.78.08",
+    "uuid": "7293d6cd964492010338cb259cfc9cf2"
+  },
+  "both_mode_summary": {
+    "schema_version": 1,
+    "profile": "qualification",
+    "gate_mode": "both",
+    "reference_only": false,
+    "selected_metrics": [
+      "ssimulacra2",
+      "butteraugli",
+      "vmaf-v0",
+      "vmaf-v1",
+      "cvvdp"
+    ],
+    "selected_gate_passed": false,
+    "results": {
+      "ssimulacra2": {
+        "ranking": "pass",
+        "subjective": "not_requested",
+        "numerical": "fail",
+        "srcc": 0.9999712737705755,
+        "tau_b": 0.9974952211456067,
+        "pearson": 0.9999736842801604,
+        "samples": 390,
+        "policy_sha256": "f8cd427f953d060257ba99abc5aad501fbe84f895a339fe49334295782f20d73"
+      },
+      "butteraugli": {
+        "ranking": "pass",
+        "subjective": "not_requested",
+        "numerical": "pass",
+        "srcc": 1.0,
+        "tau_b": 1.0,
+        "pearson": 0.9999999999876055,
+        "samples": 390,
+        "policy_sha256": "3e23e659a4c8892a2c804b81ecea8e175e548f1c9f4592f6d70454ebb1b46d95"
+      },
+      "vmaf-v0": {
+        "ranking": "pass",
+        "subjective": "not_requested",
+        "numerical": "pass",
+        "srcc": 0.9999850299538294,
+        "tau_b": 0.9995516526407887,
+        "pearson": 0.9999999998973208,
+        "samples": 390,
+        "policy_sha256": "7ee9cb3ed256b8a2184841fc28339d1ac92a4e2002c22f6a45d143e6d497a9b3"
+      },
+      "vmaf-v1": {
+        "ranking": "pass",
+        "subjective": "not_requested",
+        "numerical": "pass",
+        "srcc": 0.999999588277859,
+        "tau_b": 0.9999432382574145,
+        "pearson": 0.9999999982923999,
+        "samples": 390,
+        "policy_sha256": "a2b19215f826975e701cea46369d9f6e41d3ea1fc55cfd6acb11047faa81d855"
+      },
+      "cvvdp": {
+        "ranking": "pass",
+        "subjective": "not_requested",
+        "numerical": "pass",
+        "srcc": 1.0,
+        "tau_b": 1.0,
+        "pearson": 0.9999999999999857,
+        "samples": 390,
+        "policy_sha256": "41c9a0294d791bc2d5a105bc3b8485476bc93bb4f1163343b5c092b3ff64be25"
+      }
+    }
+  },
+  "ranking_recheck": [
+    {
+      "metric": "ssimulacra2",
+      "command": [
+        "/usr/bin/python3",
+        "-m",
+        "validation.agreement",
+        "artifacts/reports/all-metric-correlation/qualification-all-both/ssimulacra2-original.json",
+        "artifacts/reports/all-metric-correlation/qualification-all-both/ssimulacra2-candidate.json",
+        "--policy",
+        "artifacts/reports/all-metric-correlation/qualification-all-both/ssimulacra2-policy.json",
+        "--require",
+        "ranking",
+        "--output",
+        "artifacts/reports/all-metric-correlation/qualification-all-both/ssimulacra2-ranking-recheck.json"
+      ],
+      "exit_code": 0,
+      "stdout": "reference ranking agreement: PASS\nsubjective noninferiority: NOT_REQUESTED\nold numerical parity: FAIL\n",
+      "stderr": ""
+    },
+    {
+      "metric": "butteraugli",
+      "command": [
+        "/usr/bin/python3",
+        "-m",
+        "validation.agreement",
+        "artifacts/reports/all-metric-correlation/qualification-all-both/butteraugli-original.json",
+        "artifacts/reports/all-metric-correlation/qualification-all-both/butteraugli-candidate.json",
+        "--policy",
+        "artifacts/reports/all-metric-correlation/qualification-all-both/butteraugli-policy.json",
+        "--require",
+        "ranking",
+        "--output",
+        "artifacts/reports/all-metric-correlation/qualification-all-both/butteraugli-ranking-recheck.json"
+      ],
+      "exit_code": 0,
+      "stdout": "reference ranking agreement: PASS\nsubjective noninferiority: NOT_REQUESTED\nold numerical parity: PASS\n",
+      "stderr": ""
+    },
+    {
+      "metric": "vmaf-v0",
+      "command": [
+        "/usr/bin/python3",
+        "-m",
+        "validation.agreement",
+        "artifacts/reports/all-metric-correlation/qualification-all-both/vmaf-v0-original.json",
+        "artifacts/reports/all-metric-correlation/qualification-all-both/vmaf-v0-candidate.json",
+        "--policy",
+        "artifacts/reports/all-metric-correlation/qualification-all-both/vmaf-v0-policy.json",
+        "--require",
+        "ranking",
+        "--output",
+        "artifacts/reports/all-metric-correlation/qualification-all-both/vmaf-v0-ranking-recheck.json"
+      ],
+      "exit_code": 0,
+      "stdout": "reference ranking agreement: PASS\nsubjective noninferiority: NOT_REQUESTED\nold numerical parity: PASS\n",
+      "stderr": ""
+    },
+    {
+      "metric": "vmaf-v1",
+      "command": [
+        "/usr/bin/python3",
+        "-m",
+        "validation.agreement",
+        "artifacts/reports/all-metric-correlation/qualification-all-both/vmaf-v1-original.json",
+        "artifacts/reports/all-metric-correlation/qualification-all-both/vmaf-v1-candidate.json",
+        "--policy",
+        "artifacts/reports/all-metric-correlation/qualification-all-both/vmaf-v1-policy.json",
+        "--require",
+        "ranking",
+        "--output",
+        "artifacts/reports/all-metric-correlation/qualification-all-both/vmaf-v1-ranking-recheck.json"
+      ],
+      "exit_code": 0,
+      "stdout": "reference ranking agreement: PASS\nsubjective noninferiority: NOT_REQUESTED\nold numerical parity: PASS\n",
+      "stderr": ""
+    },
+    {
+      "metric": "cvvdp",
+      "command": [
+        "/usr/bin/python3",
+        "-m",
+        "validation.agreement",
+        "artifacts/reports/all-metric-correlation/qualification-all-both/cvvdp-original.json",
+        "artifacts/reports/all-metric-correlation/qualification-all-both/cvvdp-candidate.json",
+        "--policy",
+        "artifacts/reports/all-metric-correlation/qualification-all-both/cvvdp-policy.json",
+        "--require",
+        "ranking",
+        "--output",
+        "artifacts/reports/all-metric-correlation/qualification-all-both/cvvdp-ranking-recheck.json"
+      ],
+      "exit_code": 0,
+      "stdout": "reference ranking agreement: PASS\nsubjective noninferiority: NOT_REQUESTED\nold numerical parity: PASS\n",
+      "stderr": ""
+    }
+  ],
+  "metrics": {
+    "ssimulacra2": {
+      "ranking_status": "pass",
+      "global_ranking": {
+        "samples": 390,
+        "srcc": 0.9999712737705755,
+        "tau_b": 0.9974952211456067,
+        "total_pairs": 75855,
+        "concordant_pairs": 75760,
+        "reversed_pairs": 95,
+        "reference_tied_pairs": 0,
+        "candidate_tied_pairs": 0,
+        "both_tied_pairs": 0
+      },
+      "ranking_limits": {
+        "srcc_min": 0.999,
+        "tau_min": 0.99,
+        "macro_error_max": 0.005,
+        "family_error_max": 0.01,
+        "source_error_max": 0.05
+      },
+      "numerical": {
+        "status": "fail",
+        "failures": [
+          "max_error",
+          "mae"
+        ],
+        "thresholds": {
+          "max_error": 0.01,
+          "mae": 0.001
+        },
+        "max_error": 5.262514484766882,
+        "mae": 0.29521833959454835,
+        "rmse": 0.6188510760453242,
+        "mean_offset": 0.2754223522488647,
+        "affine_slope": 0.996394053642719,
+        "affine_intercept": 0.4083440838990431,
+        "pearson": 0.9999736842801604
+      },
+      "subjective_status": "not_requested",
+      "meaningful_ordering": {
+        "eligible_pairs": 2245,
+        "failures": 0
+      },
+      "configuration_ordering": {
+        "ssimulacra2-srgb444-8bit-frame-mean": {
+          "status": "pass",
+          "macro_error": 0.0,
+          "worst_source_error": 0.0,
+          "eligible_pairs": 2245,
+          "failures": 0
+        }
+      },
+      "strata": {
+        "sdr-spatial-srgb444": "pass"
+      },
+      "families": {
+        "flicker": "pass",
+        "freeze": "pass",
+        "impulse": "pass",
+        "quantization": "pass"
+      },
+      "policy_sha256": "f8cd427f953d060257ba99abc5aad501fbe84f895a339fe49334295782f20d73",
+      "oracle_file_sha256": "8e1e9f9150afc9894e7f2a6b6d8588976cff761ebe9172db47ca0b333dc515de",
+      "oracle_policy_file_sha256": "44747314455529b13cd78984113ff7d40f673f413e9bfcee2f720193479e418a",
+      "oracle_provenance_file_sha256": "418447289145c95841c54de7eeafa6e1ba6ee353915b2679e38fdb78a50895c8",
+      "agreement_file_sha256": "9b2eacc678a7aecd0f5d246e4555fd47e7fe9b8a332ec1a76156174c3785b68f",
+      "original_provenance": {
+        "revision": "81feacf6a5b0bbd7ec11b4a881a4615033ab0b10",
+        "numpy": "2.5.4",
+        "runner_sha256": "4326e17fc558ee427bdb5dd4f72c5088f634bbcb0fc346ec373d20176c1cb14b",
+        "executable_sha256": "c66a3d7cada0de986c920568c85ab31327f035c6d7d4c6c0db70146e4280dc08",
+        "build_fingerprint_sha256": "5986238c372000e8de2f4e915a9b3e888821f47adf50235435cb2981969a8da5",
+        "build_fingerprint": {
+          "environment": {
+            "CC": null,
+            "CFLAGS": null,
+            "CMAKE_PREFIX_PATH": null,
+            "CMAKE_TOOLCHAIN_FILE": null,
+            "CPPFLAGS": null,
+            "CUDA_HOME": null,
+            "CUDA_PATH": "/opt/cuda",
+            "CXX": null,
+            "CXXFLAGS": null,
+            "LDFLAGS": null,
+            "NVCC": null,
+            "PATH": "/home/creamsoda/.local/bin:/home/creamsoda/.codex/tmp/arg0-linux/codex-arg0LMS23z:/home/creamsoda/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/creamsoda/.local/bin:/home/creamsoda/.local/bin:/home/creamsoda/.local/bin:/home/creamsoda/.local/bin:/home/creamsoda/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/bin:/opt/cuda/bin:/home/creamsoda/.local/share/flatpak/exports/bin:/var/lib/flatpak/exports/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl:/usr/lib/rustup/bin:/home/creamsoda/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/opt/codex-desktop/resources",
+            "PKG_CONFIG_LIBDIR": null,
+            "PKG_CONFIG_PATH": null,
+            "VULKAN_SDK": null,
+            "ZIG_GLOBAL_CACHE_DIR": null
+          },
+          "machine": "x86_64",
+          "platform": "Linux-7.2.14-arch1-1-x86_64-with-glibc2.44",
+          "recipe_sha256": "f17290ac0d947bbd52d3adb9b7e65fb7bf00bc6132c92e0c13d735cc3d4804a5",
+          "revision": "81feacf6a5b0bbd7ec11b4a881a4615033ab0b10",
+          "schema": 1,
+          "step": "cloudinary",
+          "submodules": "",
+          "tools": {
+            "cc": {
+              "command": "cc",
+              "path": "/usr/bin/cc",
+              "version": "cc (GCC) 16.2.1 20260810\nCopyright (C) 2026 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE."
+            },
+            "cmake": {
+              "command": "cmake",
+              "path": "/usr/bin/cmake",
+              "version": "cmake version 4.4.5\n\nCMake suite maintained and supported by Kitware (kitware.com/cmake)."
+            },
+            "cxx": {
+              "command": "g++",
+              "path": "/usr/bin/g++",
+              "version": "g++ (GCC) 16.2.1 20260810\nCopyright (C) 2026 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE."
+            },
+            "make": {
+              "command": "make",
+              "path": "/usr/bin/make",
+              "version": "GNU Make 4.4.1\nBuilt for x86_64-pc-linux-gnu\nCopyright (C) 1988-2023 Free Software Foundation, Inc.\nLicense GPLv3+: GNU GPL version 3 or later <https://gnu.org/licenses/gpl.html>\nThis is free software: you are free to change and redistribute it.\nThere is NO WARRANTY, to the extent permitted by law."
+            },
+            "ninja": {
+              "command": "ninja",
+              "path": "/usr/bin/ninja",
+              "version": "1.13.2"
+            }
+          }
+        },
+        "source_sha256": {
+          "bench/inmemory/cloudinary_bench.cc": "2c7f463efacfb5a7ca48804d928bb0c9e1fbed0436ee64df9fc41c44b3c447dd",
+          "bench/inmemory/driver.h": "ebd735b4e6b2bf0b2ccc95fdfa798ab71a9a00a418e93a0e4f8056b713a8f2b0",
+          "bench/inmemory/pairs.h": "1293ab84e47995b849be4ba17912308cba3637805ba16f894b0901626dbd545c",
+          "bench/inmemory/prefetch.h": "1aae55153faf863fdf35516653c29e11fc1ddbce30b4a948bdebccd52f319662",
+          ".reference/ssimulacra2/src/ssimulacra2.cc": "38d8f92634ef1f8975bd45e7106c5a2d1a99a02de1c2f3828443ad8e16560d5f",
+          ".reference/ssimulacra2/src/lib/extras/dec/pnm.cc": "9ca5369748bbd9ab1f28b102293d24476e0ee0b23b17d1d2f20af17fb65f3a7b",
+          ".reference/ssimulacra2/src/lib/extras/dec/color_hints.cc": "c727fed52b3a58e459a4ad90f0a6fe8fccbc1fcd99926d83da24493ea869fd1f"
+        },
+        "threads": 1,
+        "decode_threads": 1,
+        "frame_iterations": 1,
+        "frame_warmup": 0,
+        "pooling": "arithmetic-mean-of-original-frame-scores",
+        "input": "bottom-up-interleaved-little-endian-FP32-PFM-encoded-sRGB",
+        "transfer": "sRGB via pinned PNM/PFM reader default ColorHints"
+      },
+      "qualification_mutation_audit": {
+        "schema_version": 1,
+        "scope": "conceptual recorded-score mutations; no production fault injection",
+        "metric": "ssimulacra2",
+        "reference_revision": "81feacf6a5b0bbd7ec11b4a881a4615033ab0b10",
+        "input_manifest_hash": "d9531f485c1dd0204763599fd53ca9e84dcb33a7c5467e71a80120bb81a2aea6",
+        "configuration_hash": "133ef18eeaffb7a54db2c363e6e84b40a3d527349e9d171c9db2129d2306b5c7",
+        "samples": 390,
+        "passed": true,
+        "discrepancies": [],
+        "audits": [
+          {
+            "mutation": "identity",
+            "expected_ranking": "pass",
+            "ranking": "pass",
+            "numerical": "pass",
+            "subjective": "not_requested",
+            "proposed": "pass",
+            "srcc": 1.0,
+            "tau_b": 1.0,
+            "max_error": 0.0,
+            "mae": 0.0,
+            "mean_offset": 0.0,
+            "failed_domains": []
+          },
+          {
+            "mutation": "offset-plus-three",
+            "expected_ranking": "pass",
+            "ranking": "pass",
+            "numerical": "fail",
+            "subjective": "not_requested",
+            "proposed": "pass",
+            "srcc": 1.0,
+            "tau_b": 1.0,
+            "max_error": 3.0000000000000036,
+            "mae": 3.0,
+            "mean_offset": 3.0,
+            "failed_domains": []
+          },
+          {
+            "mutation": "positive-scale-quarter",
+            "expected_ranking": "pass",
+            "ranking": "pass",
+            "numerical": "fail",
+            "subjective": "not_requested",
+            "proposed": "pass",
+            "srcc": 1.0,
+            "tau_b": 1.0,
+            "max_error": 266.17939346624996,
+            "mae": 52.06814779136875,
+            "mean_offset": -27.646362108615865,
+            "failed_domains": []
+          },
+          {
+            "mutation": "increasing-cube",
+            "expected_ranking": "pass",
+            "ranking": "pass",
+            "numerical": "fail",
+            "subjective": "not_requested",
+            "proposed": "pass",
+            "srcc": 1.0,
+            "tau_b": 1.0,
+            "max_error": 355.905857955,
+            "mae": 65.59332780618386,
+            "mean_offset": -30.27940818583046,
+            "failed_domains": []
+          },
+          {
+            "mutation": "reversed",
+            "expected_ranking": "fail",
+            "ranking": "fail",
+            "numerical": "fail",
+            "subjective": "not_requested",
+            "proposed": "fail",
+            "srcc": -1.0,
+            "tau_b": -1.0,
+            "max_error": 709.81171591,
+            "mae": 138.84839411031666,
+            "mean_offset": -73.72363228964231,
+            "failed_domains": [
+              "configurations/ssimulacra2-srgb444-8bit-frame-mean",
+              "strata/sdr-spatial-srgb444",
+              "families/flicker",
+              "families/freeze",
+              "families/impulse",
+              "families/quantization"
+            ]
+          },
+          {
+            "mutation": "constant-collapse",
+            "expected_ranking": "fail",
+            "ranking": "fail",
+            "numerical": "fail",
+            "subjective": "not_requested",
+            "proposed": "fail",
+            "srcc": null,
+            "tau_b": null,
+            "max_error": 454.2968387415,
+            "mae": 391.76767409982114,
+            "mean_offset": -391.76767409982114,
+            "failed_domains": [
+              "configurations/ssimulacra2-srgb444-8bit-frame-mean",
+              "strata/sdr-spatial-srgb444",
+              "families/flicker",
+              "families/freeze",
+              "families/impulse",
+              "families/quantization"
+            ]
+          },
+          {
+            "mutation": "rotated-association",
+            "expected_ranking": "fail",
+            "ranking": "fail",
+            "numerical": "fail",
+            "subjective": "not_requested",
+            "proposed": "fail",
+            "srcc": 0.19332317463271645,
+            "tau_b": 0.11362467866323907,
+            "max_error": 454.081821189,
+            "mae": 73.01740669644744,
+            "mean_offset": 0.0,
+            "failed_domains": [
+              "configurations/ssimulacra2-srgb444-8bit-frame-mean",
+              "strata/sdr-spatial-srgb444",
+              "families/flicker",
+              "families/freeze",
+              "families/impulse",
+              "families/quantization"
+            ]
+          }
+        ]
+      }
+    },
+    "butteraugli": {
+      "ranking_status": "pass",
+      "global_ranking": {
+        "samples": 390,
+        "srcc": 1.0,
+        "tau_b": 1.0,
+        "total_pairs": 75855,
+        "concordant_pairs": 75855,
+        "reversed_pairs": 0,
+        "reference_tied_pairs": 0,
+        "candidate_tied_pairs": 0,
+        "both_tied_pairs": 0
+      },
+      "ranking_limits": {
+        "srcc_min": 0.999,
+        "tau_min": 0.99,
+        "macro_error_max": 0.005,
+        "family_error_max": 0.01,
+        "source_error_max": 0.05
+      },
+      "numerical": {
+        "status": "pass",
+        "failures": [],
+        "thresholds": {
+          "max_error": 0.01,
+          "mae": 0.001
+        },
+        "max_error": 0.001781654205061045,
+        "mae": 5.637220072262603e-05,
+        "rmse": 0.0001440294250418359,
+        "mean_offset": 2.4927120648364248e-05,
+        "affine_slope": 1.000000838331805,
+        "affine_intercept": 6.712744023088663e-06,
+        "pearson": 0.9999999999876055
+      },
+      "subjective_status": "not_requested",
+      "meaningful_ordering": {
+        "eligible_pairs": 2214,
+        "failures": 0
+      },
+      "configuration_ordering": {
+        "butteraugli-srgb444-8bit-frame-mean": {
+          "status": "pass",
+          "macro_error": 0.0,
+          "worst_source_error": 0.0,
+          "eligible_pairs": 2214,
+          "failures": 0
+        }
+      },
+      "strata": {
+        "sdr-spatial-srgb444": "pass"
+      },
+      "families": {
+        "flicker": "pass",
+        "freeze": "pass",
+        "impulse": "pass",
+        "quantization": "pass"
+      },
+      "policy_sha256": "3e23e659a4c8892a2c804b81ecea8e175e548f1c9f4592f6d70454ebb1b46d95",
+      "oracle_file_sha256": "c007b308af143e5809760404c1328bc275e9038eecf22d15f084d04138bf47f9",
+      "oracle_policy_file_sha256": "850cf02d1c1044d481d91865b29ce3a989b15796019990f8c45d0c4b91bc3d52",
+      "oracle_provenance_file_sha256": "259097fbfb41ae5b5c2f4b9f7e2fc12ceefaa591e2ec80f06c3336d9e97af325",
+      "agreement_file_sha256": "fad806a3584473d8031de9110544c60c53dbe3cc1245888df9b27de9b455d7af",
+      "original_provenance": {
+        "revision": "e47d2a2b5bb418f2947ce07f36cb048861db3820",
+        "numpy": "2.5.4",
+        "runner_sha256": "4326e17fc558ee427bdb5dd4f72c5088f634bbcb0fc346ec373d20176c1cb14b",
+        "executable_sha256": "6f63cca605f9c717076ba09514ae996199cdb1f12a9b424f84b6c41caa92c37c",
+        "build_fingerprint_sha256": "e5fa4c5555d5df074fa3ae32836ea2159d5d24d3fa07d4ecddfbeb4211655723",
+        "build_fingerprint": {
+          "environment": {
+            "CC": null,
+            "CFLAGS": null,
+            "CMAKE_PREFIX_PATH": null,
+            "CMAKE_TOOLCHAIN_FILE": null,
+            "CPPFLAGS": null,
+            "CUDA_HOME": null,
+            "CUDA_PATH": "/opt/cuda",
+            "CXX": null,
+            "CXXFLAGS": null,
+            "LDFLAGS": null,
+            "NVCC": null,
+            "PATH": "/home/creamsoda/.local/bin:/home/creamsoda/.codex/tmp/arg0-linux/codex-arg0LMS23z:/home/creamsoda/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/creamsoda/.local/bin:/home/creamsoda/.local/bin:/home/creamsoda/.local/bin:/home/creamsoda/.local/bin:/home/creamsoda/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/bin:/opt/cuda/bin:/home/creamsoda/.local/share/flatpak/exports/bin:/var/lib/flatpak/exports/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl:/usr/lib/rustup/bin:/home/creamsoda/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/opt/codex-desktop/resources",
+            "PKG_CONFIG_LIBDIR": null,
+            "PKG_CONFIG_PATH": null,
+            "VULKAN_SDK": null,
+            "ZIG_GLOBAL_CACHE_DIR": null
+          },
+          "machine": "x86_64",
+          "platform": "Linux-7.2.14-arch1-1-x86_64-with-glibc2.44",
+          "recipe_sha256": "f17290ac0d947bbd52d3adb9b7e65fb7bf00bc6132c92e0c13d735cc3d4804a5",
+          "revision": "e47d2a2b5bb418f2947ce07f36cb048861db3820",
+          "schema": 1,
+          "step": "libjxl",
+          "submodules": "-73695d303670c90e4d506ea89d9901b081385089 testdata\n db24a98aed38a16de78cc05ca15cdd8dc2a0d92d third_party/brotli (db24a98)\n-6910c9d9165801d8827d628cb72eb7ea9dd538c5 third_party/googletest\n 457c891775a7397bdb0376bb1031e6e027af1c48 third_party/highway (457c891)\n 5176347635785e53ee5cee92328f76fda766ecc6 third_party/lcms (5176347)\n-8ecba3647edb6dd940463fedf38ca33a8e2a73d1 third_party/libjpeg-turbo\n-872555f4ba910252783af1507f9e7fe1653be252 third_party/libpng\n 94e0df6d0f8b44228de5be0ff35efb9f946a13c9 third_party/sjpeg (94e0df6)\n 96d9171c94b937a1b5f0293de7309ac16311b722 third_party/skcms (96d9171)\n-51b7f2abdade71cd9bb0e7a373ef2610ec6f9daf third_party/zlib",
+          "tools": {
+            "cc": {
+              "command": "cc",
+              "path": "/usr/bin/cc",
+              "version": "cc (GCC) 16.2.1 20260810\nCopyright (C) 2026 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE."
+            },
+            "cmake": {
+              "command": "cmake",
+              "path": "/usr/bin/cmake",
+              "version": "cmake version 4.4.5\n\nCMake suite maintained and supported by Kitware (kitware.com/cmake)."
+            },
+            "cxx": {
+              "command": "g++",
+              "path": "/usr/bin/g++",
+              "version": "g++ (GCC) 16.2.1 20260810\nCopyright (C) 2026 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE."
+            },
+            "make": {
+              "command": "make",
+              "path": "/usr/bin/make",
+              "version": "GNU Make 4.4.1\nBuilt for x86_64-pc-linux-gnu\nCopyright (C) 1988-2023 Free Software Foundation, Inc.\nLicense GPLv3+: GNU GPL version 3 or later <https://gnu.org/licenses/gpl.html>\nThis is free software: you are free to change and redistribute it.\nThere is NO WARRANTY, to the extent permitted by law."
+            },
+            "ninja": {
+              "command": "ninja",
+              "path": "/usr/bin/ninja",
+              "version": "1.13.2"
+            }
+          }
+        },
+        "source_sha256": {
+          "bench/inmemory/libjxl_bench.cc": "975d5c9e03715f2673cbcb7b73d3d373e28277c411d44d7efabe98b7d9fde7fa",
+          "bench/inmemory/driver.h": "ebd735b4e6b2bf0b2ccc95fdfa798ab71a9a00a418e93a0e4f8056b713a8f2b0",
+          "bench/inmemory/pairs.h": "1293ab84e47995b849be4ba17912308cba3637805ba16f894b0901626dbd545c",
+          "bench/inmemory/prefetch.h": "1aae55153faf863fdf35516653c29e11fc1ddbce30b4a948bdebccd52f319662",
+          ".reference/libjxl/lib/jxl/enc_butteraugli_comparator.cc": "2e6da929ca41a3478a77f72be502d7d1f2283f22f299c18cef939ea4381cf10d",
+          ".reference/libjxl/lib/jxl/butteraugli/butteraugli.cc": "418992b306e5e01ce8850ed811b7154ca83803229a9c23ad1c62f93739e598c6",
+          ".reference/libjxl/lib/extras/dec/pnm.cc": "f4d254122671a3ce58409ea36c296b8ba3fdd0ef657c50484d26d30b22c1f3f1",
+          ".reference/libjxl/lib/extras/dec/color_hints.cc": "b71452d50fa888d3e59ee7e1aea22aff12c04a96445ba1c47c83d0ad7a0fe3e8"
+        },
+        "threads": 1,
+        "decode_threads": 1,
+        "frame_iterations": 1,
+        "frame_warmup": 0,
+        "pooling": "arithmetic-mean-of-original-frame-scores",
+        "input": "bottom-up-interleaved-little-endian-FP32-PFM-encoded-sRGB",
+        "transfer": "sRGB via pinned PNM/PFM reader default ColorHints",
+        "parameters": {
+          "hf_asymmetry": 1.0,
+          "intensity_target": 80.0,
+          "xmul": 1.0
+        }
+      },
+      "qualification_mutation_audit": {
+        "schema_version": 1,
+        "scope": "conceptual recorded-score mutations; no production fault injection",
+        "metric": "butteraugli",
+        "reference_revision": "e47d2a2b5bb418f2947ce07f36cb048861db3820",
+        "input_manifest_hash": "bf011f24987e4ab811e0d62d1929af21032e2193442151c006e15a1baa5e56f9",
+        "configuration_hash": "aceaac4a10b5ca1df282447c36b98bce6307c62a54a674bd4221bc4830eb48ee",
+        "samples": 390,
+        "passed": true,
+        "discrepancies": [],
+        "audits": [
+          {
+            "mutation": "identity",
+            "expected_ranking": "pass",
+            "ranking": "pass",
+            "numerical": "pass",
+            "subjective": "not_requested",
+            "proposed": "pass",
+            "srcc": 1.0,
+            "tau_b": 1.0,
+            "max_error": 0.0,
+            "mae": 0.0,
+            "mean_offset": 0.0,
+            "failed_domains": []
+          },
+          {
+            "mutation": "offset-plus-three",
+            "expected_ranking": "pass",
+            "ranking": "pass",
+            "numerical": "fail",
+            "subjective": "not_requested",
+            "proposed": "pass",
+            "srcc": 1.0,
+            "tau_b": 1.0,
+            "max_error": 3.000000000000007,
+            "mae": 3.0,
+            "mean_offset": 3.0,
+            "failed_domains": []
+          },
+          {
+            "mutation": "positive-scale-quarter",
+            "expected_ranking": "pass",
+            "ranking": "pass",
+            "numerical": "fail",
+            "subjective": "not_requested",
+            "proposed": "pass",
+            "srcc": 1.0,
+            "tau_b": 1.0,
+            "max_error": 86.43033642825,
+            "mae": 16.29519766174279,
+            "mean_offset": -16.29519766174279,
+            "failed_domains": []
+          },
+          {
+            "mutation": "increasing-cube",
+            "expected_ranking": "pass",
+            "ranking": "pass",
+            "numerical": "fail",
+            "subjective": "not_requested",
+            "proposed": "pass",
+            "srcc": 1.0,
+            "tau_b": 1.0,
+            "max_error": 107.240448571,
+            "mae": 19.98010491798112,
+            "mean_offset": -19.8216770252562,
+            "failed_domains": []
+          },
+          {
+            "mutation": "reversed",
+            "expected_ranking": "fail",
+            "ranking": "fail",
+            "numerical": "fail",
+            "subjective": "not_requested",
+            "proposed": "fail",
+            "srcc": -1.0,
+            "tau_b": -1.0,
+            "max_error": 230.480897142,
+            "mae": 43.453860431314105,
+            "mean_offset": -43.453860431314105,
+            "failed_domains": [
+              "configurations/butteraugli-srgb444-8bit-frame-mean",
+              "strata/sdr-spatial-srgb444",
+              "families/flicker",
+              "families/freeze",
+              "families/impulse",
+              "families/quantization"
+            ]
+          },
+          {
+            "mutation": "constant-collapse",
+            "expected_ranking": "fail",
+            "ranking": "fail",
+            "numerical": "fail",
+            "subjective": "not_requested",
+            "proposed": "fail",
+            "srcc": null,
+            "tau_b": null,
+            "max_error": 115.027543784,
+            "mae": 21.51402542865705,
+            "mean_offset": -21.51402542865705,
+            "failed_domains": [
+              "configurations/butteraugli-srgb444-8bit-frame-mean",
+              "strata/sdr-spatial-srgb444",
+              "families/flicker",
+              "families/freeze",
+              "families/impulse",
+              "families/quantization"
+            ]
+          },
+          {
+            "mutation": "rotated-association",
+            "expected_ranking": "fail",
+            "ranking": "fail",
+            "numerical": "fail",
+            "subjective": "not_requested",
+            "proposed": "fail",
+            "srcc": 0.2939026049329207,
+            "tau_b": 0.21861446180212246,
+            "max_error": 108.80523791350001,
+            "mae": 26.492637096455127,
+            "mean_offset": 0.0,
+            "failed_domains": [
+              "configurations/butteraugli-srgb444-8bit-frame-mean",
+              "strata/sdr-spatial-srgb444",
+              "families/flicker",
+              "families/freeze",
+              "families/impulse",
+              "families/quantization"
+            ]
+          }
+        ]
+      }
+    },
+    "vmaf-v0": {
+      "ranking_status": "pass",
+      "global_ranking": {
+        "samples": 390,
+        "srcc": 0.9999850299538294,
+        "tau_b": 0.9995516526407887,
+        "total_pairs": 75855,
+        "concordant_pairs": 75816,
+        "reversed_pairs": 16,
+        "reference_tied_pairs": 23,
+        "candidate_tied_pairs": 19,
+        "both_tied_pairs": 19
+      },
+      "ranking_limits": {
+        "srcc_min": 0.999,
+        "tau_min": 0.99,
+        "macro_error_max": 0.005,
+        "family_error_max": 0.01,
+        "source_error_max": 0.05
+      },
+      "numerical": {
+        "status": "pass",
+        "failures": [],
+        "thresholds": {
+          "max_error": 0.01
+        },
+        "max_error": 0.005348495825955979,
+        "mae": 9.396986723772125e-05,
+        "rmse": 0.000317064527258498,
+        "mean_offset": 6.227976575471618e-05,
+        "affine_slope": 0.9999995771865114,
+        "affine_intercept": 9.805098934441425e-05,
+        "pearson": 0.9999999998973208
+      },
+      "subjective_status": "not_requested",
+      "meaningful_ordering": {
+        "eligible_pairs": 2002,
+        "failures": 0
+      },
+      "configuration_ordering": {
+        "vmaf-v0-native444-8bit": {
+          "status": "pass",
+          "macro_error": 0.0,
+          "worst_source_error": 0.0,
+          "eligible_pairs": 2002,
+          "failures": 0
+        }
+      },
+      "strata": {
+        "sdr-native-444": "pass"
+      },
+      "families": {
+        "flicker": "pass",
+        "freeze": "pass",
+        "impulse": "pass",
+        "quantization": "pass"
+      },
+      "policy_sha256": "7ee9cb3ed256b8a2184841fc28339d1ac92a4e2002c22f6a45d143e6d497a9b3",
+      "oracle_file_sha256": "d7923ead1ca4de77bedb152c5cabcdff9bba9accc29cc6386fa58a367d76cdd6",
+      "oracle_policy_file_sha256": "c45e6254bc4523a3fc45984cb4c76364831bdd35a549d944c07be51a85cc651b",
+      "oracle_provenance_file_sha256": "037d5fda00b1e65c5e42dad0b7ddf2734390ac8b0ff47b288d76bf8d448315e0",
+      "agreement_file_sha256": "4af88f3fedcdbe39e8922bf2451234f72a77cc656a87b4ca1366c2d88b3199f8",
+      "original_provenance": {
+        "revision": "4611e47a7330cd342498dcc130e1008efbeab6e4",
+        "numpy": "2.5.4",
+        "runner_sha256": "cbd2ea8bf38d218e243a9f43f4ecd4480b98f531902945f47e31cc6f4a058376",
+        "executable_sha256": "0b082f1918ea001b2a91e402db3a3365b6c2a2f0bbdf69b56888101dcd1b81d4",
+        "model_sha256": "26573aa333346f1109226e7283969e8b3581119a1ab7f18897767351dd963ff8",
+        "threads": 1
+      },
+      "qualification_mutation_audit": {
+        "schema_version": 1,
+        "scope": "conceptual recorded-score mutations; no production fault injection",
+        "metric": "vmaf-v0",
+        "reference_revision": "4611e47a7330cd342498dcc130e1008efbeab6e4",
+        "input_manifest_hash": "8e69c8ce4cd88896423485aa3a18942d26848b78aec17e646636a655bf57af97",
+        "configuration_hash": "ebd685938b1f8522c1b566042c568fed186610f62bef733dfebce9127c42493c",
+        "samples": 390,
+        "passed": true,
+        "discrepancies": [],
+        "audits": [
+          {
+            "mutation": "identity",
+            "expected_ranking": "pass",
+            "ranking": "pass",
+            "numerical": "pass",
+            "subjective": "not_requested",
+            "proposed": "pass",
+            "srcc": 1.0,
+            "tau_b": 1.0,
+            "max_error": 0.0,
+            "mae": 0.0,
+            "mean_offset": 0.0,
+            "failed_domains": []
+          },
+          {
+            "mutation": "offset-plus-three",
+            "expected_ranking": "pass",
+            "ranking": "pass",
+            "numerical": "fail",
+            "subjective": "not_requested",
+            "proposed": "pass",
+            "srcc": 1.0,
+            "tau_b": 1.0,
+            "max_error": 3.000000000000007,
+            "mae": 3.0,
+            "mean_offset": 3.0,
+            "failed_domains": []
+          },
+          {
+            "mutation": "positive-scale-quarter",
+            "expected_ranking": "pass",
+            "ranking": "pass",
+            "numerical": "fail",
+            "subjective": "not_requested",
+            "proposed": "pass",
+            "srcc": 1.0,
+            "tau_b": 1.0,
+            "max_error": 74.95177580625,
+            "mae": 63.45213295225962,
+            "mean_offset": -63.45213295225962,
+            "failed_domains": []
+          },
+          {
+            "mutation": "increasing-cube",
+            "expected_ranking": "pass",
+            "ranking": "pass",
+            "numerical": "fail",
+            "subjective": "not_requested",
+            "proposed": "pass",
+            "srcc": 1.0,
+            "tau_b": 1.0,
+            "max_error": 91.935701075,
+            "mae": 78.31742159185208,
+            "mean_offset": -78.31742159185208,
+            "failed_domains": []
+          },
+          {
+            "mutation": "reversed",
+            "expected_ranking": "fail",
+            "ranking": "fail",
+            "numerical": "fail",
+            "subjective": "not_requested",
+            "proposed": "fail",
+            "srcc": -1.0,
+            "tau_b": -1.0,
+            "max_error": 199.87140215,
+            "mae": 169.2056878726923,
+            "mean_offset": -169.2056878726923,
+            "failed_domains": [
+              "configurations/vmaf-v0-native444-8bit",
+              "strata/sdr-native-444",
+              "families/flicker",
+              "families/freeze",
+              "families/impulse",
+              "families/quantization"
+            ]
+          },
+          {
+            "mutation": "constant-collapse",
+            "expected_ranking": "fail",
+            "ranking": "fail",
+            "numerical": "fail",
+            "subjective": "not_requested",
+            "proposed": "fail",
+            "srcc": null,
+            "tau_b": null,
+            "max_error": 80.1088733,
+            "mae": 64.77601616134615,
+            "mean_offset": -64.77601616134615,
+            "failed_domains": [
+              "configurations/vmaf-v0-native444-8bit",
+              "strata/sdr-native-444",
+              "families/flicker",
+              "families/freeze",
+              "families/impulse",
+              "families/quantization"
+            ]
+          },
+          {
+            "mutation": "rotated-association",
+            "expected_ranking": "fail",
+            "ranking": "fail",
+            "numerical": "fail",
+            "subjective": "not_requested",
+            "proposed": "fail",
+            "srcc": -0.029581329108002354,
+            "tau_b": -0.019424517354151283,
+            "max_error": 80.108869,
+            "mae": 20.167658441410257,
+            "mean_offset": 0.0,
+            "failed_domains": [
+              "configurations/vmaf-v0-native444-8bit",
+              "strata/sdr-native-444",
+              "families/flicker",
+              "families/freeze",
+              "families/impulse",
+              "families/quantization"
+            ]
+          }
+        ]
+      }
+    },
+    "vmaf-v1": {
+      "ranking_status": "pass",
+      "global_ranking": {
+        "samples": 390,
+        "srcc": 0.999999588277859,
+        "tau_b": 0.9999432382574145,
+        "total_pairs": 75855,
+        "concordant_pairs": 70468,
+        "reversed_pairs": 2,
+        "reference_tied_pairs": 5385,
+        "candidate_tied_pairs": 5385,
+        "both_tied_pairs": 5385
+      },
+      "ranking_limits": {
+        "srcc_min": 0.999,
+        "tau_min": 0.99,
+        "macro_error_max": 0.005,
+        "family_error_max": 0.01,
+        "source_error_max": 0.05
+      },
+      "numerical": {
+        "status": "pass",
+        "failures": [],
+        "thresholds": {
+          "max_error": 0.35
+        },
+        "max_error": 0.006993603398981918,
+        "mae": 0.000815937619127556,
+        "rmse": 0.0014647048755034005,
+        "mean_offset": 0.0008083750944878833,
+        "affine_slope": 0.9999888561032172,
+        "affine_intercept": 0.0017693945133926275,
+        "pearson": 0.9999999982923999
+      },
+      "subjective_status": "not_requested",
+      "meaningful_ordering": {
+        "eligible_pairs": 2030,
+        "failures": 0
+      },
+      "configuration_ordering": {
+        "vmaf-v1-native444-8bit": {
+          "status": "pass",
+          "macro_error": 0.0,
+          "worst_source_error": 0.0,
+          "eligible_pairs": 2030,
+          "failures": 0
+        }
+      },
+      "strata": {
+        "sdr-native-444": "pass"
+      },
+      "families": {
+        "flicker": "pass",
+        "freeze": "pass",
+        "impulse": "pass",
+        "quantization": "pass"
+      },
+      "policy_sha256": "a2b19215f826975e701cea46369d9f6e41d3ea1fc55cfd6acb11047faa81d855",
+      "oracle_file_sha256": "dd17a664bca35990513dc81406e2a2cce2e5c85c3f09e42db28afcb831f740d7",
+      "oracle_policy_file_sha256": "7f0ede9a2fe10e432159849225dd994011f4e7c2f2e1da18847cc6e3a2ebfb26",
+      "oracle_provenance_file_sha256": "7dccdb41afe6af809a1a9fac376680f974b148d9815779be24076144e629b2e3",
+      "agreement_file_sha256": "f090860859b1d39d24e985cbc0c687903d3ae364d88d6335ab9b043e5d5eaa5e",
+      "original_provenance": {
+        "revision": "4611e47a7330cd342498dcc130e1008efbeab6e4",
+        "numpy": "2.5.4",
+        "runner_sha256": "cbd2ea8bf38d218e243a9f43f4ecd4480b98f531902945f47e31cc6f4a058376",
+        "executable_sha256": "0b082f1918ea001b2a91e402db3a3365b6c2a2f0bbdf69b56888101dcd1b81d4",
+        "model_sha256": "e4cf8c147e1368b35497d772920bc92f98c1ad7853c1033d8a836947f427140e",
+        "threads": 1
+      },
+      "qualification_mutation_audit": {
+        "schema_version": 1,
+        "scope": "conceptual recorded-score mutations; no production fault injection",
+        "metric": "vmaf-v1",
+        "reference_revision": "4611e47a7330cd342498dcc130e1008efbeab6e4",
+        "input_manifest_hash": "98097b74473a97b95df38ebb3fa8d2d21148852c2f6210ec41cbcbb7f153696f",
+        "configuration_hash": "d06bade22b9ec7617a4b686bc22ca75caffc8fc25bef6b8a32d9e7cf7b2a4d89",
+        "samples": 390,
+        "passed": true,
+        "discrepancies": [],
+        "audits": [
+          {
+            "mutation": "identity",
+            "expected_ranking": "pass",
+            "ranking": "pass",
+            "numerical": "pass",
+            "subjective": "not_requested",
+            "proposed": "pass",
+            "srcc": 1.0,
+            "tau_b": 1.0,
+            "max_error": 0.0,
+            "mae": 0.0,
+            "mean_offset": 0.0,
+            "failed_domains": []
+          },
+          {
+            "mutation": "offset-plus-three",
+            "expected_ranking": "pass",
+            "ranking": "pass",
+            "numerical": "fail",
+            "subjective": "not_requested",
+            "proposed": "pass",
+            "srcc": 1.0,
+            "tau_b": 1.0,
+            "max_error": 3.000000000000007,
+            "mae": 3.0,
+            "mean_offset": 3.0,
+            "failed_domains": []
+          },
+          {
+            "mutation": "positive-scale-quarter",
+            "expected_ranking": "pass",
+            "ranking": "pass",
+            "numerical": "fail",
+            "subjective": "not_requested",
+            "proposed": "pass",
+            "srcc": 1.0,
+            "tau_b": 1.0,
+            "max_error": 75.0,
+            "mae": 64.6779648291827,
+            "mean_offset": -64.6779648291827,
+            "failed_domains": []
+          },
+          {
+            "mutation": "increasing-cube",
+            "expected_ranking": "pass",
+            "ranking": "pass",
+            "numerical": "fail",
+            "subjective": "not_requested",
+            "proposed": "pass",
+            "srcc": 1.0,
+            "tau_b": 1.0,
+            "max_error": 92.0,
+            "mae": 79.70605502219613,
+            "mean_offset": -79.70605502219613,
+            "failed_domains": []
+          },
+          {
+            "mutation": "reversed",
+            "expected_ranking": "fail",
+            "ranking": "fail",
+            "numerical": "fail",
+            "subjective": "not_requested",
+            "proposed": "fail",
+            "srcc": -1.0,
+            "tau_b": -1.0,
+            "max_error": 200.0,
+            "mae": 172.47457287782052,
+            "mean_offset": -172.47457287782052,
+            "failed_domains": [
+              "configurations/vmaf-v1-native444-8bit",
+              "strata/sdr-native-444",
+              "families/flicker",
+              "families/freeze",
+              "families/impulse",
+              "families/quantization"
+            ]
+          },
+          {
+            "mutation": "constant-collapse",
+            "expected_ranking": "fail",
+            "ranking": "fail",
+            "numerical": "fail",
+            "subjective": "not_requested",
+            "proposed": "fail",
+            "srcc": null,
+            "tau_b": null,
+            "max_error": 86.7935174,
+            "mae": 73.03080383891026,
+            "mean_offset": -73.03080383891026,
+            "failed_domains": [
+              "configurations/vmaf-v1-native444-8bit",
+              "strata/sdr-native-444",
+              "families/flicker",
+              "families/freeze",
+              "families/impulse",
+              "families/quantization"
+            ]
+          },
+          {
+            "mutation": "rotated-association",
+            "expected_ranking": "fail",
+            "ranking": "fail",
+            "numerical": "fail",
+            "subjective": "not_requested",
+            "proposed": "fail",
+            "srcc": -0.07674557321500439,
+            "tau_b": -0.05988363842769973,
+            "max_error": 86.7935174,
+            "mae": 18.080328102820513,
+            "mean_offset": 0.0,
+            "failed_domains": [
+              "configurations/vmaf-v1-native444-8bit",
+              "strata/sdr-native-444",
+              "families/flicker",
+              "families/freeze",
+              "families/impulse",
+              "families/quantization"
+            ]
+          }
+        ]
+      }
+    },
+    "cvvdp": {
+      "ranking_status": "pass",
+      "global_ranking": {
+        "samples": 390,
+        "srcc": 1.0,
+        "tau_b": 1.0,
+        "total_pairs": 75855,
+        "concordant_pairs": 75855,
+        "reversed_pairs": 0,
+        "reference_tied_pairs": 0,
+        "candidate_tied_pairs": 0,
+        "both_tied_pairs": 0
+      },
+      "ranking_limits": {
+        "srcc_min": 0.999,
+        "tau_min": 0.99,
+        "macro_error_max": 0.005,
+        "family_error_max": 0.01,
+        "source_error_max": 0.05
+      },
+      "numerical": {
+        "status": "pass",
+        "failures": [],
+        "thresholds": {
+          "max_error": 0.001
+        },
+        "max_error": 1.4042005346937003e-05,
+        "mae": 1.6450050844937708e-06,
+        "rmse": 2.8761106647117017e-06,
+        "mean_offset": 1.501890094335323e-06,
+        "affine_slope": 0.999999666094264,
+        "affine_intercept": 3.2100356636543398e-06,
+        "pearson": 0.9999999999999857
+      },
+      "subjective_status": "not_requested",
+      "meaningful_ordering": {
+        "eligible_pairs": 2238,
+        "failures": 0
+      },
+      "configuration_ordering": {
+        "cvvdp-standard4k-25:1": {
+          "status": "pass",
+          "macro_error": 0.0,
+          "worst_source_error": 0.0,
+          "eligible_pairs": 76,
+          "failures": 0
+        },
+        "cvvdp-standard4k-30000:1001": {
+          "status": "pass",
+          "macro_error": 0.0,
+          "worst_source_error": 0.0,
+          "eligible_pairs": 1633,
+          "failures": 0
+        },
+        "cvvdp-standard4k-30:1": {
+          "status": "pass",
+          "macro_error": 0.0,
+          "worst_source_error": 0.0,
+          "eligible_pairs": 529,
+          "failures": 0
+        }
+      },
+      "strata": {
+        "sdr-native-444": "pass"
+      },
+      "families": {
+        "flicker": "pass",
+        "freeze": "pass",
+        "impulse": "pass",
+        "quantization": "pass"
+      },
+      "policy_sha256": "41c9a0294d791bc2d5a105bc3b8485476bc93bb4f1163343b5c092b3ff64be25",
+      "oracle_file_sha256": "b7488f0cb7a04bc3c62e3c97779885ea56e0db89722335f81ae6590b8f0bd2c8",
+      "oracle_policy_file_sha256": "18f99941af981813c7c9591b0ae7683f730ed2abe1925e190cd1e5a97015a8c8",
+      "oracle_provenance_file_sha256": "d1656dfd040aebf006b01a68ded00166a251dd3c8a6977ae47265cf8713c347d",
+      "agreement_file_sha256": "d97bb39e676c674a68823c502db3f397d32dfe6f034924f7d42798d3b2f768fc",
+      "original_provenance": {
+        "revision": "2a268bce8d56e2f3abde46df3927d8a633707a24",
+        "numpy": "2.5.4",
+        "runner_sha256": "cbd2ea8bf38d218e243a9f43f4ecd4480b98f531902945f47e31cc6f4a058376",
+        "torch": "2.15.0+cpu",
+        "threads": 1,
+        "precision": "CPU-FP32-highest",
+        "display": "standard_4k",
+        "source_colorspace": "sRGB",
+        "temporal_padding": "replicate"
+      },
+      "qualification_mutation_audit": {
+        "schema_version": 1,
+        "scope": "conceptual recorded-score mutations; no production fault injection",
+        "metric": "cvvdp",
+        "reference_revision": "2a268bce8d56e2f3abde46df3927d8a633707a24",
+        "input_manifest_hash": "da8018f95b1162423438fed413ce9aa1251f64c792000f4a6c623b2c2ba77ea4",
+        "configuration_hash": "17187fbf21805857eb0815e3aee5f16e63e0a45fac1371bbad5945651b3ee26c",
+        "samples": 390,
+        "passed": true,
+        "discrepancies": [],
+        "audits": [
+          {
+            "mutation": "identity",
+            "expected_ranking": "pass",
+            "ranking": "pass",
+            "numerical": "pass",
+            "subjective": "not_requested",
+            "proposed": "pass",
+            "srcc": 1.0,
+            "tau_b": 1.0,
+            "max_error": 0.0,
+            "mae": 0.0,
+            "mean_offset": 0.0,
+            "failed_domains": []
+          },
+          {
+            "mutation": "offset-plus-three",
+            "expected_ranking": "pass",
+            "ranking": "pass",
+            "numerical": "fail",
+            "subjective": "not_requested",
+            "proposed": "pass",
+            "srcc": 1.0,
+            "tau_b": 1.0,
+            "max_error": 3.0,
+            "mae": 3.0,
+            "mean_offset": 3.0,
+            "failed_domains": []
+          },
+          {
+            "mutation": "positive-scale-quarter",
+            "expected_ranking": "pass",
+            "ranking": "pass",
+            "numerical": "fail",
+            "subjective": "not_requested",
+            "proposed": "pass",
+            "srcc": 1.0,
+            "tau_b": 1.0,
+            "max_error": 11.38434362411499,
+            "mae": 5.956677642235389,
+            "mean_offset": -3.8367390522590052,
+            "failed_domains": []
+          },
+          {
+            "mutation": "increasing-cube",
+            "expected_ranking": "pass",
+            "ranking": "pass",
+            "numerical": "fail",
+            "subjective": "not_requested",
+            "proposed": "pass",
+            "srcc": 1.0,
+            "tau_b": 1.0,
+            "max_error": 16.17912483215332,
+            "mae": 2.7806923338189935,
+            "mean_offset": 1.1279592148025754,
+            "failed_domains": []
+          },
+          {
+            "mutation": "reversed",
+            "expected_ranking": "fail",
+            "ranking": "fail",
+            "numerical": "fail",
+            "subjective": "not_requested",
+            "proposed": "fail",
+            "srcc": -1.0,
+            "tau_b": -1.0,
+            "max_error": 30.35824966430664,
+            "mae": 15.884473712627704,
+            "mean_offset": -10.231304139357347,
+            "failed_domains": [
+              "configurations/cvvdp-standard4k-25:1",
+              "configurations/cvvdp-standard4k-30000:1001",
+              "configurations/cvvdp-standard4k-30:1",
+              "strata/sdr-native-444",
+              "families/flicker",
+              "families/freeze",
+              "families/impulse",
+              "families/quantization"
+            ]
+          },
+          {
+            "mutation": "constant-collapse",
+            "expected_ranking": "fail",
+            "ranking": "fail",
+            "numerical": "fail",
+            "subjective": "not_requested",
+            "proposed": "fail",
+            "srcc": null,
+            "tau_b": null,
+            "max_error": 25.126748085021973,
+            "mae": 20.294776901831995,
+            "mean_offset": -20.294776901831995,
+            "failed_domains": [
+              "configurations/cvvdp-standard4k-25:1",
+              "configurations/cvvdp-standard4k-30000:1001",
+              "configurations/cvvdp-standard4k-30:1",
+              "strata/sdr-native-444",
+              "families/flicker",
+              "families/freeze",
+              "families/impulse",
+              "families/quantization"
+            ]
+          },
+          {
+            "mutation": "rotated-association",
+            "expected_ranking": "fail",
+            "ranking": "fail",
+            "numerical": "fail",
+            "subjective": "not_requested",
+            "proposed": "fail",
+            "srcc": 0.06596826864284244,
+            "tau_b": 0.035053720914903434,
+            "max_error": 24.59666347503662,
+            "mae": 6.378794188377185,
+            "mean_offset": 0.0,
+            "failed_domains": [
+              "configurations/cvvdp-standard4k-25:1",
+              "configurations/cvvdp-standard4k-30000:1001",
+              "configurations/cvvdp-standard4k-30:1",
+              "strata/sdr-native-444",
+              "families/flicker",
+              "families/freeze",
+              "families/impulse",
+              "families/quantization"
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "checks": {
+    "gpu_core_tests": 240,
+    "gpu_core_failed_checks": 0,
+    "release_ctest_passed": 23,
+    "release_ctest_total": 23,
+    "new_cpu_workflow_reference_tests": 29,
+    "new_python_ruff": "pass",
+    "new_python_yapf": "pass",
+    "repository_quality": "pass"
+  },
+  "raw_reports": "artifacts/reports/all-metric-correlation/qualification-all-both",
+  "spatial_generation_dispatcher_sha256": "e7e351a89c9f9e437067b57bfd4692edd9aa5d70dfcad18055d53ac888470188",
+  "spatial_generation_dispatcher_note": "Spatial original generation preceded addition of a separate dispatcher hash to runtime provenance; runner_sha256 in its frozen provenance identifies spatial_reference.py.",
+  "final_smoke_summary": {
+    "schema_version": 1,
+    "profile": "smoke",
+    "gate_mode": "ranking",
+    "reference_only": false,
+    "selected_metrics": [
+      "ssimulacra2",
+      "butteraugli",
+      "vmaf-v0",
+      "vmaf-v1",
+      "cvvdp"
+    ],
+    "selected_gate_passed": true,
+    "results": {
+      "ssimulacra2": {
+        "ranking": "pass",
+        "subjective": "not_requested",
+        "numerical": "fail",
+        "srcc": 1.0,
+        "tau_b": 1.0,
+        "pearson": 0.9999781440015689,
+        "samples": 39,
+        "policy_sha256": "8319de67760c0ef482fe259e0a25a6b479d8196628c7233acc1c9aab5594726a"
+      },
+      "butteraugli": {
+        "ranking": "pass",
+        "subjective": "not_requested",
+        "numerical": "pass",
+        "srcc": 1.0,
+        "tau_b": 1.0,
+        "pearson": 0.9999999999924832,
+        "samples": 39,
+        "policy_sha256": "47a349dac5d02e0f29bbb99c5dcc6757dbd796a00c69f678b5b3fbacf651e1f4"
+      },
+      "vmaf-v0": {
+        "ranking": "pass",
+        "subjective": "not_requested",
+        "numerical": "pass",
+        "srcc": 1.0,
+        "tau_b": 1.0,
+        "pearson": 0.9999999999962896,
+        "samples": 39,
+        "policy_sha256": "c1b1b3e91c0849820fe229f62a8f8d0e6b6eaaa6992825e5aba5f474ce5b8594"
+      },
+      "vmaf-v1": {
+        "ranking": "pass",
+        "subjective": "not_requested",
+        "numerical": "pass",
+        "srcc": 1.0,
+        "tau_b": 1.0,
+        "pearson": 0.9999999989700888,
+        "samples": 39,
+        "policy_sha256": "2fe349086f32c253228a08ce1ad7c9fa3a021544452c99cc32f0898919c439b6"
+      },
+      "cvvdp": {
+        "ranking": "pass",
+        "subjective": "not_requested",
+        "numerical": "pass",
+        "srcc": 1.0,
+        "tau_b": 1.0,
+        "pearson": 0.9999999999999944,
+        "samples": 39,
+        "policy_sha256": "d14bd9bf707630d90cb5cd799452c6dcac780523b76225bc4b8cda1499ae845a"
+      }
+    }
+  },
+  "final_smoke_pair_lists": {
+    "butteraugli-pairs.tsv": "8ac8f0ac4f4d86186a4a03ec5f95712c0cceaa1c869a459eb72081b74fc41161",
+    "cvvdp-pairs.tsv": "0e25fd209f213c8530aac626898dc8beaabfca7263441eec42d7d8c345480cf0",
+    "ssimulacra2-pairs.tsv": "8ac8f0ac4f4d86186a4a03ec5f95712c0cceaa1c869a459eb72081b74fc41161",
+    "vmaf-v0-pairs.tsv": "0e25fd209f213c8530aac626898dc8beaabfca7263441eec42d7d8c345480cf0",
+    "vmaf-v1-pairs.tsv": "0e25fd209f213c8530aac626898dc8beaabfca7263441eec42d7d8c345480cf0"
+  }
+}

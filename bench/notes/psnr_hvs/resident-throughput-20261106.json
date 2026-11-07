@@ -1,0 +1,168 @@
+{
+  "date": "2026-11-06",
+  "gpu": "NVIDIA GeForce RTX 5070",
+  "driver": "615.78.08",
+  "metric": "FP32 PSNR-HVS",
+  "format": "YUV420 8-bit",
+  "workload": "First frame of synthetic testsrc2 clips; distortion luma quantized in steps of eight; chroma unchanged",
+  "reference_cache_provenance": "bench/notes/cvvdp/cvvdp-implementation.md",
+  "iterations": 20,
+  "warmup": 3,
+  "resident": 2,
+  "workers": 1,
+  "both_inputs_prepared": true,
+  "uploads_in_timing": false,
+  "executable": "build-psnr-hvs/vqm_bench",
+  "executable_sha256": "c2dd56d79652c9ae916bab6690e872d8938c44d31aa411b355719657abc962e9",
+  "inputs": {
+    ".cache/bench/cvvdp/1080-original.y4m": {
+      "sha256": "469e2ba28fd050329b7e665ea2f37eeba0dd4cfbfe8bc172b801dc137219d368",
+      "bytes": 99533052
+    },
+    ".cache/bench/cvvdp/1080-distorted.y4m": {
+      "sha256": "45825347e0bcc4f03f7117be011db4925ee572c44110c58d523c95fa5c90faf9",
+      "bytes": 99533052
+    },
+    ".cache/bench/cvvdp/4k-original.y4m": {
+      "sha256": "ca9eeb9fba9b686f508ec4828a5039f78f7c71281b5f81394fd48f97e3b127fa",
+      "bytes": 398131452
+    },
+    ".cache/bench/cvvdp/4k-distorted.y4m": {
+      "sha256": "3d4bfc409977490f76d2697eff84934b0465c5e30e774b7c15d5dbc4200d5502",
+      "bytes": 398131452
+    }
+  },
+  "summaries": {
+    "1080p": {
+      "wall_pairs_per_second": [
+        2236.964,
+        2307.041,
+        2438.564,
+        2439.129,
+        2424.484
+      ],
+      "wall_ms_per_pair": [
+        0.447034,
+        0.433456,
+        0.410077,
+        0.409982,
+        0.412459
+      ],
+      "median_call_ms": [
+        0.410759,
+        0.412663,
+        0.410289,
+        0.409574,
+        0.409439
+      ],
+      "score": 40.20762634,
+      "checksum": 924.77540588,
+      "owned_buffer_bytes": 116628544,
+      "stages_ms_per_pair": {
+        "psnr_hvs_prepare": [
+          0.038413,
+          0.03581,
+          0.034981,
+          0.034989,
+          0.034701
+        ],
+        "psnr_hvs_blocks": [
+          0.301331,
+          0.301243,
+          0.301562,
+          0.301472,
+          0.301555
+        ],
+        "psnr_hvs_reduce": [
+          0.04197,
+          0.042011,
+          0.041933,
+          0.041907,
+          0.042008
+        ],
+        "psnr_hvs_score": [
+          0.001097,
+          0.00116,
+          0.000944,
+          0.000946,
+          0.001371
+        ]
+      },
+      "median_pairs_per_second": 2424.484,
+      "median_wall_ms_per_pair": 0.412459,
+      "median_call_latency_ms": 0.410289,
+      "median_stages_ms": {
+        "psnr_hvs_prepare": 0.034989,
+        "psnr_hvs_blocks": 0.301472,
+        "psnr_hvs_reduce": 0.04197,
+        "psnr_hvs_score": 0.001097
+      }
+    },
+    "4k": {
+      "wall_pairs_per_second": [
+        490.022,
+        519.83,
+        541.781,
+        557.896,
+        555.475
+      ],
+      "wall_ms_per_pair": [
+        2.040726,
+        1.923704,
+        1.845765,
+        1.792449,
+        1.800261
+      ],
+      "median_call_ms": [
+        2.041785,
+        1.913477,
+        1.844018,
+        1.787569,
+        1.800823
+      ],
+      "score": 40.35023117,
+      "checksum": 928.05531693,
+      "owned_buffer_bytes": 466512256,
+      "stages_ms_per_pair": {
+        "psnr_hvs_prepare": [
+          0.259315,
+          0.256835,
+          0.25515,
+          0.255149,
+          0.255379
+        ],
+        "psnr_hvs_blocks": [
+          1.356915,
+          1.231749,
+          1.192651,
+          1.191912,
+          1.192325
+        ],
+        "psnr_hvs_reduce": [
+          0.374888,
+          0.362133,
+          0.35835,
+          0.305613,
+          0.305744
+        ],
+        "psnr_hvs_score": [
+          0.001419,
+          0.001618,
+          0.001148,
+          0.001219,
+          0.001145
+        ]
+      },
+      "median_pairs_per_second": 541.781,
+      "median_wall_ms_per_pair": 1.845765,
+      "median_call_latency_ms": 1.844018,
+      "median_stages_ms": {
+        "psnr_hvs_prepare": 0.255379,
+        "psnr_hvs_blocks": 1.192651,
+        "psnr_hvs_reduce": 0.35835,
+        "psnr_hvs_score": 0.001219
+      }
+    }
+  },
+  "raw_reports": "artifacts/reports/psnr-hvs-throughput-20261106"
+}

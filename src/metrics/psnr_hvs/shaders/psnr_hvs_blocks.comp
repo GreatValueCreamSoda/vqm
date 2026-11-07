@@ -1,0 +1,150 @@
+// Copyright 2001-2012 Xiph.Org and contributors.
+// BSD-2-Clause; see licenses/XIPH-PSNR-HVS-LICENSE.
+// CSF and masking: libvmaf 4611e47, third_party/xiph/psnr_hvs.c:159-337.
+// VQM distributes short quadrant/row sums across lanes, retaining the
+// orthonormal FP32 DCT and centered-variance formulas.
+
+#version 450
+
+#include "psnr_hvs_common.glsl"
+#include "psnr_hvs_dct.glsl"
+
+layout(local_size_x = 64) in;
+
+shared float samples[2][64];
+shared float vertical[2][64];
+shared float coefficients[2][64];
+shared float quadrant_means[2][4];
+shared float global_variance_partials[2][4];
+shared float local_variance_partials[2][4];
+shared float variance_ratio[2];
+shared float masking_partials[2][8];
+shared float masking[2];
+shared float errors[64];
+shared float error_rows[8];
+
+uint QuadrantIndex(uint quadrant, uint position) {
+    const uint row = (quadrant % 2u) * 4u + position / 4u;
+    const uint column = (quadrant / 2u) * 4u + position % 4u;
+    return row * 8u + column;
+}
+
+void QuadrantMean(uint image, uint quadrant) {
+    float sum = 0.0;
+    for (uint position = 0u; position < 16u; ++position)
+        sum += samples[image][QuadrantIndex(quadrant, position)];
+    quadrant_means[image][quadrant] = sum / 16.0;
+}
+
+// Use centered deviations in both the full block and each quadrant. No
+// subtract-large-moments formula is introduced for near-flat high-code blocks.
+void QuadrantVariances(uint image, uint quadrant) {
+    const float mean = (quadrant_means[image][0] + quadrant_means[image][1] +
+                        quadrant_means[image][2] + quadrant_means[image][3]) /
+                       4.0;
+    const float local_mean = quadrant_means[image][quadrant];
+    float global_sum = 0.0;
+    float local_sum = 0.0;
+    for (uint position = 0u; position < 16u; ++position) {
+        const float value = samples[image][QuadrantIndex(quadrant, position)];
+        const float global_delta = value - mean;
+        const float local_delta = value - local_mean;
+        global_sum += global_delta * global_delta;
+        local_sum += local_delta * local_delta;
+    }
+    global_variance_partials[image][quadrant] = global_sum;
+    local_variance_partials[image][quadrant] = local_sum;
+}
+
+void VarianceRatio(uint image) {
+    float variance = 0.0;
+    float local = 0.0;
+    for (uint quadrant = 0u; quadrant < 4u; ++quadrant) {
+        variance += global_variance_partials[image][quadrant];
+        local +=
+            local_variance_partials[image][quadrant] * ((1.0 / 15.0) * 16.0);
+    }
+    variance *= (1.0 / 63.0) * 64.0;
+    variance_ratio[image] = variance > 0.0 ? local / variance : 0.0;
+}
+
+float MaskWeight(uint index) {
+    const float scaled = Csf(pc.plane * 64u + index) * 0.3885746225901003;
+    return scaled * scaled;
+}
+
+void MaskingRow(uint image, uint row) {
+    float sum = 0.0;
+    for (uint column = row == 0u ? 1u : 0u; column < 8u; ++column) {
+        const uint index = row * 8u + column;
+        const float value = coefficients[image][index];
+        sum += (value * value) * MaskWeight(index);
+    }
+    masking_partials[image][row] = sum;
+}
+
+void Masking(uint image) {
+    float sum = 0.0;
+    for (uint row = 0u; row < 8u; ++row) sum += masking_partials[image][row];
+    masking[image] = sqrt(sum * variance_ratio[image]) / 32.0;
+}
+
+void main() {
+    const uint lane = gl_LocalInvocationIndex;
+    const uint row = lane / 8u;
+    const uint column = lane % 8u;
+    const uvec2 start = gl_WorkGroupID.xy * 7u;
+    const uint index = (start.y + row) * pc.width + start.x + column;
+    samples[0][lane] = arena[pc.reference + index];
+    samples[1][lane] = arena[pc.distorted + index];
+    barrier();
+    if (lane < 8u) QuadrantMean(lane / 4u, lane % 4u);
+    barrier();
+    if (lane < 8u) QuadrantVariances(lane / 4u, lane % 4u);
+    barrier();
+    if (lane < 2u) VarianceRatio(lane);
+    // Column DCT: row is vertical frequency and column is spatial position.
+    for (uint image = 0u; image < 2u; ++image) {
+        float value = 0.0;
+        for (uint position = 0u; position < 8u; ++position)
+            value += DctBasis(row * 8u + position) *
+                     samples[image][position * 8u + column];
+        vertical[image][lane] = value;
+    }
+    barrier();
+    // Row DCT: the lane now owns coefficient (row, column).
+    for (uint image = 0u; image < 2u; ++image) {
+        float value = 0.0;
+        for (uint position = 0u; position < 8u; ++position)
+            value += DctBasis(column * 8u + position) *
+                     vertical[image][row * 8u + position];
+        coefficients[image][lane] = value;
+    }
+    barrier();
+    if (lane < 16u) MaskingRow(lane / 8u, lane % 8u);
+    barrier();
+    if (lane < 2u) Masking(lane);
+    barrier();
+    float error = abs(coefficients[0][lane] - coefficients[1][lane]);
+    if (lane != 0u) {
+        const float threshold = max(masking[0], masking[1]) / MaskWeight(lane);
+        error = error < threshold ? 0.0 : error - threshold;
+    }
+    const float weighted = error * Csf(pc.plane * 64u + lane);
+    errors[lane] = weighted * weighted;
+    barrier();
+    if (lane < 8u) {
+        float sum = 0.0;
+        for (uint position = 0u; position < 8u; ++position)
+            sum += errors[lane * 8u + position];
+        error_rows[lane] = sum;
+    }
+    barrier();
+    if (lane == 0u) {
+        float sum = 0.0;
+        for (uint partial = 0u; partial < 8u; ++partial)
+            sum += error_rows[partial];
+        const uint block = gl_WorkGroupID.y * pc.blocks_x + gl_WorkGroupID.x;
+        arena[pc.destination + block] = sum;
+    }
+}

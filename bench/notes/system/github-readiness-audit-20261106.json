@@ -1,0 +1,281 @@
+{
+  "date": "2026-11-06",
+  "starting_revision": "a949b6177efb88890dd44860cc30dff45486a25d",
+  "scope": "Current working tree; pre-existing edits preserved; local validation only",
+  "raw_reports": "artifacts/reports/repo-audit-2026-11-06",
+  "hardware": {
+    "gpu": "NVIDIA GeForce RTX 5070",
+    "driver": "615.78.08",
+    "compiler": "GCC 16.2.1",
+    "python": "3.12.14"
+  },
+  "checks": {
+    "release_build": "pass",
+    "ctest": {
+      "passed": 27,
+      "failed": 0,
+      "python_reference_skips": 0
+    },
+    "required_gpu": {
+      "tests": 249,
+      "failed_checks": 0,
+      "skips": 0
+    },
+    "asan_ubsan": {
+      "tests": 249,
+      "failed_checks": 0,
+      "skips": 0,
+      "detect_leaks": false,
+      "halt_on_ubsan_error": true
+    },
+    "fresh_core_without_python_png_jpeg_references_caches": "pass",
+    "installed_package_consumer": "pass",
+    "embedded_consumer": "pass",
+    "fresh_full_clone": {
+      "ctest_passed": 27,
+      "failed": 0,
+      "optional_reference_skips": 5,
+      "required_gpu_tests": 249,
+      "gpu_skips": 0
+    },
+    "optional_libvmaf_oracle_after_frame_count_fix": {
+      "tests": 6,
+      "skips": 0,
+      "status": "pass"
+    },
+    "cpp_glsl_format": {
+      "files": 258,
+      "status": "pass"
+    },
+    "production_clang_tidy": {
+      "translation_units": 52,
+      "status": "pass"
+    },
+    "shader_manifest_variants": 127,
+    "reference_pins": "pass for ssimulacra2, libjxl, vmaf and ColorVideoVDP",
+    "generated_models": "CVVDP and both VMAF tables match pinned inputs",
+    "ssimulacra2_identity": 100.0,
+    "butteraugli_identity": 0.0,
+    "python_changed_format": "pass for all 8 changed Python files",
+    "python_validator_consumers_and_mocks_ruff": "pass for 7 changed Python files",
+    "python_legacy_oracle_ruff": {
+      "existing_findings": 185,
+      "introduced_findings": 0
+    },
+    "python_initial_repo_ruff_findings": 2478,
+    "python_initial_yapf_differing_files": 51,
+    "python_remaining_yapf_differing_files": 50,
+    "shell_syntax": "profile scripts and updated local validation recipe pass",
+    "whitespace": "git diff --check passes",
+    "public_headers": {
+      "standalone_compile_count": 16,
+      "status": "pass"
+    },
+    "documentation": {
+      "markdown_files": 119,
+      "local_links": 500,
+      "status": "pass"
+    },
+    "vulkan_api_and_sync_validation": {
+      "status": "unavailable",
+      "reason": "VK_LAYER_KHRONOS_validation not found; confirmed by loader diagnostic"
+    },
+    "interleaved_performance_protocol": "not run; no performance improvement claimed"
+  },
+  "temporal_qualification": {
+    "command": ".venv/bin/python -m validation.temporal.run --profile qualification --offline --out-dir artifacts/reports/repo-audit-2026-11-06/temporal-qualification-final",
+    "profile": "qualification",
+    "gate_mode": "ranking",
+    "selected_metrics": [
+      "ssimulacra2",
+      "butteraugli",
+      "vmaf-v0",
+      "vmaf-v1",
+      "cvvdp"
+    ],
+    "selected_gate_passed": true,
+    "metrics": {
+      "ssimulacra2": {
+        "gate_mode": "ranking",
+        "selected_gate_passed": true,
+        "ranking": "pass",
+        "subjective": "not_requested",
+        "numerical": "fail",
+        "numerical_diagnostics": {
+          "status": "fail",
+          "failures": [
+            "max_error",
+            "mae"
+          ],
+          "thresholds": {
+            "max_error": 0.01,
+            "mae": 0.001
+          },
+          "max_error": 5.262514484766882,
+          "mae": 0.29521833959454835,
+          "rmse": 0.6188510760453242,
+          "mean_offset": 0.2754223522488647,
+          "affine_slope": 0.996394053642719,
+          "affine_intercept": 0.4083440838990431,
+          "pearson": 0.9999736842801609
+        },
+        "srcc": 0.9999712737705755,
+        "tau_b": 0.9974952211456067,
+        "pearson": 0.9999736842801609,
+        "samples": 390,
+        "policy_sha256": "f8cd427f953d060257ba99abc5aad501fbe84f895a339fe49334295782f20d73",
+        "configuration_hash": "133ef18eeaffb7a54db2c363e6e84b40a3d527349e9d171c9db2129d2306b5c7",
+        "input_manifest_hash": "d9531f485c1dd0204763599fd53ca9e84dcb33a7c5467e71a80120bb81a2aea6",
+        "candidate_revision": "sha256:8638f4847b9495674449c27ff3c52f37fc8c01c2ea073f4605dbfe37000278a7",
+        "reference_revision": "81feacf6a5b0bbd7ec11b4a881a4615033ab0b10",
+        "total_sources": 30,
+        "ranking_failures": [],
+        "agreement_sha256": "4cfb0661b66bc4ee4f13008d1e17e4b58035e6102031386107bd00346555095c"
+      },
+      "butteraugli": {
+        "gate_mode": "ranking",
+        "selected_gate_passed": true,
+        "ranking": "pass",
+        "subjective": "not_requested",
+        "numerical": "pass",
+        "numerical_diagnostics": {
+          "status": "pass",
+          "failures": [],
+          "thresholds": {
+            "max_error": 0.01,
+            "mae": 0.001
+          },
+          "max_error": 0.001781654205061045,
+          "mae": 5.637220072262603e-05,
+          "rmse": 0.0001440294250418359,
+          "mean_offset": 2.4927120648364248e-05,
+          "affine_slope": 1.000000838331805,
+          "affine_intercept": 6.712744023088663e-06,
+          "pearson": 0.9999999999876056
+        },
+        "srcc": 1.0,
+        "tau_b": 1.0,
+        "pearson": 0.9999999999876056,
+        "samples": 390,
+        "policy_sha256": "3e23e659a4c8892a2c804b81ecea8e175e548f1c9f4592f6d70454ebb1b46d95",
+        "configuration_hash": "aceaac4a10b5ca1df282447c36b98bce6307c62a54a674bd4221bc4830eb48ee",
+        "input_manifest_hash": "bf011f24987e4ab811e0d62d1929af21032e2193442151c006e15a1baa5e56f9",
+        "candidate_revision": "sha256:8638f4847b9495674449c27ff3c52f37fc8c01c2ea073f4605dbfe37000278a7",
+        "reference_revision": "e47d2a2b5bb418f2947ce07f36cb048861db3820",
+        "total_sources": 30,
+        "ranking_failures": [],
+        "agreement_sha256": "21e56e463dfa5e82dccd9d188c3c8f454050b4a71513159faeb45d05dfc11d48"
+      },
+      "vmaf-v0": {
+        "gate_mode": "ranking",
+        "selected_gate_passed": true,
+        "ranking": "pass",
+        "subjective": "not_requested",
+        "numerical": "pass",
+        "numerical_diagnostics": {
+          "status": "pass",
+          "failures": [],
+          "thresholds": {
+            "max_error": 0.01
+          },
+          "max_error": 0.005348495825955979,
+          "mae": 9.396986723772125e-05,
+          "rmse": 0.000317064527258498,
+          "mean_offset": 6.227976575471618e-05,
+          "affine_slope": 0.9999995771865114,
+          "affine_intercept": 9.805098934441425e-05,
+          "pearson": 0.9999999998973211
+        },
+        "srcc": 0.9999850299538294,
+        "tau_b": 0.9995516526407887,
+        "pearson": 0.9999999998973211,
+        "samples": 390,
+        "policy_sha256": "7ee9cb3ed256b8a2184841fc28339d1ac92a4e2002c22f6a45d143e6d497a9b3",
+        "configuration_hash": "ebd685938b1f8522c1b566042c568fed186610f62bef733dfebce9127c42493c",
+        "input_manifest_hash": "8e69c8ce4cd88896423485aa3a18942d26848b78aec17e646636a655bf57af97",
+        "candidate_revision": "sha256:8638f4847b9495674449c27ff3c52f37fc8c01c2ea073f4605dbfe37000278a7",
+        "reference_revision": "4611e47a7330cd342498dcc130e1008efbeab6e4",
+        "total_sources": 30,
+        "ranking_failures": [],
+        "agreement_sha256": "62636bf62f9b45dd87d1afe12a5a1cd17d343e283e2b1403983dc85acc79f7ef"
+      },
+      "vmaf-v1": {
+        "gate_mode": "ranking",
+        "selected_gate_passed": true,
+        "ranking": "pass",
+        "subjective": "not_requested",
+        "numerical": "pass",
+        "numerical_diagnostics": {
+          "status": "pass",
+          "failures": [],
+          "thresholds": {
+            "max_error": 0.35
+          },
+          "max_error": 0.006993603398981918,
+          "mae": 0.000815937619127556,
+          "rmse": 0.0014647048755034005,
+          "mean_offset": 0.0008083750944878833,
+          "affine_slope": 0.9999888561032172,
+          "affine_intercept": 0.0017693945133926275,
+          "pearson": 0.9999999982924026
+        },
+        "srcc": 0.999999588277859,
+        "tau_b": 0.9999432382574145,
+        "pearson": 0.9999999982924026,
+        "samples": 390,
+        "policy_sha256": "a2b19215f826975e701cea46369d9f6e41d3ea1fc55cfd6acb11047faa81d855",
+        "configuration_hash": "d06bade22b9ec7617a4b686bc22ca75caffc8fc25bef6b8a32d9e7cf7b2a4d89",
+        "input_manifest_hash": "98097b74473a97b95df38ebb3fa8d2d21148852c2f6210ec41cbcbb7f153696f",
+        "candidate_revision": "sha256:8638f4847b9495674449c27ff3c52f37fc8c01c2ea073f4605dbfe37000278a7",
+        "reference_revision": "4611e47a7330cd342498dcc130e1008efbeab6e4",
+        "total_sources": 30,
+        "ranking_failures": [],
+        "agreement_sha256": "56fe39ebaf0e501995dcf183bcd3335930c87d66bbca31fca233b45269db5178"
+      },
+      "cvvdp": {
+        "gate_mode": "ranking",
+        "selected_gate_passed": true,
+        "ranking": "pass",
+        "subjective": "not_requested",
+        "numerical": "pass",
+        "numerical_diagnostics": {
+          "status": "pass",
+          "failures": [],
+          "thresholds": {
+            "max_error": 0.001
+          },
+          "max_error": 1.4042005346937003e-05,
+          "mae": 1.6450050844937708e-06,
+          "rmse": 2.8761106647117017e-06,
+          "mean_offset": 1.501890094335323e-06,
+          "affine_slope": 0.999999666094264,
+          "affine_intercept": 3.2100356636543398e-06,
+          "pearson": 0.9999999999999852
+        },
+        "srcc": 1.0,
+        "tau_b": 1.0,
+        "pearson": 0.9999999999999852,
+        "samples": 390,
+        "policy_sha256": "41c9a0294d791bc2d5a105bc3b8485476bc93bb4f1163343b5c092b3ff64be25",
+        "configuration_hash": "17187fbf21805857eb0815e3aee5f16e63e0a45fac1371bbad5945651b3ee26c",
+        "input_manifest_hash": "da8018f95b1162423438fed413ce9aa1251f64c792000f4a6c623b2c2ba77ea4",
+        "candidate_revision": "sha256:8638f4847b9495674449c27ff3c52f37fc8c01c2ea073f4605dbfe37000278a7",
+        "reference_revision": "2a268bce8d56e2f3abde46df3927d8a633707a24",
+        "total_sources": 30,
+        "ranking_failures": [],
+        "agreement_sha256": "6bf160dff1cd483e84bae7dd69d1c4749d40bae705da4f793442679c67e62864"
+      }
+    },
+    "summary_sha256": "21b0e5c7ed6a9d39e16d65541e5a185f7e0646dc53751261d033fb2d3e571e53"
+  },
+  "candidate_cli_sha256": "8638f4847b9495674449c27ff3c52f37fc8c01c2ea073f4605dbfe37000278a7",
+  "remaining_limits": [
+    "PSNR-HVS corpus reference-ranking qualification remains pending.",
+    "SSIMULACRA 2 old numerical parity limits fail; its registered ranking gate passes; no thresholds changed.",
+    "Repository-wide Python style/annotation/complexity debt remains.",
+    "Vulkan API/synchronization validation layer is not installed."
+  ],
+  "ci_added": false,
+  "commits_created": false,
+  "remote_changes": false
+}

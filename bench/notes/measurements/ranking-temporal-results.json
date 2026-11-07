@@ -1,0 +1,642 @@
+{
+  "date": "2026-11-06",
+  "question": "Does the public video CLI preserve original metric ordering under the frozen policy, with old numerical gates retained?",
+  "command": "python3 -m validation.temporal.run --profile qualification --offline --out-dir artifacts/reports/ranking-temporal/qualification-final",
+  "sources_manifest": "validation/temporal/sources.json",
+  "sources_manifest_sha256": "02d44580888ad3bb34a44aeecb8ce04c4931ccf529386a2b790eebc998e0e2a7",
+  "source_groups": 30,
+  "variants_per_source": 13,
+  "frames_per_clip": 40,
+  "clips_per_metric": 390,
+  "candidate": {
+    "binary": "build/vqm",
+    "binary_sha256": "ec5c9eeefbc55f2b2c168d66afc19f887c0ed9de32e4d3e93b292d3bc8f8d541",
+    "repository_head": "a949b6177efb88890dd44860cc30dff45486a25d",
+    "working_tree_dirty": true,
+    "gpu": "NVIDIA GeForce RTX 5070",
+    "device_uuid": "7293d6cd964492010338cb259cfc9cf2",
+    "driver": "615.78.08"
+  },
+  "metrics": {
+    "vmaf-v0": {
+      "ranking_status": "pass",
+      "numerical": {
+        "status": "pass",
+        "failures": [],
+        "thresholds": {
+          "max_error": 0.01
+        },
+        "max_error": 0.005348495825955979,
+        "mae": 9.396986723772125e-05,
+        "rmse": 0.000317064527258498,
+        "mean_offset": 6.227976575471618e-05,
+        "affine_slope": 0.9999995771865114,
+        "affine_intercept": 9.805098934441425e-05,
+        "pearson": 0.9999999998973208
+      },
+      "subjective": "not_requested",
+      "global_ranking": {
+        "samples": 390,
+        "srcc": 0.9999850299538294,
+        "tau_b": 0.9995516526407887,
+        "total_pairs": 75855,
+        "concordant_pairs": 75816,
+        "reversed_pairs": 16,
+        "reference_tied_pairs": 23,
+        "candidate_tied_pairs": 19,
+        "both_tied_pairs": 19
+      },
+      "eligible_within_source_pairs": 2002,
+      "within_source_failures": 0,
+      "configurations": {
+        "vmaf-v0-native444-8bit": "pass"
+      },
+      "strata": {
+        "sdr-native-444": "pass"
+      },
+      "families": {
+        "flicker": "pass",
+        "freeze": "pass",
+        "impulse": "pass",
+        "quantization": "pass"
+      },
+      "policy_sha256": "7ee9cb3ed256b8a2184841fc28339d1ac92a4e2002c22f6a45d143e6d497a9b3",
+      "original_report_sha256": "d7923ead1ca4de77bedb152c5cabcdff9bba9accc29cc6386fa58a367d76cdd6",
+      "original_provenance": {
+        "revision": "4611e47a7330cd342498dcc130e1008efbeab6e4",
+        "numpy": "2.5.4",
+        "runner_sha256": "cbd2ea8bf38d218e243a9f43f4ecd4480b98f531902945f47e31cc6f4a058376",
+        "executable_sha256": "0b082f1918ea001b2a91e402db3a3365b6c2a2f0bbdf69b56888101dcd1b81d4",
+        "model_sha256": "26573aa333346f1109226e7283969e8b3581119a1ab7f18897767351dd963ff8",
+        "threads": 1
+      },
+      "mutation_audit": {
+        "schema_version": 1,
+        "scope": "conceptual recorded-score mutations; no production fault injection",
+        "metric": "vmaf-v0",
+        "reference_revision": "4611e47a7330cd342498dcc130e1008efbeab6e4",
+        "input_manifest_hash": "8e69c8ce4cd88896423485aa3a18942d26848b78aec17e646636a655bf57af97",
+        "configuration_hash": "ebd685938b1f8522c1b566042c568fed186610f62bef733dfebce9127c42493c",
+        "samples": 390,
+        "passed": true,
+        "discrepancies": [],
+        "audits": [
+          {
+            "mutation": "identity",
+            "expected_ranking": "pass",
+            "ranking": "pass",
+            "numerical": "pass",
+            "subjective": "not_requested",
+            "proposed": "pass",
+            "srcc": 1.0,
+            "tau_b": 1.0,
+            "max_error": 0.0,
+            "mae": 0.0,
+            "mean_offset": 0.0,
+            "failed_domains": []
+          },
+          {
+            "mutation": "offset-plus-three",
+            "expected_ranking": "pass",
+            "ranking": "pass",
+            "numerical": "fail",
+            "subjective": "not_requested",
+            "proposed": "pass",
+            "srcc": 1.0,
+            "tau_b": 1.0,
+            "max_error": 3.000000000000007,
+            "mae": 3.0,
+            "mean_offset": 3.0,
+            "failed_domains": []
+          },
+          {
+            "mutation": "positive-scale-quarter",
+            "expected_ranking": "pass",
+            "ranking": "pass",
+            "numerical": "fail",
+            "subjective": "not_requested",
+            "proposed": "pass",
+            "srcc": 1.0,
+            "tau_b": 1.0,
+            "max_error": 74.95177580625,
+            "mae": 63.45213295225962,
+            "mean_offset": -63.45213295225962,
+            "failed_domains": []
+          },
+          {
+            "mutation": "increasing-cube",
+            "expected_ranking": "pass",
+            "ranking": "pass",
+            "numerical": "fail",
+            "subjective": "not_requested",
+            "proposed": "pass",
+            "srcc": 1.0,
+            "tau_b": 1.0,
+            "max_error": 91.935701075,
+            "mae": 78.31742159185208,
+            "mean_offset": -78.31742159185208,
+            "failed_domains": []
+          },
+          {
+            "mutation": "reversed",
+            "expected_ranking": "fail",
+            "ranking": "fail",
+            "numerical": "fail",
+            "subjective": "not_requested",
+            "proposed": "fail",
+            "srcc": -1.0,
+            "tau_b": -1.0,
+            "max_error": 199.87140215,
+            "mae": 169.2056878726923,
+            "mean_offset": -169.2056878726923,
+            "failed_domains": [
+              "configurations/vmaf-v0-native444-8bit",
+              "strata/sdr-native-444",
+              "families/flicker",
+              "families/freeze",
+              "families/impulse",
+              "families/quantization"
+            ]
+          },
+          {
+            "mutation": "constant-collapse",
+            "expected_ranking": "fail",
+            "ranking": "fail",
+            "numerical": "fail",
+            "subjective": "not_requested",
+            "proposed": "fail",
+            "srcc": null,
+            "tau_b": null,
+            "max_error": 80.1088733,
+            "mae": 64.77601616134615,
+            "mean_offset": -64.77601616134615,
+            "failed_domains": [
+              "configurations/vmaf-v0-native444-8bit",
+              "strata/sdr-native-444",
+              "families/flicker",
+              "families/freeze",
+              "families/impulse",
+              "families/quantization"
+            ]
+          },
+          {
+            "mutation": "rotated-association",
+            "expected_ranking": "fail",
+            "ranking": "fail",
+            "numerical": "fail",
+            "subjective": "not_requested",
+            "proposed": "fail",
+            "srcc": -0.029581329108002354,
+            "tau_b": -0.019424517354151283,
+            "max_error": 80.108869,
+            "mae": 20.167658441410257,
+            "mean_offset": 0.0,
+            "failed_domains": [
+              "configurations/vmaf-v0-native444-8bit",
+              "strata/sdr-native-444",
+              "families/flicker",
+              "families/freeze",
+              "families/impulse",
+              "families/quantization"
+            ]
+          }
+        ]
+      }
+    },
+    "vmaf-v1": {
+      "ranking_status": "pass",
+      "numerical": {
+        "status": "pass",
+        "failures": [],
+        "thresholds": {
+          "max_error": 0.35
+        },
+        "max_error": 0.006993603398981918,
+        "mae": 0.000815937619127556,
+        "rmse": 0.0014647048755034005,
+        "mean_offset": 0.0008083750944878833,
+        "affine_slope": 0.9999888561032172,
+        "affine_intercept": 0.0017693945133926275,
+        "pearson": 0.9999999982923999
+      },
+      "subjective": "not_requested",
+      "global_ranking": {
+        "samples": 390,
+        "srcc": 0.999999588277859,
+        "tau_b": 0.9999432382574145,
+        "total_pairs": 75855,
+        "concordant_pairs": 70468,
+        "reversed_pairs": 2,
+        "reference_tied_pairs": 5385,
+        "candidate_tied_pairs": 5385,
+        "both_tied_pairs": 5385
+      },
+      "eligible_within_source_pairs": 2030,
+      "within_source_failures": 0,
+      "configurations": {
+        "vmaf-v1-native444-8bit": "pass"
+      },
+      "strata": {
+        "sdr-native-444": "pass"
+      },
+      "families": {
+        "flicker": "pass",
+        "freeze": "pass",
+        "impulse": "pass",
+        "quantization": "pass"
+      },
+      "policy_sha256": "a2b19215f826975e701cea46369d9f6e41d3ea1fc55cfd6acb11047faa81d855",
+      "original_report_sha256": "dd17a664bca35990513dc81406e2a2cce2e5c85c3f09e42db28afcb831f740d7",
+      "original_provenance": {
+        "revision": "4611e47a7330cd342498dcc130e1008efbeab6e4",
+        "numpy": "2.5.4",
+        "runner_sha256": "cbd2ea8bf38d218e243a9f43f4ecd4480b98f531902945f47e31cc6f4a058376",
+        "executable_sha256": "0b082f1918ea001b2a91e402db3a3365b6c2a2f0bbdf69b56888101dcd1b81d4",
+        "model_sha256": "e4cf8c147e1368b35497d772920bc92f98c1ad7853c1033d8a836947f427140e",
+        "threads": 1
+      },
+      "mutation_audit": {
+        "schema_version": 1,
+        "scope": "conceptual recorded-score mutations; no production fault injection",
+        "metric": "vmaf-v1",
+        "reference_revision": "4611e47a7330cd342498dcc130e1008efbeab6e4",
+        "input_manifest_hash": "98097b74473a97b95df38ebb3fa8d2d21148852c2f6210ec41cbcbb7f153696f",
+        "configuration_hash": "d06bade22b9ec7617a4b686bc22ca75caffc8fc25bef6b8a32d9e7cf7b2a4d89",
+        "samples": 390,
+        "passed": true,
+        "discrepancies": [],
+        "audits": [
+          {
+            "mutation": "identity",
+            "expected_ranking": "pass",
+            "ranking": "pass",
+            "numerical": "pass",
+            "subjective": "not_requested",
+            "proposed": "pass",
+            "srcc": 1.0,
+            "tau_b": 1.0,
+            "max_error": 0.0,
+            "mae": 0.0,
+            "mean_offset": 0.0,
+            "failed_domains": []
+          },
+          {
+            "mutation": "offset-plus-three",
+            "expected_ranking": "pass",
+            "ranking": "pass",
+            "numerical": "fail",
+            "subjective": "not_requested",
+            "proposed": "pass",
+            "srcc": 1.0,
+            "tau_b": 1.0,
+            "max_error": 3.000000000000007,
+            "mae": 3.0,
+            "mean_offset": 3.0,
+            "failed_domains": []
+          },
+          {
+            "mutation": "positive-scale-quarter",
+            "expected_ranking": "pass",
+            "ranking": "pass",
+            "numerical": "fail",
+            "subjective": "not_requested",
+            "proposed": "pass",
+            "srcc": 1.0,
+            "tau_b": 1.0,
+            "max_error": 75.0,
+            "mae": 64.6779648291827,
+            "mean_offset": -64.6779648291827,
+            "failed_domains": []
+          },
+          {
+            "mutation": "increasing-cube",
+            "expected_ranking": "pass",
+            "ranking": "pass",
+            "numerical": "fail",
+            "subjective": "not_requested",
+            "proposed": "pass",
+            "srcc": 1.0,
+            "tau_b": 1.0,
+            "max_error": 92.0,
+            "mae": 79.70605502219613,
+            "mean_offset": -79.70605502219613,
+            "failed_domains": []
+          },
+          {
+            "mutation": "reversed",
+            "expected_ranking": "fail",
+            "ranking": "fail",
+            "numerical": "fail",
+            "subjective": "not_requested",
+            "proposed": "fail",
+            "srcc": -1.0,
+            "tau_b": -1.0,
+            "max_error": 200.0,
+            "mae": 172.47457287782052,
+            "mean_offset": -172.47457287782052,
+            "failed_domains": [
+              "configurations/vmaf-v1-native444-8bit",
+              "strata/sdr-native-444",
+              "families/flicker",
+              "families/freeze",
+              "families/impulse",
+              "families/quantization"
+            ]
+          },
+          {
+            "mutation": "constant-collapse",
+            "expected_ranking": "fail",
+            "ranking": "fail",
+            "numerical": "fail",
+            "subjective": "not_requested",
+            "proposed": "fail",
+            "srcc": null,
+            "tau_b": null,
+            "max_error": 86.7935174,
+            "mae": 73.03080383891026,
+            "mean_offset": -73.03080383891026,
+            "failed_domains": [
+              "configurations/vmaf-v1-native444-8bit",
+              "strata/sdr-native-444",
+              "families/flicker",
+              "families/freeze",
+              "families/impulse",
+              "families/quantization"
+            ]
+          },
+          {
+            "mutation": "rotated-association",
+            "expected_ranking": "fail",
+            "ranking": "fail",
+            "numerical": "fail",
+            "subjective": "not_requested",
+            "proposed": "fail",
+            "srcc": -0.07674557321500439,
+            "tau_b": -0.05988363842769973,
+            "max_error": 86.7935174,
+            "mae": 18.080328102820513,
+            "mean_offset": 0.0,
+            "failed_domains": [
+              "configurations/vmaf-v1-native444-8bit",
+              "strata/sdr-native-444",
+              "families/flicker",
+              "families/freeze",
+              "families/impulse",
+              "families/quantization"
+            ]
+          }
+        ]
+      }
+    },
+    "cvvdp": {
+      "ranking_status": "pass",
+      "numerical": {
+        "status": "pass",
+        "failures": [],
+        "thresholds": {
+          "max_error": 0.001
+        },
+        "max_error": 1.4042005346937003e-05,
+        "mae": 1.6450050844937708e-06,
+        "rmse": 2.8761106647117017e-06,
+        "mean_offset": 1.501890094335323e-06,
+        "affine_slope": 0.999999666094264,
+        "affine_intercept": 3.2100356636543398e-06,
+        "pearson": 0.9999999999999857
+      },
+      "subjective": "not_requested",
+      "global_ranking": {
+        "samples": 390,
+        "srcc": 1.0,
+        "tau_b": 1.0,
+        "total_pairs": 75855,
+        "concordant_pairs": 75855,
+        "reversed_pairs": 0,
+        "reference_tied_pairs": 0,
+        "candidate_tied_pairs": 0,
+        "both_tied_pairs": 0
+      },
+      "eligible_within_source_pairs": 2238,
+      "within_source_failures": 0,
+      "configurations": {
+        "cvvdp-standard4k-25:1": "pass",
+        "cvvdp-standard4k-30000:1001": "pass",
+        "cvvdp-standard4k-30:1": "pass"
+      },
+      "strata": {
+        "sdr-native-444": "pass"
+      },
+      "families": {
+        "flicker": "pass",
+        "freeze": "pass",
+        "impulse": "pass",
+        "quantization": "pass"
+      },
+      "policy_sha256": "41c9a0294d791bc2d5a105bc3b8485476bc93bb4f1163343b5c092b3ff64be25",
+      "original_report_sha256": "b7488f0cb7a04bc3c62e3c97779885ea56e0db89722335f81ae6590b8f0bd2c8",
+      "original_provenance": {
+        "revision": "2a268bce8d56e2f3abde46df3927d8a633707a24",
+        "numpy": "2.5.4",
+        "runner_sha256": "cbd2ea8bf38d218e243a9f43f4ecd4480b98f531902945f47e31cc6f4a058376",
+        "torch": "2.15.0+cpu",
+        "threads": 1,
+        "precision": "CPU-FP32-highest",
+        "display": "standard_4k",
+        "source_colorspace": "sRGB",
+        "temporal_padding": "replicate"
+      },
+      "mutation_audit": {
+        "schema_version": 1,
+        "scope": "conceptual recorded-score mutations; no production fault injection",
+        "metric": "cvvdp",
+        "reference_revision": "2a268bce8d56e2f3abde46df3927d8a633707a24",
+        "input_manifest_hash": "da8018f95b1162423438fed413ce9aa1251f64c792000f4a6c623b2c2ba77ea4",
+        "configuration_hash": "17187fbf21805857eb0815e3aee5f16e63e0a45fac1371bbad5945651b3ee26c",
+        "samples": 390,
+        "passed": true,
+        "discrepancies": [],
+        "audits": [
+          {
+            "mutation": "identity",
+            "expected_ranking": "pass",
+            "ranking": "pass",
+            "numerical": "pass",
+            "subjective": "not_requested",
+            "proposed": "pass",
+            "srcc": 1.0,
+            "tau_b": 1.0,
+            "max_error": 0.0,
+            "mae": 0.0,
+            "mean_offset": 0.0,
+            "failed_domains": []
+          },
+          {
+            "mutation": "offset-plus-three",
+            "expected_ranking": "pass",
+            "ranking": "pass",
+            "numerical": "fail",
+            "subjective": "not_requested",
+            "proposed": "pass",
+            "srcc": 1.0,
+            "tau_b": 1.0,
+            "max_error": 3.0,
+            "mae": 3.0,
+            "mean_offset": 3.0,
+            "failed_domains": []
+          },
+          {
+            "mutation": "positive-scale-quarter",
+            "expected_ranking": "pass",
+            "ranking": "pass",
+            "numerical": "fail",
+            "subjective": "not_requested",
+            "proposed": "pass",
+            "srcc": 1.0,
+            "tau_b": 1.0,
+            "max_error": 11.38434362411499,
+            "mae": 5.956677642235389,
+            "mean_offset": -3.8367390522590052,
+            "failed_domains": []
+          },
+          {
+            "mutation": "increasing-cube",
+            "expected_ranking": "pass",
+            "ranking": "pass",
+            "numerical": "fail",
+            "subjective": "not_requested",
+            "proposed": "pass",
+            "srcc": 1.0,
+            "tau_b": 1.0,
+            "max_error": 16.17912483215332,
+            "mae": 2.7806923338189935,
+            "mean_offset": 1.1279592148025754,
+            "failed_domains": []
+          },
+          {
+            "mutation": "reversed",
+            "expected_ranking": "fail",
+            "ranking": "fail",
+            "numerical": "fail",
+            "subjective": "not_requested",
+            "proposed": "fail",
+            "srcc": -1.0,
+            "tau_b": -1.0,
+            "max_error": 30.35824966430664,
+            "mae": 15.884473712627704,
+            "mean_offset": -10.231304139357347,
+            "failed_domains": [
+              "configurations/cvvdp-standard4k-25:1",
+              "configurations/cvvdp-standard4k-30000:1001",
+              "configurations/cvvdp-standard4k-30:1",
+              "strata/sdr-native-444",
+              "families/flicker",
+              "families/freeze",
+              "families/impulse",
+              "families/quantization"
+            ]
+          },
+          {
+            "mutation": "constant-collapse",
+            "expected_ranking": "fail",
+            "ranking": "fail",
+            "numerical": "fail",
+            "subjective": "not_requested",
+            "proposed": "fail",
+            "srcc": null,
+            "tau_b": null,
+            "max_error": 25.126748085021973,
+            "mae": 20.294776901831995,
+            "mean_offset": -20.294776901831995,
+            "failed_domains": [
+              "configurations/cvvdp-standard4k-25:1",
+              "configurations/cvvdp-standard4k-30000:1001",
+              "configurations/cvvdp-standard4k-30:1",
+              "strata/sdr-native-444",
+              "families/flicker",
+              "families/freeze",
+              "families/impulse",
+              "families/quantization"
+            ]
+          },
+          {
+            "mutation": "rotated-association",
+            "expected_ranking": "fail",
+            "ranking": "fail",
+            "numerical": "fail",
+            "subjective": "not_requested",
+            "proposed": "fail",
+            "srcc": 0.06596826864284244,
+            "tau_b": 0.035053720914903434,
+            "max_error": 24.59666347503662,
+            "mae": 6.378794188377185,
+            "mean_offset": 0.0,
+            "failed_domains": [
+              "configurations/cvvdp-standard4k-25:1",
+              "configurations/cvvdp-standard4k-30000:1001",
+              "configurations/cvvdp-standard4k-30:1",
+              "strata/sdr-native-444",
+              "families/flicker",
+              "families/freeze",
+              "families/impulse",
+              "families/quantization"
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "checks": {
+    "old_release_core": {
+      "tests": 227,
+      "failed": 0
+    },
+    "expanded_release_core": {
+      "tests": 240,
+      "failed": 0,
+      "gpu_required": true
+    },
+    "ctest_release": {
+      "suites": 21,
+      "failed": 0
+    },
+    "asan_ubsan_core": {
+      "tests": 240,
+      "failed": 0,
+      "gpu_required": true
+    },
+    "asan_ubsan_cli_video": {
+      "tests": 7,
+      "failed": 0
+    },
+    "production_quality_lint": {
+      "compiled_cpp_files": 48,
+      "passed": true
+    },
+    "new_python_ruff_yapf": "pass",
+    "existing_affected_python_ruff": {
+      "before": 160,
+      "after": 133,
+      "new_rule_file_counts": 0
+    },
+    "fresh_core_only_build": "build-ranking-core: pass",
+    "hardware_vulkan_validation": {
+      "tests": 240,
+      "failed": 0,
+      "validation_errors": 0
+    },
+    "temporal_workflow_tests": {
+      "tests": 22,
+      "failed": 0,
+      "cli_gpu_cases": 5
+    }
+  },
+  "scope": [
+    "Fixed corpus of hosted SD progressive CFR clips; native YUV444 8-bit VMAF and Standard4K SDR CVVDP.",
+    "No subjective ratings for these video clips; no claim of subjective video accuracy or unseen-content error bounds.",
+    "Numerical API/feature/model oracles remain hard for unchanged operations and unqualified HDR/high-bit-depth/alternate settings.",
+    "No performance improvement is claimed."
+  ],
+  "raw_reports": "artifacts/reports/ranking-temporal/",
+  "scores_csv": "bench/notes/measurements/ranking-temporal-scores.csv",
+  "scores_csv_sha256": "8f73b12723cd699818a8a993caaf6516dc5a535fc7445ce4d1452416f7e19d42"
+}

@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "metric": "butteraugli",
+  "reference_revision": "e47d2a2b5bb418f2947ce07f36cb048861db3820",
+  "margins": {
+    "butteraugli-srgb444-8bit-frame-mean": 0.8382419091232499
+  },
+  "configuration_hash": "aceaac4a10b5ca1df282447c36b98bce6307c62a54a674bd4221bc4830eb48ee",
+  "input_manifest_hash": "bf011f24987e4ab811e0d62d1929af21032e2193442151c006e15a1baa5e56f9",
+  "min_total_sources": 30,
+  "min_total_samples": 390,
+  "coverage": {
+    "min_sources": 1,
+    "min_samples": 2,
+    "min_eligible_pairs": 1,
+    "min_eligible_fraction": 0.1
+  },
+  "required_strata": {
+    "sdr-spatial-srgb444": {
+      "min_sources": 1,
+      "min_samples": 2,
+      "min_eligible_pairs": 1,
+      "min_eligible_fraction": 0.1
+    }
+  },
+  "numerical_max": 0.01,
+  "subjective": {
+    "required": false
+  },
+  "direction": "lower",
+  "numerical_mean": 0.001
+}

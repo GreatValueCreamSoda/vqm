@@ -1,0 +1,114 @@
+{
+  "ssimu2": [
+    {
+      "name": "ours-resident",
+      "driver": "build/vqm_bench",
+      "args": ["--metric", "ssimulacra2", "--resident", "2"],
+      "throughput_threads": 3
+    },
+    {
+      "name": "ours-streaming",
+      "driver": "build/vqm_bench",
+      "args": ["--metric", "ssimulacra2"],
+      "throughput_threads": 3
+    },
+    {
+      "name": "ours-half-planes",
+      "driver": "build/vqm_bench",
+      "args": ["--metric", "ssimulacra2", "--resident", "2", "--half-planes"],
+      "throughput_threads": 3
+    },
+    {
+      "name": "cloudinary",
+      "driver": "build/reference-build/ss2_cloudinary_bench",
+      "throughput_threads": 16
+    },
+    {
+      "name": "libjxl",
+      "driver": "build/libjxl-build/tools/ss2_libjxl_bench",
+      "args": ["--metric", "ssimu2"],
+      "throughput_threads": 16
+    },
+    {
+      "name": "fssimu2",
+      "driver": "build/fssimu2-build/bin/ssimu2_bench",
+      "throughput_threads": 16
+    },
+    {
+      "name": "vship-cuda",
+      "driver": "build/vship-build-cuda/vship_bench",
+      "args": ["--metric", "ssimu2"],
+      "throughput_threads": 3
+    },
+    {
+      "name": "vship-vulkan",
+      "driver": "build/vship-build-vulkan/vship_bench",
+      "args": ["--metric", "ssimu2"],
+      "throughput_threads": 3
+    },
+    {
+      "name": "vship-fast-vulkan",
+      "driver": "build/vship-fast-build-vulkan/vship_bench",
+      "args": ["--metric", "ssimu2"],
+      "throughput_threads": 3
+    }
+  ],
+  "butteraugli": [
+    {
+      "name": "ours-resident",
+      "driver": "build/vqm_bench",
+      "args": ["--metric", "butteraugli", "--resident", "2"],
+      "throughput_threads": 3
+    },
+    {
+      "name": "ours-streaming",
+      "driver": "build/vqm_bench",
+      "args": ["--metric", "butteraugli"],
+      "throughput_threads": 3
+    },
+    {
+      "name": "libjxl",
+      "driver": "build/libjxl-build/tools/ss2_libjxl_bench",
+      "args": ["--metric", "butteraugli"],
+      "throughput_threads": 16
+    },
+    {
+      "name": "vship-cuda",
+      "driver": "build/vship-build-cuda/vship_bench",
+      "args": ["--metric", "butteraugli"],
+      "throughput_threads": 3
+    },
+    {
+      "name": "vship-vulkan",
+      "driver": "build/vship-build-vulkan/vship_bench",
+      "args": ["--metric", "butteraugli"],
+      "throughput_threads": 3
+    },
+    {
+      "name": "vship-fast-vulkan",
+      "driver": "build/vship-fast-build-vulkan/vship_bench",
+      "args": ["--metric", "butteraugli"],
+      "throughput_threads": 3
+    }
+  ],
+  "cvvdp": [
+    {
+      "name": "ours-resident",
+      "driver": "build/vqm_bench",
+      "args": ["--metric", "cvvdp", "--resident", "2"],
+      "throughput_threads": 1
+    },
+    {
+      "name": "ours-streaming",
+      "driver": "build/vqm_bench",
+      "args": ["--metric", "cvvdp"],
+      "throughput_threads": 1
+    },
+    {
+      "name": "vship-vulkan",
+      "driver": "build/vship-build-vulkan/vship_bench",
+      "args": ["--metric", "cvvdp"],
+      "throughput_threads": 1
+    }
+  ]
+}

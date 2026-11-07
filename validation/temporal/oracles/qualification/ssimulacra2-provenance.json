@@ -1,0 +1,77 @@
+{
+  "revision": "81feacf6a5b0bbd7ec11b4a881a4615033ab0b10",
+  "numpy": "2.5.4",
+  "runner_sha256": "4326e17fc558ee427bdb5dd4f72c5088f634bbcb0fc346ec373d20176c1cb14b",
+  "executable_sha256": "c66a3d7cada0de986c920568c85ab31327f035c6d7d4c6c0db70146e4280dc08",
+  "build_fingerprint_sha256": "5986238c372000e8de2f4e915a9b3e888821f47adf50235435cb2981969a8da5",
+  "build_fingerprint": {
+    "environment": {
+      "CC": null,
+      "CFLAGS": null,
+      "CMAKE_PREFIX_PATH": null,
+      "CMAKE_TOOLCHAIN_FILE": null,
+      "CPPFLAGS": null,
+      "CUDA_HOME": null,
+      "CUDA_PATH": "/opt/cuda",
+      "CXX": null,
+      "CXXFLAGS": null,
+      "LDFLAGS": null,
+      "NVCC": null,
+      "PATH": "/home/creamsoda/.local/bin:/home/creamsoda/.codex/tmp/arg0-linux/codex-arg0LMS23z:/home/creamsoda/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/creamsoda/.local/bin:/home/creamsoda/.local/bin:/home/creamsoda/.local/bin:/home/creamsoda/.local/bin:/home/creamsoda/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/bin:/opt/cuda/bin:/home/creamsoda/.local/share/flatpak/exports/bin:/var/lib/flatpak/exports/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl:/usr/lib/rustup/bin:/home/creamsoda/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/opt/codex-desktop/resources",
+      "PKG_CONFIG_LIBDIR": null,
+      "PKG_CONFIG_PATH": null,
+      "VULKAN_SDK": null,
+      "ZIG_GLOBAL_CACHE_DIR": null
+    },
+    "machine": "x86_64",
+    "platform": "Linux-7.2.14-arch1-1-x86_64-with-glibc2.44",
+    "recipe_sha256": "f17290ac0d947bbd52d3adb9b7e65fb7bf00bc6132c92e0c13d735cc3d4804a5",
+    "revision": "81feacf6a5b0bbd7ec11b4a881a4615033ab0b10",
+    "schema": 1,
+    "step": "cloudinary",
+    "submodules": "",
+    "tools": {
+      "cc": {
+        "command": "cc",
+        "path": "/usr/bin/cc",
+        "version": "cc (GCC) 16.2.1 20260810\nCopyright (C) 2026 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE."
+      },
+      "cmake": {
+        "command": "cmake",
+        "path": "/usr/bin/cmake",
+        "version": "cmake version 4.4.5\n\nCMake suite maintained and supported by Kitware (kitware.com/cmake)."
+      },
+      "cxx": {
+        "command": "g++",
+        "path": "/usr/bin/g++",
+        "version": "g++ (GCC) 16.2.1 20260810\nCopyright (C) 2026 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE."
+      },
+      "make": {
+        "command": "make",
+        "path": "/usr/bin/make",
+        "version": "GNU Make 4.4.1\nBuilt for x86_64-pc-linux-gnu\nCopyright (C) 1988-2023 Free Software Foundation, Inc.\nLicense GPLv3+: GNU GPL version 3 or later <https://gnu.org/licenses/gpl.html>\nThis is free software: you are free to change and redistribute it.\nThere is NO WARRANTY, to the extent permitted by law."
+      },
+      "ninja": {
+        "command": "ninja",
+        "path": "/usr/bin/ninja",
+        "version": "1.13.2"
+      }
+    }
+  },
+  "source_sha256": {
+    "bench/inmemory/cloudinary_bench.cc": "2c7f463efacfb5a7ca48804d928bb0c9e1fbed0436ee64df9fc41c44b3c447dd",
+    "bench/inmemory/driver.h": "ebd735b4e6b2bf0b2ccc95fdfa798ab71a9a00a418e93a0e4f8056b713a8f2b0",
+    "bench/inmemory/pairs.h": "1293ab84e47995b849be4ba17912308cba3637805ba16f894b0901626dbd545c",
+    "bench/inmemory/prefetch.h": "1aae55153faf863fdf35516653c29e11fc1ddbce30b4a948bdebccd52f319662",
+    ".reference/ssimulacra2/src/ssimulacra2.cc": "38d8f92634ef1f8975bd45e7106c5a2d1a99a02de1c2f3828443ad8e16560d5f",
+    ".reference/ssimulacra2/src/lib/extras/dec/pnm.cc": "9ca5369748bbd9ab1f28b102293d24476e0ee0b23b17d1d2f20af17fb65f3a7b",
+    ".reference/ssimulacra2/src/lib/extras/dec/color_hints.cc": "c727fed52b3a58e459a4ad90f0a6fe8fccbc1fcd99926d83da24493ea869fd1f"
+  },
+  "threads": 1,
+  "decode_threads": 1,
+  "frame_iterations": 1,
+  "frame_warmup": 0,
+  "pooling": "arithmetic-mean-of-original-frame-scores",
+  "input": "bottom-up-interleaved-little-endian-FP32-PFM-encoded-sRGB",
+  "transfer": "sRGB via pinned PNM/PFM reader default ColorHints"
+}

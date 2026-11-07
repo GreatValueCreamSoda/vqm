@@ -1,0 +1,227 @@
+// Derived from Cloudinary SSIMULACRA 2 (Copyright (c) Jon Sneyers, Cloudinary).
+// BSD-3-Clause; see LICENSE.
+// Butteraugli portions: Copyright (c) the JPEG XL Project Authors.
+// BSD-3-Clause; see licenses/JPEG-XL-LICENSE.
+
+// Opsin dynamics for one image of one level, butteraugli.cc:1468-1540
+// (OpsinDynamicsImage):
+//   - a sigma-1.2 blur of the linear rgb planes, with libjxl's Separable5
+//     border rule (mirror, edge repeated once; :229-267 selects Separable5 for
+//     a 5-tap kernel and convolve_slow.cc SlowSeparablePixel uses WrapMirror),
+//   - the per-pixel sensitivity from Gamma(absorbance(blurred)) over the
+//     absorbance itself,
+//   - absorbance again on the unblurred pixel, scaled by that sensitivity,
+//     clamped, and written as x = m0 - m1, y = m0 + m1, b = m2 (:1500-1536).
+// At level 0 the same dispatch also writes the 2x2 box subsample of the
+// *linear* rgb (:1733-1766 SubSample2x), which is level 1's input: libjxl
+// subsamples rgb, not XYB. Repeated-edge tile samples already account for its
+// odd last-column/row correction, so the four-tap average needs no multiplier.
+//
+// One workgroup owns a 32x32 output tile plus the 2-pixel blur halo, 36x36
+// source samples per channel, so the blur reads shared memory only. op 0
+// decodes from the image's source descriptor (color.glsl, shared with
+// SSIMULACRA 2); op 1 reads the already-linear subsampled rgb planes.
+
+#version 450
+
+#include "butter_common.glsl"
+#include "color.glsl"
+
+layout(local_size_x = 16, local_size_y = 16) in;
+
+const uint kTile = 32u;
+const uint kHalo = 2u;                 // 5 taps
+const uint kSrc = kTile + 2u * kHalo;  // 36
+const uint kSrcSamples = kSrc * kSrc;
+
+// rgb of the tile (raw linear samples, unblurred) and the horizontal pass.
+shared float tile[3][kSrcSamples];
+shared float mid[3][kSrc * kTile];
+
+// OpsinAbsorbance constants, butteraugli.cc:1425-1454.
+const float kMix0 = 0.29956550340058319;
+const float kMix1 = 0.63373087833825936;
+const float kMix2 = 0.077705617820981968;
+const float kMix3 = 1.7557483643287353;
+const float kMix4 = 0.22158691104574774;
+const float kMix5 = 0.69391388044116142;
+const float kMix6 = 0.0987313588422;
+const float kMix7 = 1.7557483643287353;
+const float kMix8 = 0.02;
+const float kMix9 = 0.02;
+const float kMix10 = 0.20480129041026129;
+const float kMix11 = 12.226454707163354;
+const float kMin2 = 12.226454707163354;
+
+vec3 absorbance(vec3 c) {
+    return vec3(
+        kMix0 * c.x + (kMix1 * c.y + (kMix2 * c.z + kMix3)),
+        kMix4 * c.x + (kMix5 * c.y + (kMix6 * c.z + kMix7)),
+        kMix8 * c.x + (kMix9 * c.y + (kMix10 * c.z + kMix11))
+    );
+}
+
+// Gamma, butteraugli.cc:1407-1422: libjxl folds ln(2) into the multiplier so
+// it can use a fast log2. A GLSL log2 with the same folded constant is the
+// same function to within an ulp, so no polynomial is ported.
+float gamma_(float v) {
+    const float kRetMul = 19.245013259874995 * 0.6931471805599453;
+    const float kRetAdd = -23.16046239805755;
+    v = max(v, 0.0);
+    return kRetMul * log2(v + 9.9710635769299145) + kRetAdd;
+}
+
+vec3 gamma3(vec3 v) { return vec3(gamma_(v.x), gamma_(v.y), gamma_(v.z)); }
+
+// Mirror, image_ops.h:184-196: reflect on the border and repeat the edge
+// pixel. The source loops because a radius can exceed the image (level 1 of a
+// 32-wide fixture is 16 wide and every tile corner reflects twice).
+int mirror(int x, int size) {
+    while (x < 0 || x >= size) {
+        x = x < 0 ? -x - 1 : 2 * size - 1 - x;
+    }
+    return x;
+}
+
+// One linear rgb sample of the source, by global pixel coordinate. op 0
+// decodes through the descriptor; op 1 reads the level's rgb planes.
+vec3 source_rgb(uint op, uint x, uint y, uint chain_base) {
+    if (op == 1u) {
+        const uint index = chain_base + y * butter_width() + x;
+        const uint area = butter_area();
+        return vec3(arena[index], arena[index + area], arena[index + 2u * area]);
+    }
+    const Rgb4 block = block_linear_rgb(x >> 1u, y >> 1u);
+    const uint pick = (x & 1u) + 2u * (y & 1u);
+    return vec3(block.r[pick], block.g[pick], block.b[pick]);
+}
+
+void main() {
+    const uint tid = gl_LocalInvocationIndex;
+    const uint width = butter_width();
+    const uint height = butter_height();
+    const uint x0 = gl_WorkGroupID.x * kTile;
+    const uint y0 = gl_WorkGroupID.y * kTile;
+
+    // The rgb plane this image reads: level 0 decodes, level 1 reads the
+    // subsample level 0 wrote. The chain offsets are the sub regions.
+    const uint rgb_base =
+        pc.image == 0u ? butter_here(R_SUB0) : butter_here(R_SUB1);
+
+    // The 5-tap opsin kernel, in registers for the same reason as the
+    // separation's blurs.
+    float opsin_taps[5];
+    for (uint t = 0u; t < 5u; ++t) opsin_taps[t] = arena[pc.kernel + t];
+
+    // 1. The tile, mirror-wrapped so the separable blur below can read it
+    // linearly and still see the image's borders mirrored. The decoder returns
+    // all three channels, so each invocation publishes them together.
+    for (uint cell = tid; cell < kSrcSamples; cell += 256u) {
+        const uint r = cell / kSrc;
+        const uint c = cell % kSrc;
+        const int gx = mirror(int(x0) + int(c) - int(kHalo), int(width));
+        const int gy = mirror(int(y0) + int(r) - int(kHalo), int(height));
+        const vec3 rgb = source_rgb(pc.op, uint(gx), uint(gy), rgb_base);
+        tile[0][cell] = rgb.x;
+        tile[1][cell] = rgb.y;
+        tile[2][cell] = rgb.z;
+    }
+    barrier();
+
+    // 2. Horizontal 5-tap pass over the whole source tile.
+    for (uint i = tid; i < 3u * kSrc * kTile; i += 256u) {
+        const uint channel = i / (kSrc * kTile);
+        const uint cell = i % (kSrc * kTile);
+        const uint r = cell / kTile;
+        const uint c = cell % kTile;
+        float acc = 0.0;
+        for (uint t = 0u; t < 5u; ++t) {
+            acc += opsin_taps[t] * tile[channel][r * kSrc + c + t];
+        }
+        mid[channel][cell] = acc;
+    }
+    barrier();
+
+    // 3. Vertical pass, opsin, and the level-0 subsample. Four output pixels
+    // per invocation.
+    const uint area = butter_area();
+    const uint xyb = butter_here(R_SCRATCH_A);
+    const float target = pc.q2;
+    for (uint i = tid; i < kTile * kTile; i += 256u) {
+        const uint x = i % kTile;
+        const uint y = i / kTile;
+        const uint gx = x0 + x;
+        const uint gy = y0 + y;
+        if (gx >= width || gy >= height) continue;
+
+        vec3 blurred;
+        vec3 rgb;
+        for (uint channel = 0u; channel < 3u; ++channel) {
+            float acc = 0.0;
+            for (uint t = 0u; t < 5u; ++t) {
+                acc += opsin_taps[t] * mid[channel][(y + t) * kTile + x];
+            }
+            const float raw = tile[channel][(y + kHalo) * kSrc + x + kHalo];
+            if (channel == 0u) {
+                blurred.x = acc;
+                rgb.x = raw;
+            } else if (channel == 1u) {
+                blurred.y = acc;
+                rgb.y = raw;
+            } else {
+                blurred.z = acc;
+                rgb.z = raw;
+            }
+        }
+
+        // Sensitivity from the blurred plane, clamped as libjxl does.
+        vec3 pre = absorbance(blurred * target);
+        pre = max(pre, vec3(kMix3, kMix7, kMix11));
+        pre = max(pre, vec3(1e-4));
+        vec3 sensitivity = max(gamma3(pre) / pre, vec3(1e-4));
+
+        vec3 cur = absorbance(rgb * target) * sensitivity;
+        cur.x = max(cur.x, kMix3);
+        cur.y = max(cur.y, kMix7);
+        cur.z = max(cur.z, kMin2);
+
+        const uint index = gy * width + gx;
+        arena[xyb + index] = cur.x - cur.y;
+        arena[xyb + area + index] = cur.x + cur.y;
+        arena[xyb + 2u * area + index] = cur.z;
+    }
+
+    // 4. Level 0 also writes the 2x2 box subsample of the unblurred rgb.
+    // mirror() repeats the last sample for an odd column/row, preserving the
+    // average without applying SubSample2x's missing-tap correction again.
+    if (pc.op == 0u) {
+        const uint sub =
+            pc.image == 0u ? butter_here(R_SUB0) : butter_here(R_SUB1);
+        const uint sub_w = butter_here(R_SUBW);
+        const uint sub_h = butter_here(R_SUBH);
+        const uint tx = tid % 16u;
+        const uint ty = tid / 16u;
+        const uint sx = (x0 >> 1u) + tx;
+        const uint sy = (y0 >> 1u) + ty;
+        if (sx < sub_w && sy < sub_h) {
+            const uint bx = 2u * (sx - (x0 >> 1u));
+            const uint by = 2u * (sy - (y0 >> 1u));
+            // The sub region holds the NEXT level's planes, so its channel
+            // stride is that level's area, not this one's.
+            const uint area_s = sub_w * sub_h;
+            for (uint channel = 0u; channel < 3u; ++channel) {
+                float sum = 0.0;
+                // The four samples of the block, in (0,0),(1,0),(0,1),(1,1)
+                // order, each 0.25 of the sum (SubSample2x:1739-1746). The
+                // tile is the halo-wrapped window, so pixel (x0+bx, y0+by)
+                // sits at (by + kHalo, bx + kHalo) in it.
+                sum += tile[channel][(by + kHalo + 0u) * kSrc + bx + kHalo + 0u];
+                sum += tile[channel][(by + kHalo + 0u) * kSrc + bx + kHalo + 1u];
+                sum += tile[channel][(by + kHalo + 1u) * kSrc + bx + kHalo + 0u];
+                sum += tile[channel][(by + kHalo + 1u) * kSrc + bx + kHalo + 1u];
+                const float value = sum * 0.25;
+                arena[sub + channel * area_s + sy * sub_w + sx] = value;
+            }
+        }
+    }
+}

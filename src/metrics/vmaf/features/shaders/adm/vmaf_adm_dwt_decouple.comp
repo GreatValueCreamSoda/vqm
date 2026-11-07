@@ -1,0 +1,137 @@
+// VMAF ADM: Copyright 2016-2020 Netflix, Inc.
+// BSD-2-Clause-Patent; see licenses/NETFLIX-VMAF-LICENSE.
+// Wavelet coefficients, orientation and edge reflection follow Netflix's
+// adm_tools.c:43-44,101-233,1017-1153 at
+// 4611e47a7330cd342498dcc130e1008efbeab6e4.
+
+#version 450
+#include "bindings.glsl"
+
+#ifndef VQM_ADM_ENHN_GAIN_LIMIT
+#define VQM_ADM_ENHN_GAIN_LIMIT 100
+#endif
+
+layout(local_size_x = 16, local_size_y = 16) in;
+layout(push_constant) uniform Params {
+    uint width;
+    uint height;
+    uint reference;
+    uint distorted;
+    uint reference_low;
+    uint distorted_low;
+    uint reference_details;
+    uint restored;
+    uint additive;
+    uint stride;
+}
+pc;
+
+const float kLow[4] = float[4](
+    0.482962913144690, 0.836516303737469, 0.224143868041857, -0.129409522550921
+);
+const float kHigh[4] = float[4](
+    -0.129409522550921, -0.224143868041857, 0.836516303737469, -0.482962913144690
+);
+
+#ifdef VQM_ADM_SOURCE_TILE
+shared float reference_tile[34 * 34];
+shared float distorted_tile[34 * 34];
+#endif
+
+int dwt_mirror(int coordinate, int extent) {
+    if (coordinate < 0) return -coordinate;
+    if (coordinate >= extent) return 2 * extent - coordinate - 1;
+    return coordinate;
+}
+
+void transform(uvec2 pos, uint source, out float ll, out vec3 detail) {
+    float low_rows[4];
+    float high_rows[4];
+    for (int x = 0; x < 4; ++x) {
+        const int sx = dwt_mirror(2 * int(pos.x) - 1 + x, int(pc.width));
+        precise float low = 0.0;
+        precise float high = 0.0;
+        for (int y = 0; y < 4; ++y) {
+#ifdef VQM_ADM_SOURCE_TILE
+            const int tx = 2 * (int(pos.x) - int(gl_WorkGroupID.x * 16u)) + x;
+            const int ty = 2 * (int(pos.y) - int(gl_WorkGroupID.y * 16u)) + y;
+            const uint tile_index = uint(ty * 34 + tx);
+            const float value = source == pc.reference
+                                    ? reference_tile[tile_index]
+                                    : distorted_tile[tile_index];
+#else
+            const int sy = dwt_mirror(2 * int(pos.y) - 1 + y, int(pc.height));
+            const float value = arena[source + uint(sy) * pc.width + uint(sx)];
+#endif
+            low += kLow[y] * value;
+            high += kHigh[y] * value;
+        }
+        low_rows[x] = low;
+        high_rows[x] = high;
+    }
+    precise float low = 0.0;
+    precise float hl = 0.0;
+    precise float lh = 0.0;
+    precise float hh = 0.0;
+    for (int x = 0; x < 4; ++x) {
+        low += kLow[x] * low_rows[x];
+        lh += kHigh[x] * low_rows[x];
+        hl += kLow[x] * high_rows[x];
+        hh += kHigh[x] * high_rows[x];
+    }
+    ll = low;
+    detail = vec3(hl, lh, hh);
+}
+
+void main() {
+    const uvec2 pos = gl_GlobalInvocationID.xy;
+    const uvec2 out_size = (uvec2(pc.width, pc.height) + 1u) / 2u;
+#ifdef VQM_ADM_SOURCE_TILE
+    const uint lane = gl_LocalInvocationIndex;
+    const int origin_x = int(gl_WorkGroupID.x * 16u);
+    const int origin_y = int(gl_WorkGroupID.y * 16u);
+    for (uint i = lane; i < 34u * 34u; i += 256u) {
+        const int tx = int(i % 34u);
+        const int ty = int(i / 34u);
+        // Active outputs need at most this halo. Clamp unused tile padding
+        // before the single reflection, including at the smallest scales.
+        const int raw_x = clamp(2 * origin_x - 1 + tx, -1, int(pc.width) + 1);
+        const int raw_y = clamp(2 * origin_y - 1 + ty, -1, int(pc.height) + 1);
+        const int sx = dwt_mirror(raw_x, int(pc.width));
+        const int sy = dwt_mirror(raw_y, int(pc.height));
+        const uint index = uint(sy) * pc.width + uint(sx);
+        reference_tile[i] = arena[pc.reference + index];
+        distorted_tile[i] = arena[pc.distorted + index];
+    }
+    barrier();
+#endif
+    if (any(greaterThanEqual(pos, out_size))) return;
+    float ref_low, dis_low;
+    vec3 ref, dis;
+    transform(pos, pc.reference, ref_low, ref);
+    transform(pos, pc.distorted, dis_low, dis);
+    const uint index = pos.y * out_size.x + pos.x;
+    arena[pc.reference_low + index] = ref_low;
+    arena[pc.distorted_low + index] = dis_low;
+    vec3 restored = clamp(dis / (ref + vec3(1e-30)), 0.0, 1.0) * ref;
+#if VQM_ADM_ENHN_GAIN_LIMIT > 1
+    const float dotp = ref.x * dis.x + ref.y * dis.y;
+    const float refmag = ref.x * ref.x + ref.y * ref.y;
+    const float dismag = dis.x * dis.x + dis.y * dis.y;
+    if (dotp >= 0.0 && dotp * dotp >= 0.9996954135 * refmag * dismag) {
+        for (uint c = 0; c < 3; ++c) {
+            if (restored[c] > 0.0)
+                restored[c] =
+                    min(restored[c] * float(VQM_ADM_ENHN_GAIN_LIMIT), dis[c]);
+            if (restored[c] < 0.0)
+                restored[c] =
+                    max(restored[c] * float(VQM_ADM_ENHN_GAIN_LIMIT), dis[c]);
+        }
+    }
+#endif
+    for (uint c = 0; c < 3; ++c) {
+        arena[pc.reference_details + c * pc.stride + index] = ref[c];
+        arena[pc.restored + c * pc.stride + index] = restored[c];
+        arena[pc.additive + c * pc.stride + index] = dis[c] - restored[c];
+    }
+}

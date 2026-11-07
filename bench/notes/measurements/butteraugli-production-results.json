@@ -1,0 +1,774 @@
+{
+  "date": "2026-11-06",
+  "purpose": "Production qualification of three Butteraugli correctness fixes",
+  "baseline_head": "a949b6177efb88890dd44860cc30dff45486a25d",
+  "baseline_source": "Pre-fix dirty working tree captured before edits, overlaid onto a detached worktree at the stated commit; that worktree was built separately and removed after verification/preservation.",
+  "baseline_preservation": {
+    "source_archive": "artifacts/snapshots/butteraugli-production-baseline-2026-11-06.tar.gz",
+    "source_archive_sha256": "4d2bbceac0c86a990c4a123e118839124ee88ba258e1a227b000fefbaa29285d",
+    "source_manifest_sha256": "bbf48afebb9339abcadb9aea60727ec450733deb852f720235939634a5579b3b",
+    "baseline_binary_sha256": "51e144d5a07a082a9ef8dccf3eaf21ebf40ca5268bbeff2238374bc799ac5568",
+    "worktree_contents_verified_against_captured_source": true,
+    "unexpected_authored_files": []
+  },
+  "fixed_source_sha256": {
+    "include/butteraugli.h": "484fe8e7a88804f3ad43128e7c7aef4ba9375b1bca32e7cb5fbdbe7009de0fb9",
+    "src/metrics/butteraugli/shaders/butter_blur.comp": "bcc6f311a4b8dc15ca3511fc8193cba0ce6d99ddeb15f12b828f151a9e0d9e51",
+    "src/metrics/butteraugli/shaders/butter_malta.comp": "5a269aed3b541e8fd32b70ca247a8e22bc662e4db8ce194c4010132b9234f718",
+    "src/metrics/butteraugli/vulkan.cc": "61c8f25e329906962c3e1fad25e0d3717f92cb12c48cc3090f91c06a1a52b0bd",
+    "tests/metrics/butteraugli/butter_test.cc": "e426f5083fd439bb7eee03b5272d99949af87719e2287c25fdef51f37335bbbe",
+    "tests/metrics/butteraugli/butter_ref.cc": "e09fe25ca1e15f6bc6c8c92810cef7eab88d453be5bcdb9ee72433b63fa25c69",
+    "tests/metrics/butteraugli/butter_ref.h": "4d475f088111035cc8bb86a4801e8c8e3f2dd7d1a6f04b7b004f7ffcc2be3ef6"
+  },
+  "build": "CMake Release (-O3 -DNDEBUG), warnings as errors, GCC 16.2.1; glslc -O --target-env=vulkan1.1",
+  "gpu_before": "NVIDIA GeForce RTX 5070, 615.78.08, 49, 367 MHz",
+  "gpu_after": "NVIDIA GeForce RTX 5070, 615.78.08, 57, 2947 MHz",
+  "parameters": {
+    "hf_asymmetry": 1.0,
+    "xmul": 1.0,
+    "intensity_target": 80.0
+  },
+  "active_shader_variants": 124,
+  "raw_report_directory": "artifacts/reports/butteraugli-production",
+  "gates": {
+    "release_gpu": {
+      "command": "./build/vqm_test --require-gpu",
+      "tests": 227,
+      "failed_checks": 0,
+      "gpu_tests_skipped_for_lack_of_device": 0
+    },
+    "asan_ubsan_gpu": {
+      "command": "ASAN_OPTIONS=detect_leaks=0 UBSAN_OPTIONS=halt_on_error=1 ./build-asan/vqm_test --require-gpu",
+      "tests": 227,
+      "failed_checks": 0,
+      "gpu_tests_skipped_for_lack_of_device": 0
+    },
+    "ctest": {
+      "command": "ctest --preset release",
+      "suites": 14,
+      "failed": 0
+    },
+    "quality": {
+      "command": "python3 tools/check_quality.py --lint",
+      "formatted_files": 237,
+      "linted_production_cpp_files": 47,
+      "passed": true
+    },
+    "butteraugli_cid22_accuracy": {
+      "pairs": 4292,
+      "tolerance": 0.005,
+      "passed": true
+    },
+    "ssimulacra2_cid22_accuracy": {
+      "pairs": 300,
+      "tolerance": 0.005,
+      "passed": true
+    },
+    "references": {
+      "command": "python3 tools/fetch_references.py --check --only cid22,libjxl,ssimulacra2",
+      "passed": true
+    },
+    "ssimulacra2_identity": 100.0,
+    "butteraugli_identity_score": 0.0,
+    "butteraugli_identity_p3": 0.0
+  },
+  "goldens": {
+    "gradient_b": {
+      "score": 3.77568078,
+      "distance_p3": 2.92297296
+    },
+    "gradient_c_measured": {
+      "score": 2.95148849,
+      "distance_p3": 2.35224729
+    },
+    "golden_absolute_tolerance": 0.005,
+    "oracle_relative_tolerance_gradients_and_spatial": 0.001,
+    "ssimulacra2_pins_unchanged": [93.17505696, 92.12553218]
+  },
+  "new_regression_tests": [
+    "TestButterSpatialFrequencyResidual",
+    "TestButterSpatialChromaSuppression",
+    "TestButterSpatialTransposedOddTiles"
+  ],
+  "single_bug_mutations": {
+    "date": "2026-11-06",
+    "gpu": "NVIDIA GeForce RTX 5070",
+    "driver": "615.78.08",
+    "relative_tolerance": 0.001,
+    "corrected_experiment_result": {
+      "tests": 3,
+      "failed_checks": 0,
+      "streamed_and_cached_resident": true
+    },
+    "method": "Compile current spatial test helpers plus unchanged CPU oracle against corrected experiment timing core; restore exactly one old bug in each arm, rebuild shaders/core and relink the same test object. Raw logs retain the old third test name. Experiment shader sources restored corrected after all three arms. Only the residual arm changes two branch assignments belonging to the same raw-frequency residual bug.",
+    "source_sha256": {
+      "tests/metrics/butteraugli/butter_test.cc": "e426f5083fd439bb7eee03b5272d99949af87719e2287c25fdef51f37335bbbe",
+      "tests/metrics/butteraugli/butter_ref.cc": "e09fe25ca1e15f6bc6c8c92810cef7eab88d453be5bcdb9ee72433b63fa25c69",
+      "tests/metrics/butteraugli/butter_ref.h": "4d475f088111035cc8bb86a4801e8c8e3f2dd7d1a6f04b7b004f7ffcc2be3ef6",
+      "artifacts/reports/butteraugli-drift/mutations/corrected-blur.comp": "4ec5f75c889e0a718762b0bcf3ded4f8fa1ec3e3d4eae67606e7dba1bfcc0df5",
+      "artifacts/reports/butteraugli-drift/mutations/corrected-malta.comp": "5a269aed3b541e8fd32b70ca247a8e22bc662e4db8ce194c4010132b9234f718"
+    },
+    "experiments": [
+      {
+        "single_bug_reintroduced": "residual",
+        "exit_code": 1,
+        "raw_log": "artifacts/reports/butteraugli-drift/mutations/no-residual.log",
+        "tests": [
+          {
+            "test": "TestButterSpatialFrequencyResidual",
+            "measured_test_name": "TestButterSpatialFrequencyResidual",
+            "passed": false,
+            "oracle_score": 2.57974731586,
+            "oracle_distance_p3": 1.71196475529,
+            "score": 2.40446949005,
+            "score_relative_error": -0.06794379617430424,
+            "distance_p3": 1.66238333709,
+            "distance_p3_relative_error": -0.028961704992344295
+          },
+          {
+            "test": "TestButterSpatialChromaSuppression",
+            "measured_test_name": "TestButterSpatialChromaSuppression",
+            "passed": false,
+            "oracle_score": 2.44109057991,
+            "oracle_distance_p3": 1.64173778083,
+            "score": 2.37162685394,
+            "score_relative_error": -0.02845602147731896,
+            "distance_p3": 1.58957528748,
+            "distance_p3_relative_error": -0.03177273128454694
+          },
+          {
+            "test": "TestButterSpatialTransposedOddTiles",
+            "measured_test_name": "TestButterSpatialDirectionalMalta",
+            "passed": false,
+            "oracle_score": 2.58223560672,
+            "oracle_distance_p3": 1.69565743687,
+            "score": 2.40901708603,
+            "score_relative_error": -0.06708083500948425,
+            "distance_p3": 1.64533602472,
+            "distance_p3_relative_error": -0.02967663813210286
+          }
+        ]
+      },
+      {
+        "single_bug_reintroduced": "suppression",
+        "exit_code": 1,
+        "raw_log": "artifacts/reports/butteraugli-drift/mutations/no-suppression.log",
+        "tests": [
+          {
+            "test": "TestButterSpatialFrequencyResidual",
+            "measured_test_name": "TestButterSpatialFrequencyResidual",
+            "passed": true,
+            "oracle_score": 2.57974731586,
+            "oracle_distance_p3": 1.71196475529
+          },
+          {
+            "test": "TestButterSpatialChromaSuppression",
+            "measured_test_name": "TestButterSpatialChromaSuppression",
+            "passed": false,
+            "oracle_score": 2.44109057991,
+            "oracle_distance_p3": 1.64173778083,
+            "score": 2.41972351074,
+            "score_relative_error": -0.008753083292299624,
+            "distance_p3": 1.62706616448,
+            "distance_p3_relative_error": -0.008936638068097968
+          },
+          {
+            "test": "TestButterSpatialTransposedOddTiles",
+            "measured_test_name": "TestButterSpatialDirectionalMalta",
+            "passed": true,
+            "oracle_score": 2.58223560672,
+            "oracle_distance_p3": 1.69565743687
+          }
+        ]
+      },
+      {
+        "single_bug_reintroduced": "malta",
+        "exit_code": 1,
+        "raw_log": "artifacts/reports/butteraugli-drift/mutations/no-malta.log",
+        "tests": [
+          {
+            "test": "TestButterSpatialFrequencyResidual",
+            "measured_test_name": "TestButterSpatialFrequencyResidual",
+            "passed": false,
+            "oracle_score": 2.57974731586,
+            "oracle_distance_p3": 1.71196475529,
+            "score": 2.5970287323,
+            "score_relative_error": 0.0066988795118636535,
+            "distance_p3": 1.71412838224,
+            "distance_p3_relative_error": 0.0012638268067810543
+          },
+          {
+            "test": "TestButterSpatialChromaSuppression",
+            "measured_test_name": "TestButterSpatialChromaSuppression",
+            "passed": true,
+            "oracle_score": 2.44109057991,
+            "oracle_distance_p3": 1.64173778083
+          },
+          {
+            "test": "TestButterSpatialTransposedOddTiles",
+            "measured_test_name": "TestButterSpatialDirectionalMalta",
+            "passed": true,
+            "oracle_score": 2.58223560672,
+            "oracle_distance_p3": 1.69565743687
+          }
+        ]
+      }
+    ]
+  },
+  "corpus": {
+    "pairs": 4292,
+    "mean_absolute_error": 0.0002852785647716698,
+    "max_absolute_error": 0.032817120000000255,
+    "p99_absolute_error": 0.005892558600000386,
+    "pairs_over_5_percent": 0,
+    "pairs_over_0_01": 8,
+    "png_pairs": 3756,
+    "png_mae": 1.4928974973378024e-05,
+    "png_max": 0.0004358299999989157,
+    "png_default_strict_thresholds_pass": true,
+    "full_corpus_default_strict_thresholds_pass": false,
+    "full_corpus_strict_limit": "Eight MozJPEG ICC profiles differ; metric fixes do not change input color management.",
+    "production_matches_investigation_corrected_scores": true
+  },
+  "performance_protocol": {
+    "runs_per_arm": 5,
+    "order": "For each geometry/mode, alternate baseline then fixed for rounds1..5",
+    "resident": {
+      "iterations": 20,
+      "warmup": 3,
+      "resident": 2,
+      "reference_cached": true
+    },
+    "streaming": {
+      "iterations": 8,
+      "warmup": 2,
+      "resident": 0
+    },
+    "all_40_scores_checksums_and_stage_tables_checked": true,
+    "processes": 1,
+    "workers": 1,
+    "half_planes": false,
+    "speedup_required": false,
+    "comparison": "Correctness fix; latency/stage deltas are reported rather than claimed as an optimization."
+  },
+  "binary_sha256": {
+    "baseline": "51e144d5a07a082a9ef8dccf3eaf21ebf40ca5268bbeff2238374bc799ac5568",
+    "fixed": "155eda72e223cdb87b08a300f99e9d6959c7228c2c28b75580854b6adff87ee0"
+  },
+  "input_sha256": {
+    "1920x1080": {
+      ".cache/bench/pairs/synthetic-1920x1080/orig.png": "7f2007adcb5a07312b28613aee75f5b2a0f15ea5541e5b9af5104a0f30c38c4c",
+      ".cache/bench/pairs/synthetic-1920x1080/dist.png": "c509994f72b5a8feb92ef44a24c3319815db248c21c71c422677ec2b00745ee0"
+    },
+    "3840x2160": {
+      ".cache/bench/pairs/synthetic-3840x2160/orig.png": "756b05ccfb73363a0baf14c6909e8da9fd8938fb68847858cbf34f9892d563f8",
+      ".cache/bench/pairs/synthetic-3840x2160/dist.png": "150342f805c5908187b44f24daad727e4d7c7e2669c09c5e51c177387eadd253"
+    }
+  },
+  "performance": [
+    {
+      "geometry": "1920x1080",
+      "mode": "resident",
+      "timings_ms": {
+        "core_ms": {
+          "baseline": {
+            "median": 2.082586,
+            "min": 2.074777,
+            "max": 2.089237,
+            "values": [2.074777, 2.087626, 2.079461, 2.082586, 2.089237]
+          },
+          "fixed": {
+            "median": 2.079516,
+            "min": 2.068251,
+            "max": 2.081396,
+            "values": [2.079516, 2.078092, 2.068251, 2.081396, 2.079571]
+          },
+          "fixed_change_percent": -0.14741287994830543
+        },
+        "opsin": {
+          "baseline": {
+            "median": 0.262336,
+            "min": 0.261635,
+            "max": 0.264722,
+            "values": [0.262368, 0.264722, 0.261736, 0.261635, 0.262336]
+          },
+          "fixed": {
+            "median": 0.26293,
+            "min": 0.261834,
+            "max": 0.26363,
+            "values": [0.262042, 0.26293, 0.261834, 0.262994, 0.26363]
+          },
+          "fixed_change_percent": 0.22642717736032214
+        },
+        "separate": {
+          "baseline": {
+            "median": 0.562755,
+            "min": 0.561128,
+            "max": 0.565138,
+            "values": [0.562755, 0.561128, 0.563955, 0.562475, 0.565138]
+          },
+          "fixed": {
+            "median": 0.55993,
+            "min": 0.557675,
+            "max": 0.56296,
+            "values": [0.557675, 0.558408, 0.56296, 0.55993, 0.560509]
+          },
+          "fixed_change_percent": -0.5019946513136198
+        },
+        "malta": {
+          "baseline": {
+            "median": 0.609195,
+            "min": 0.598402,
+            "max": 0.631866,
+            "values": [0.598402, 0.609195, 0.620886, 0.607022, 0.631866]
+          },
+          "fixed": {
+            "median": 0.60689,
+            "min": 0.606566,
+            "max": 0.617539,
+            "values": [0.60689, 0.60677, 0.606566, 0.609362, 0.617539]
+          },
+          "fixed_change_percent": -0.37836817439407255
+        },
+        "diff": {
+          "baseline": {
+            "median": 0.273515,
+            "min": 0.271232,
+            "max": 0.278093,
+            "values": [0.272565, 0.278093, 0.271232, 0.27424, 0.273515]
+          },
+          "fixed": {
+            "median": 0.275995,
+            "min": 0.269243,
+            "max": 0.276923,
+            "values": [0.275995, 0.276694, 0.269243, 0.276923, 0.274344]
+          },
+          "fixed_change_percent": 0.906714439793066
+        },
+        "mask": {
+          "baseline": {
+            "median": 0.086934,
+            "min": 0.086267,
+            "max": 0.087197,
+            "values": [0.086336, 0.086267, 0.087197, 0.086934, 0.087022]
+          },
+          "fixed": {
+            "median": 0.088306,
+            "min": 0.087827,
+            "max": 0.088624,
+            "values": [0.087827, 0.088302, 0.088624, 0.088306, 0.088467]
+          },
+          "fixed_change_percent": 1.5782087560678226
+        },
+        "combine": {
+          "baseline": {
+            "median": 0.170725,
+            "min": 0.169886,
+            "max": 0.171336,
+            "values": [0.170253, 0.169886, 0.170781, 0.170725, 0.171336]
+          },
+          "fixed": {
+            "median": 0.170912,
+            "min": 0.169622,
+            "max": 0.171334,
+            "values": [0.169622, 0.170965, 0.170752, 0.171334, 0.170912]
+          },
+          "fixed_change_percent": 0.10953287450579108
+        },
+        "reduce": {
+          "baseline": {
+            "median": 0.043126,
+            "min": 0.043035,
+            "max": 0.043259,
+            "values": [0.043126, 0.043035, 0.043182, 0.043259, 0.04308]
+          },
+          "fixed": {
+            "median": 0.043054,
+            "min": 0.042979,
+            "max": 0.043259,
+            "values": [0.043259, 0.042979, 0.043157, 0.043054, 0.04305]
+          },
+          "fixed_change_percent": -0.16695265037331986
+        }
+      }
+    },
+    {
+      "geometry": "1920x1080",
+      "mode": "streaming",
+      "timings_ms": {
+        "core_ms": {
+          "baseline": {
+            "median": 3.474655,
+            "min": 3.46422,
+            "max": 3.48082,
+            "values": [3.475955, 3.48082, 3.467205, 3.46422, 3.474655]
+          },
+          "fixed": {
+            "median": 3.46522,
+            "min": 3.449855,
+            "max": 3.46872,
+            "values": [3.46872, 3.46522, 3.46517, 3.449855, 3.467785]
+          },
+          "fixed_change_percent": -0.27153774979098433
+        },
+        "opsin": {
+          "baseline": {
+            "median": 0.531592,
+            "min": 0.519384,
+            "max": 0.555608,
+            "values": [0.555608, 0.519384, 0.533748, 0.531592, 0.52062]
+          },
+          "fixed": {
+            "median": 0.52016,
+            "min": 0.518644,
+            "max": 0.534384,
+            "values": [0.534384, 0.52016, 0.520972, 0.518644, 0.519364]
+          },
+          "fixed_change_percent": -2.150521452542553
+        },
+        "separate": {
+          "baseline": {
+            "median": 1.130936,
+            "min": 1.129532,
+            "max": 1.137244,
+            "values": [1.137244, 1.130936, 1.1324, 1.130004, 1.129532]
+          },
+          "fixed": {
+            "median": 1.125684,
+            "min": 1.121036,
+            "max": 1.137756,
+            "values": [1.125684, 1.121364, 1.137756, 1.133208, 1.121036]
+          },
+          "fixed_change_percent": -0.46439409480288907
+        },
+        "malta": {
+          "baseline": {
+            "median": 0.612644,
+            "min": 0.593844,
+            "max": 0.632324,
+            "values": [0.613464, 0.61228, 0.632324, 0.612644, 0.593844]
+          },
+          "fixed": {
+            "median": 0.611428,
+            "min": 0.593884,
+            "max": 0.637316,
+            "values": [0.637316, 0.593884, 0.611916, 0.611428, 0.61012]
+          },
+          "fixed_change_percent": -0.19848394826359472
+        },
+        "diff": {
+          "baseline": {
+            "median": 0.27464,
+            "min": 0.271024,
+            "max": 0.27796,
+            "values": [0.27796, 0.27464, 0.272192, 0.274972, 0.271024]
+          },
+          "fixed": {
+            "median": 0.274284,
+            "min": 0.271028,
+            "max": 0.275972,
+            "values": [0.274564, 0.275972, 0.271028, 0.273744, 0.274284]
+          },
+          "fixed_change_percent": -0.12962423536266865
+        },
+        "mask": {
+          "baseline": {
+            "median": 0.086172,
+            "min": 0.0857,
+            "max": 0.086848,
+            "values": [0.085772, 0.0857, 0.086172, 0.086848, 0.086836]
+          },
+          "fixed": {
+            "median": 0.087864,
+            "min": 0.08742,
+            "max": 0.088676,
+            "values": [0.08742, 0.087864, 0.087836, 0.088276, 0.088676]
+          },
+          "fixed_change_percent": 1.9635148308035033
+        },
+        "combine": {
+          "baseline": {
+            "median": 0.170612,
+            "min": 0.170312,
+            "max": 0.171864,
+            "values": [0.170412, 0.170312, 0.171864, 0.170612, 0.17064]
+          },
+          "fixed": {
+            "median": 0.171184,
+            "min": 0.170552,
+            "max": 0.171568,
+            "values": [0.170552, 0.171568, 0.171184, 0.170876, 0.171432]
+          },
+          "fixed_change_percent": 0.3352636391344088
+        },
+        "reduce": {
+          "baseline": {
+            "median": 0.04302,
+            "min": 0.043008,
+            "max": 0.0432,
+            "values": [0.043196, 0.04302, 0.043008, 0.043016, 0.0432]
+          },
+          "fixed": {
+            "median": 0.043008,
+            "min": 0.042948,
+            "max": 0.043148,
+            "values": [0.043008, 0.042948, 0.043148, 0.042952, 0.043132]
+          },
+          "fixed_change_percent": -0.027894002789408123
+        }
+      }
+    },
+    {
+      "geometry": "3840x2160",
+      "mode": "resident",
+      "timings_ms": {
+        "core_ms": {
+          "baseline": {
+            "median": 9.28581,
+            "min": 9.266116,
+            "max": 9.315001,
+            "values": [9.266116, 9.277177, 9.315001, 9.28875, 9.28581]
+          },
+          "fixed": {
+            "median": 9.360032,
+            "min": 9.338596,
+            "max": 9.557487,
+            "values": [9.360032, 9.557487, 9.347481, 9.338596, 9.367996]
+          },
+          "fixed_change_percent": 0.7993056071575966
+        },
+        "opsin": {
+          "baseline": {
+            "median": 1.012638,
+            "min": 1.010914,
+            "max": 1.013168,
+            "values": [1.010914, 1.011603, 1.012674, 1.013168, 1.012638]
+          },
+          "fixed": {
+            "median": 1.011958,
+            "min": 1.011645,
+            "max": 1.01304,
+            "values": [1.011645, 1.011779, 1.011958, 1.01229, 1.01304]
+          },
+          "fixed_change_percent": -0.06715134134804845
+        },
+        "separate": {
+          "baseline": {
+            "median": 2.532846,
+            "min": 2.496792,
+            "max": 2.538757,
+            "values": [2.538757, 2.532846, 2.524757, 2.536278, 2.496792]
+          },
+          "fixed": {
+            "median": 2.571613,
+            "min": 2.56171,
+            "max": 2.635064,
+            "values": [2.56171, 2.635064, 2.569779, 2.591091, 2.571613]
+          },
+          "fixed_change_percent": 1.5305707492678122
+        },
+        "malta": {
+          "baseline": {
+            "median": 2.738806,
+            "min": 2.716942,
+            "max": 2.747419,
+            "values": [2.718976, 2.716942, 2.743894, 2.738806, 2.747419]
+          },
+          "fixed": {
+            "median": 2.727467,
+            "min": 2.724098,
+            "max": 2.747152,
+            "values": [2.736083, 2.727067, 2.727467, 2.747152, 2.724098]
+          },
+          "fixed_change_percent": -0.4140125295475472
+        },
+        "diff": {
+          "baseline": {
+            "median": 1.450266,
+            "min": 1.442635,
+            "max": 1.477277,
+            "values": [1.445318, 1.477277, 1.45613, 1.442635, 1.450266]
+          },
+          "fixed": {
+            "median": 1.468858,
+            "min": 1.453112,
+            "max": 1.519651,
+            "values": [1.453112, 1.492133, 1.460949, 1.519651, 1.468858]
+          },
+          "fixed_change_percent": 1.2819717210497794
+        },
+        "mask": {
+          "baseline": {
+            "median": 0.393309,
+            "min": 0.390758,
+            "max": 0.395995,
+            "values": [0.395995, 0.394901, 0.390758, 0.392757, 0.393309]
+          },
+          "fixed": {
+            "median": 0.405374,
+            "min": 0.401045,
+            "max": 0.429835,
+            "values": [0.404752, 0.425822, 0.401045, 0.405374, 0.429835]
+          },
+          "fixed_change_percent": 3.0675626542997936
+        },
+        "combine": {
+          "baseline": {
+            "median": 0.799072,
+            "min": 0.791141,
+            "max": 0.812234,
+            "values": [0.791141, 0.812234, 0.80252, 0.799072, 0.797504]
+          },
+          "fixed": {
+            "median": 0.795653,
+            "min": 0.792261,
+            "max": 0.804566,
+            "values": [0.795653, 0.792261, 0.804566, 0.794229, 0.799314]
+          },
+          "fixed_change_percent": -0.4278713307436566
+        },
+        "reduce": {
+          "baseline": {
+            "median": 0.18479,
+            "min": 0.184685,
+            "max": 0.184941,
+            "values": [0.184709, 0.18479, 0.184685, 0.18484, 0.184941]
+          },
+          "fixed": {
+            "median": 0.184856,
+            "min": 0.18436,
+            "max": 0.228699,
+            "values": [0.185043, 0.184802, 0.18436, 0.184856, 0.228699]
+          },
+          "fixed_change_percent": 0.03571621841007566
+        }
+      }
+    },
+    {
+      "geometry": "3840x2160",
+      "mode": "streaming",
+      "timings_ms": {
+        "core_ms": {
+          "baseline": {
+            "median": 15.288186,
+            "min": 15.095611,
+            "max": 15.30921,
+            "values": [15.301476, 15.288186, 15.095611, 15.30921, 15.160114]
+          },
+          "fixed": {
+            "median": 15.259556,
+            "min": 15.126376,
+            "max": 15.45753,
+            "values": [15.126376, 15.255061, 15.259556, 15.45753, 15.289404]
+          },
+          "fixed_change_percent": -0.18726878388318768
+        },
+        "opsin": {
+          "baseline": {
+            "median": 2.061604,
+            "min": 2.052756,
+            "max": 2.071876,
+            "values": [2.071876, 2.054644, 2.052756, 2.07076, 2.061604]
+          },
+          "fixed": {
+            "median": 2.05262,
+            "min": 2.033204,
+            "max": 2.125808,
+            "values": [2.05262, 2.03576, 2.033204, 2.125808, 2.06124]
+          },
+          "fixed_change_percent": -0.4357771909639263
+        },
+        "separate": {
+          "baseline": {
+            "median": 5.063908,
+            "min": 5.003276,
+            "max": 5.167508,
+            "values": [5.063908, 5.066256, 5.003276, 5.167508, 5.039936]
+          },
+          "fixed": {
+            "median": 5.266312,
+            "min": 5.17284,
+            "max": 5.3301,
+            "values": [5.3301, 5.303308, 5.17284, 5.266312, 5.173356]
+          },
+          "fixed_change_percent": 3.9969920464589803
+        },
+        "malta": {
+          "baseline": {
+            "median": 2.75586,
+            "min": 2.73188,
+            "max": 2.789552,
+            "values": [2.75586, 2.789552, 2.756024, 2.751188, 2.73188]
+          },
+          "fixed": {
+            "median": 2.744736,
+            "min": 2.73542,
+            "max": 2.82746,
+            "values": [2.743672, 2.809224, 2.73542, 2.82746, 2.744736]
+          },
+          "fixed_change_percent": -0.40364895168840675
+        },
+        "diff": {
+          "baseline": {
+            "median": 1.47222,
+            "min": 1.448888,
+            "max": 1.498892,
+            "values": [1.498892, 1.474992, 1.455532, 1.47222, 1.448888]
+          },
+          "fixed": {
+            "median": 1.46962,
+            "min": 1.434932,
+            "max": 1.520552,
+            "values": [1.434932, 1.4837, 1.451588, 1.520552, 1.46962]
+          },
+          "fixed_change_percent": -0.17660404015705788
+        },
+        "mask": {
+          "baseline": {
+            "median": 0.394888,
+            "min": 0.389912,
+            "max": 0.41418,
+            "values": [0.389912, 0.41056, 0.392688, 0.41418, 0.394888]
+          },
+          "fixed": {
+            "median": 0.396984,
+            "min": 0.394508,
+            "max": 0.398664,
+            "values": [0.396896, 0.398216, 0.396984, 0.394508, 0.398664]
+          },
+          "fixed_change_percent": 0.5307834120054311
+        },
+        "combine": {
+          "baseline": {
+            "median": 0.791372,
+            "min": 0.79074,
+            "max": 0.792808,
+            "values": [0.79074, 0.790872, 0.791372, 0.791556, 0.792808]
+          },
+          "fixed": {
+            "median": 0.797048,
+            "min": 0.787816,
+            "max": 0.844756,
+            "values": [0.787816, 0.792144, 0.797048, 0.844756, 0.8418]
+          },
+          "fixed_change_percent": 0.717235383612258
+        },
+        "reduce": {
+          "baseline": {
+            "median": 0.200632,
+            "min": 0.18486,
+            "max": 0.237676,
+            "values": [0.215436, 0.18486, 0.237676, 0.197528, 0.200632]
+          },
+          "fixed": {
+            "median": 0.18436,
+            "min": 0.183676,
+            "max": 0.201252,
+            "values": [0.185104, 0.18436, 0.201252, 0.183676, 0.18414]
+          },
+          "fixed_change_percent": -8.110371226922929
+        }
+      }
+    }
+  ]
+}

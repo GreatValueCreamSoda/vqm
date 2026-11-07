@@ -1,0 +1,67 @@
+// ColorVideoVDP: Copyright (c) 2024, Graphics and Displays group.
+// MIT; see licenses/COLORVIDEOVDP-LICENSE.
+// Original mult-mutual masking and pooling: cvvdp_metric.py:759-771,848-861,
+// 918-944,1005-1026 (v0.5.7). The 13x13 reflect Gaussian is evaluated as two
+// separable passes; its FP32 reduction order is validated against the oracle.
+
+#version 450
+#include "cvvdp_spatial_common.glsl"
+
+layout(local_size_x = 256) in;
+shared float sums[256];
+
+void main() {
+    const uint index = gl_GlobalInvocationID.x;
+    const uint area = pc.width * pc.height;
+    const uint channel = gl_WorkGroupID.y;
+    const uint plane = channel * area;
+    if (pc.op < 3u) {
+        if (index >= area) return;
+        float value;
+        if (pc.op == 2u) {
+            value = arena[pc.reference + plane + index];
+        } else {
+            const int x = int(index % pc.width);
+            const int y = int(index / pc.width);
+            value = 0.0;
+            for (int tap = -6; tap <= 6; ++tap) {
+                const int sx = pc.op == 0u ? reflect(x + tap, int(pc.width)) : x;
+                const int sy =
+                    pc.op == 1u ? reflect(y + tap, int(pc.height)) : y;
+                value +=
+                    model(24u + uint(tap + 6)) *
+                    arena[pc.reference + plane + uint(sy) * pc.width + uint(sx)];
+            }
+        }
+        if (pc.op != 0u) {
+            value = safe_pow(abs(value * model(1u)), model(4u + channel));
+        }
+        arena[pc.destination + plane + index] = value;
+        return;
+    }
+    float power = 0.0;
+    if (index < area) {
+        float difference = arena[pc.reference + plane + index];
+        if (pc.op == 3u) {
+            float mask = 0.0;
+            for (uint source = 0u; source < pc.channels; ++source) {
+                mask += arena[pc.distorted + source * area + index] *
+                        model(8u + source * 4u + channel);
+            }
+            const float unbounded =
+                safe_pow(difference, model(0u)) / (1.0 + mask);
+            difference = model(2u) * unbounded / (model(2u) + unbounded);
+        }
+        power = safe_pow(difference, 2.0);
+    }
+    const uint lane = gl_LocalInvocationIndex;
+    sums[lane] = power;
+    barrier();
+    for (uint stride = 128u; stride > 0u; stride >>= 1u) {
+        if (lane < stride) sums[lane] += sums[lane + stride];
+        barrier();
+    }
+    if (lane == 0u) {
+        arena[pc.partials + channel * pc.groups + gl_WorkGroupID.x] = sums[0];
+    }
+}

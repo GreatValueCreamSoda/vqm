@@ -1,0 +1,112 @@
+// ColorVideoVDP display model: Graphics and Displays Group (2024), MIT.
+// VQM source decoding is shared with the other metrics, BSD-3-Clause.
+#version 450
+#extension GL_GOOGLE_include_directive : require
+
+layout(local_size_x = 16, local_size_y = 8) in;
+#include "bindings.glsl"
+layout(std430, binding = 1) buffer InputStatus { uint input_status[]; };
+layout(push_constant) uniform Push {
+    uint desc_base;
+    uint output_base;
+    uint width;
+    uint height;
+    uint transfer_kind;
+    float peak;
+    float black;
+    float reflected;
+    float exposure;
+    float hlg_gamma;
+    float background;  // Required only by the unused shared high-level decoder.
+    float matrix[9];
+    uint status;
+}
+pc;
+uint source_width() { return pc.width; }
+uint source_height() { return pc.height; }
+#include "color.glsl"
+
+vec3 emitted(vec3 value) {
+    if (pc.transfer_kind == 1u) {
+        return clamp(value * pc.exposure, max(0.005, pc.black), pc.peak) +
+               pc.reflected;
+    }
+    value = clamp(value, 0.0, 1.0);
+    if (pc.transfer_kind == 2u) {
+        vec3 power = pow(value, vec3(1.0 / 78.84375));
+        vec3 nits = 10000.0 * pow(max(power - 0.8359375, 0.0) /
+                                      (18.8515625 - 18.6875 * power),
+                                  vec3(1.0 / 0.1593017578125));
+        return clamp(nits * pc.exposure, 0.005, pc.peak) + pc.black +
+               pc.reflected;
+    }
+    vec3 linear;
+    if (pc.transfer_kind == 3u) {
+        const float a = 0.17883277;
+        const float b = 1.0 - 4.0 * a;
+        const float c = 0.5 - a * log(4.0 * a);
+        for (uint ch = 0u; ch < 3u; ++ch) {
+            linear[ch] = value[ch] <= 0.5
+                             ? value[ch] * value[ch] / 3.0
+                             : (exp((value[ch] - c) / a) + b) / 12.0;
+        }
+        float luminance = dot(linear, vec3(0.2627, 0.6780, 0.0593));
+        linear *= pow(luminance, pc.hlg_gamma - 1.0);
+    } else {
+        linear =
+            vec3(srgb_eotf(value.x), srgb_eotf(value.y), srgb_eotf(value.z));
+    }
+    if (pc.exposure != 1.0) linear = clamp(linear * pc.exposure, 0.0, 1.0);
+    return (pc.peak - pc.black) * linear + pc.black + pc.reflected;
+}
+
+void main() {
+    uint bx = gl_GlobalInvocationID.x;
+    uint by = gl_GlobalInvocationID.y;
+    if (2u * bx >= pc.width || 2u * by >= pc.height) return;
+    uvec4 px = uvec4(
+        2u * bx, min(2u * bx + 1u, pc.width - 1u), 2u * bx,
+        min(2u * bx + 1u, pc.width - 1u)
+    );
+    uvec4 py = uvec4(
+        2u * by, 2u * by, min(2u * by + 1u, pc.height - 1u),
+        min(2u * by + 1u, pc.height - 1u)
+    );
+    vec4 u = vec4(0.0);
+    vec4 v = vec4(0.0);
+    if (src_family() == 2u) {
+        u = chroma_block(1u, px, py);
+        v = chroma_block(2u, px, py);
+    }
+    for (uint i = 0u; i < 4u; ++i) {
+        // Duplicate edge lanes are skipped so no invocation races on an odd
+        // edge.
+        if ((i % 2u == 1u && 2u * bx + 1u >= pc.width) ||
+            (i >= 2u && 2u * by + 1u >= pc.height))
+            continue;
+        vec3 encoded = vec3(raw_sample(0u, px[i], py[i]));
+        if (src_family() == 2u)
+            encoded.yz = vec2(u[i], v[i]);
+        else if (src_family() == 1u)
+            encoded.yz =
+                vec2(raw_sample(1u, px[i], py[i]), raw_sample(2u, px[i], py[i]));
+        vec3 rgb =
+            src_identity1() ? encoded : apply_matrix(kDescMatrix1, encoded);
+        if (any(isnan(rgb)) || any(isinf(rgb))) {
+            atomicOr(input_status[pc.status], 1u);
+            continue;
+        }
+        vec3 light = emitted(rgb);
+        if (any(isnan(light)) || any(isinf(light))) {
+            atomicOr(input_status[pc.status], 1u);
+            continue;
+        }
+        uint pixel = py[i] * pc.width + px[i];
+        for (uint ch = 0u; ch < 3u; ++ch) {
+            uint row = 3u * ch;
+            arena[pc.output_base + ch * pc.width * pc.height + pixel] =
+                light.x * pc.matrix[row] + light.y * pc.matrix[row + 1u] +
+                light.z * pc.matrix[row + 2u];
+        }
+    }
+}

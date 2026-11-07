@@ -1,0 +1,77 @@
+// Derived from Cloudinary SSIMULACRA 2 (Copyright (c) Jon Sneyers, Cloudinary).
+// BSD-3-Clause; see LICENSE.
+// Convert described SDR input to BT.709 limited-range 16-bit YUV for VMAF.
+// The shared decoder converts into linear Rec.709 and blends alpha in the
+// same source domain as SSIMULACRA 2 before applying its transfer function.
+#version 450
+
+#include "bindings.glsl"
+
+layout(push_constant) uniform Push {
+    uint desc_base;
+    uint width;
+    uint height;
+    uint out_y;
+    uint out_u;
+    uint out_v;
+    uint flags;
+    float background;
+}
+pc;
+
+uint source_width() { return pc.width; }
+uint source_height() { return pc.height; }
+
+#include "color.glsl"
+
+layout(local_size_x = 16, local_size_y = 16) in;
+
+// The float feature planes use coded 8-bit units minus 128, including the
+// fractional low bits of the 16-bit representation. Clamp legal storage
+// values without clipping headroom/footroom to nominal limited range.
+float coded_sample(float value) {
+    return roundEven(clamp(value * 256.0, 0.0, 65535.0)) * (1.0 / 256.0) - 128.0;
+}
+
+vec3 yuv_of(vec3 linear_rgb) {
+    // The shared source decoder uses display-referred BT.709 (gamma 2.4),
+    // matching zimg's default. Its inverse preserves BT.709 round trips;
+    // the camera OETF is a different curve.
+    const vec3 rgb = pow(max(linear_rgb, vec3(0.0)), vec3(1.0 / 2.4));
+    const float y = dot(rgb, vec3(0.2126, 0.7152, 0.0722));
+    return vec3(
+        16.0 + 219.0 * y, 128.0 + (112.0 / 0.9278) * (rgb.b - y),
+        128.0 + (112.0 / 0.7874) * (rgb.r - y)
+    );
+}
+
+void main() {
+    const uvec2 block = gl_GlobalInvocationID.xy;
+    const uvec2 base = 2u * block;
+    if (base.x >= pc.width || base.y >= pc.height) return;
+    const Rgb4 rgb = block_linear_rgb(block.x, block.y);
+    vec3 colors[4];
+    for (uint i = 0u; i < 4u; ++i)
+        colors[i] = yuv_of(vec3(rgb.r[i], rgb.g[i], rgb.b[i]));
+
+    const bool chroma420 = (pc.flags & 1u) != 0u;
+    const bool emit_chroma = (pc.flags & 2u) != 0u;
+    for (uint i = 0u; i < 4u; ++i) {
+        const uvec2 p = base + uvec2(i & 1u, i >> 1u);
+        if (p.x >= pc.width || p.y >= pc.height) continue;
+        const uint index = p.y * pc.width + p.x;
+        arena[pc.out_y + index] = coded_sample(colors[i].x);
+        if (emit_chroma && !chroma420) {
+            arena[pc.out_u + index] = coded_sample(colors[i].y);
+            arena[pc.out_v + index] = coded_sample(colors[i].z);
+        }
+    }
+    if (emit_chroma && chroma420) {
+        // The source decoder clamps the 2x2 block at odd right/bottom edges.
+        const uint chroma_width = pc.width / 2u + pc.width % 2u;
+        const uint index = block.y * chroma_width + block.x;
+        const vec3 mean = (colors[0] + colors[1] + colors[2] + colors[3]) * 0.25;
+        arena[pc.out_u + index] = coded_sample(mean.y);
+        arena[pc.out_v + index] = coded_sample(mean.z);
+    }
+}

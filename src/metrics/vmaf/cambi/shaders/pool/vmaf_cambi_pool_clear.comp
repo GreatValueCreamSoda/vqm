@@ -1,0 +1,14 @@
+// Copyright 2016-2020 Netflix, Inc. BSD-2-Clause-Patent.
+// See licenses/NETFLIX-VMAF-LICENSE.
+#version 450
+#include "vmaf_cambi_pool_common.glsl"
+layout(local_size_x = 256) in;
+void main() {
+    PoolArgs a = pool_args();
+    uint lane = gl_LocalInvocationIndex;
+    data[a.histogram + lane] = 0;
+    if (lane == 0 && a.pass == 3) {
+        data[a.state] = 0;               // prefix of threshold key
+        data[a.state + 1] = a.selected;  // 1-based rank within prefix
+    }
+}

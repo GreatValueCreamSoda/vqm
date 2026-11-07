@@ -1,0 +1,218 @@
+// Derived from Cloudinary SSIMULACRA 2 (Copyright (c) Jon Sneyers, Cloudinary).
+// BSD-3-Clause; see LICENSE.
+// Butteraugli portions: Copyright (c) the JPEG XL Project Authors.
+// BSD-3-Clause; see licenses/JPEG-XL-LICENSE.
+
+// One separable plane-to-plane blur of the frequency separation, compiled once
+// per tap count (7, 13, 15, 33 taps) with libjxl's truncate-and-renormalize
+// borders (butteraugli.cc:99-228 ConvolutionWithTranspose: an out-of-range tap
+// is dropped and the remaining weights are renormalized; the interior divides
+// by the full kernel sum, which is 1 because the host stores normalized taps).
+//
+// The epilogue folds the separation's post-ops into the vertical pass, so the
+// blurred value never makes a round trip through another dispatch:
+//   op 0 PLAIN  out0 = blur(in)
+//   op 1 LF     out0 = blur(in) (raw; XybLowFreqToVals runs where it is read)
+//               out1 = in - out0        (mf = xyb - lf)
+//   op 2 MF     out0 = range(blur(in))  (X remove 0.29, Y amplify 0.1)
+//               out1 = in - blur(in)    (hf = mf_before - raw_blur)
+//               the B channel (z == 2) has no hf and takes the plain blur.
+//   op 3 UHF    out0 = hf after the UHF range rule, out1 = uhf
+//               (X: hf = remove(blur, 1.5), uhf = remove(in - blur, 0.04);
+//                Y: hf = amplify(2.155*clamp(blur, 28.469), 0.132),
+//                   uhf = 2.69313763794*clamp(in - clamp(blur, 28.469), 5.1918))
+//               SeparateHFAndUHF, butteraugli.cc:476-537.
+// Before op 3, SuppressXByY (:367-390,472) scales the raw HF X samples by
+// their sibling HF Y values. Loading that transform into the source tile
+// applies it to both the blur taps and the unblurred residual. The raw HF
+// input planes remain immutable; the dispatch writes separate HF/UHF planes.
+//
+// Geometry: 16x16 invocations own a 32x32 output tile plus a radius halo, so
+// the shared block is (32+2R)^2 + 32*(32+2R) floats -- 24 KB at 33 taps.
+//
+// Both passes use scale.comp's shape: four outputs share one window of source
+// values. The horizontal pass reads kTaps+3 shared values for four output
+// columns (16 values feeding 52 taps for the 13-tap kernel), and the vertical
+// pass reads kTaps+3 rows for four consecutive output rows, so the 33-tap LF
+// blur goes from 99 shared loads per output per channel to 18. Every output
+// still accumulates its taps in ascending order, so the sums are the same
+// association; the compiler contracts the four accumulators into FMAs
+// differently, which is why the 32x32 fixture's distance_p3 moved by 2e-8
+// while the score and the 4K checksum stayed identical. The tap weights live in
+// registers because re-reading them from the arena measurably cost 42% of the
+// stage.
+
+#version 450
+
+#include "butter_common.glsl"
+
+layout(local_size_x = 16, local_size_y = 16) in;
+
+const uint kTile = 32u;
+const uint kTaps = uint(BUTTER_BLUR_TAPS);
+const uint kRadius = kTaps / 2u;
+const uint kSrc = kTile + 2u * kRadius;
+const uint kQuads = kTile / 4u;
+// Four outputs in a row share kTaps + 3 source values.
+const uint kValues = kTaps + 3u;
+const uint kWork = kSrc * kSrc + kTile * kSrc;
+
+shared float pool[kWork];
+
+uint mid_index(uint r, uint c) { return kSrc * kSrc + r * kTile + c; }
+
+// The separation's post-ops, one output pixel per call.
+void epilogue(
+    uint op, uint z, float blurred, float pre, out float value, out float aux,
+    out bool write_aux
+) {
+    value = blurred;
+    aux = 0.0;
+    write_aux = false;
+    if (op == 2u) {
+        if (z == 0u) {
+            value = remove_range(blurred, 0.29);
+            aux = pre - blurred;
+            write_aux = true;
+        } else if (z == 1u) {
+            value = amplify_range(blurred, 0.1);
+            aux = pre - blurred;
+            write_aux = true;
+        }
+    } else if (op == 3u) {
+        if (z == 0u) {
+            value = remove_range(blurred, 1.5);
+            aux = remove_range(pre - blurred, 0.04);
+            write_aux = true;
+        } else {
+            const float hf = maximum_clamp(blurred, 28.4691806922);
+            aux = 2.69313763794 * maximum_clamp(pre - hf, 5.19175294647);
+            value = amplify_range(hf * 2.155, 0.132);
+            write_aux = true;
+        }
+    } else if (op == 1u) {
+        aux = pre - blurred;
+        write_aux = true;
+    }
+}
+
+void main() {
+    const uint tid = gl_LocalInvocationIndex;
+    const uint width = butter_width();
+    const uint height = butter_height();
+    const uint area = butter_area();
+    const uint x0 = gl_WorkGroupID.x * kTile;
+    const uint y0 = gl_WorkGroupID.y * kTile;
+    const uint z = gl_WorkGroupID.z;
+
+    // The tap table is uniform for the whole dispatch, so hold it in registers
+    // rather than re-reading the arena inside every loop iteration.
+    float weight_taps[kTaps];
+    for (uint t = 0u; t < kTaps; ++t) weight_taps[t] = arena[pc.kernel + t];
+
+    const uint in_base = pc.a + z * area;
+    const uint out0 = pc.b + z * area;
+    const uint out1 = pc.c + z * area;
+
+    // 1. The source tile, zero outside the image: those taps are dropped and
+    // the weight renormalized, which is exactly what the border rule does.
+    for (uint i = tid; i < kSrc * kSrc; i += 256u) {
+        const uint r = i / kSrc;
+        const uint c = i % kSrc;
+        const int gx = int(x0) + int(c) - int(kRadius);
+        const int gy = int(y0) + int(r) - int(kRadius);
+        float value = 0.0;
+        if (gx >= 0 && uint(gx) < width && gy >= 0 && uint(gy) < height) {
+            const uint index = uint(gy) * width + uint(gx);
+            value = arena[in_base + index];
+            if (pc.op == 3u && z == 0u) {
+                // SuppressXByY, pinned libjxl butteraugli.cc:367-390,472.
+                const float y = arena[pc.a + area + index];
+                const float suppress = 46.0;
+                const float scale = 0.653020556257;
+                const float factor =
+                    scale + (1.0 - scale) * (suppress / (y * y + suppress));
+                value *= factor;
+            }
+        }
+        pool[r * kSrc + c] = value;
+    }
+    barrier();
+
+    // 2. Horizontal pass: four output columns per window.
+    for (uint i = tid; i < kSrc * kQuads; i += 256u) {
+        const uint r = i / kQuads;
+        const uint c0 = (i % kQuads) * 4u;
+        float w[kValues];
+        for (uint j = 0u; j < kValues; ++j) w[j] = pool[r * kSrc + c0 + j];
+        float a0 = 0.0;
+        float a1 = 0.0;
+        float a2 = 0.0;
+        float a3 = 0.0;
+        for (uint t = 0u; t < kTaps; ++t) {
+            const float k = weight_taps[t];
+            a0 += k * w[t];
+            a1 += k * w[t + 1u];
+            a2 += k * w[t + 2u];
+            a3 += k * w[t + 3u];
+        }
+        pool[mid_index(r, c0 + 0u)] = a0;
+        pool[mid_index(r, c0 + 1u)] = a1;
+        pool[mid_index(r, c0 + 2u)] = a2;
+        pool[mid_index(r, c0 + 3u)] = a3;
+    }
+    barrier();
+
+    // 3. Vertical pass and epilogue: one column, four consecutive output rows.
+    const uint ox = tid % kTile;
+    const uint row0 = (tid / kTile) * 4u;
+    float v[kValues];
+    for (uint j = 0u; j < kValues; ++j) v[j] = pool[mid_index(row0 + j, ox)];
+    float acc0 = 0.0;
+    float acc1 = 0.0;
+    float acc2 = 0.0;
+    float acc3 = 0.0;
+    for (uint t = 0u; t < kTaps; ++t) {
+        const float k = weight_taps[t];
+        acc0 += k * v[t];
+        acc1 += k * v[t + 1u];
+        acc2 += k * v[t + 2u];
+        acc3 += k * v[t + 3u];
+    }
+    const float acc[4] = float[](acc0, acc1, acc2, acc3);
+
+    const uint gx = x0 + ox;
+    if (gx >= width) return;
+    // The border renormalization, separable: the in-range weight product of
+    // this output's column and row. Interior pixels have the full sum 1. The
+    // column weight is shared by the four rows; the row weight is per output.
+    float wx = 1.0;
+    if (int(gx) < int(kRadius) || int(gx) + int(kRadius) >= int(width)) {
+        wx = 0.0;
+        for (uint t = 0u; t < kTaps; ++t) {
+            const int sx = int(gx) + int(t) - int(kRadius);
+            if (sx >= 0 && sx < int(width)) wx += weight_taps[t];
+        }
+    }
+    for (uint r = 0u; r < 4u; ++r) {
+        const uint gy = y0 + row0 + r;
+        if (gy >= height) break;
+        float wy = 1.0;
+        if (int(gy) < int(kRadius) || int(gy) + int(kRadius) >= int(height)) {
+            wy = 0.0;
+            for (uint t = 0u; t < kTaps; ++t) {
+                const int sy = int(gy) + int(t) - int(kRadius);
+                if (sy >= 0 && sy < int(height)) wy += weight_taps[t];
+            }
+        }
+        const float blurred = acc[r] / (wx * wy);
+        const float pre = pool[(row0 + r + kRadius) * kSrc + ox + kRadius];
+        float value = 0.0;
+        float aux = 0.0;
+        bool write_aux = false;
+        epilogue(pc.op, z, blurred, pre, value, aux, write_aux);
+        const uint index = gy * width + gx;
+        arena[out0 + index] = value;
+        if (write_aux) arena[out1 + index] = aux;
+    }
+}

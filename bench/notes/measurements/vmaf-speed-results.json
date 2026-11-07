@@ -1,0 +1,2892 @@
+{
+  "schema_version": 1,
+  "study": "VMAF speed investigation",
+  "date": "2026-11-05",
+  "hardware": {
+    "gpu": "RTX 5070",
+    "driver": "615.78.08",
+    "compiler": "GCC 16.2.1"
+  },
+  "corpus": {
+    "pairs": 4292,
+    "conversion": "rgb8-srgb-encoded-bt709-limited-yuv444p10le-rne-v1",
+    "libvmaf_revision": "4611e47a7330cd342498dcc130e1008efbeab6e4",
+    "v0_model_sha256": "26573aa333346f1109226e7283969e8b3581119a1ab7f18897767351dd963ff8",
+    "v1_model_sha256": "e4cf8c147e1368b35497d772920bc92f98c1ad7853c1033d8a836947f427140e",
+    "driver_sha256": "5bb52d3f1e5c52a21bb4f5558e513363d19f1833b1901a0d66a9fbb9eb722ba9",
+    "mcos_sha256": "fbaf42f5031b0c520209e9739a352d3048d711c85c20552679304e9784af0cc6",
+    "input_manifest_sha256": "29692268960531f84af1a80179dd5ea24606175dce180e5aedd95ce45b477985",
+    "numpy": "2.5.4",
+    "pillow": "13.0.0",
+    "temporal": "independent single-frame sequences; motion=0",
+    "correlations": {
+      "libvmaf_v0": {
+        "KRCC": 0.5953725443953046,
+        "SRCC": 0.7948172968517071,
+        "PCC": 0.7551936432544321
+      },
+      "libvmaf_v1": {
+        "KRCC": 0.5639669030907921,
+        "SRCC": 0.7618604240534096,
+        "PCC": 0.7178018689878718
+      },
+      "vqm_v0": {
+        "KRCC": 0.595376236646995,
+        "SRCC": 0.794819622813697,
+        "PCC": 0.7551959955064413
+      },
+      "vqm_v1": {
+        "KRCC": 0.5639510481276511,
+        "SRCC": 0.7618450591962422,
+        "PCC": 0.7177954326224015
+      }
+    },
+    "parity": {
+      "v0": {
+        "max_absolute": 0.017107827841016388,
+        "mean_absolute": 0.00019564888812083318,
+        "p99_absolute": 0.00148239219207156,
+        "rmse": 0.0005079656304995186
+      },
+      "v1": {
+        "max_absolute": 0.004638776546443069,
+        "mean_absolute": 0.0016747895917727958,
+        "p99_absolute": 0.003432102666900221,
+        "rmse": 0.0017743846277630823
+      }
+    },
+    "vqm_benchmark_sha256": "97cf5dbbef83538f20686d53c6cfcf231367d062d67e36df049c65d39506cd1a"
+  },
+  "drift": {
+    "v0": {
+      "pairs": 4292,
+      "input_hashes_verified": true,
+      "max_absolute": 3.60100000023067e-05,
+      "mean_absolute": 3.1720456664544397e-06,
+      "p99_absolute": 1.4921800011222788e-05,
+      "rmse": 5.279587385862315e-06,
+      "worst_pair": {
+        "original": "original/adriankierman-report-page.png",
+        "distorted": "compressed/adriankierman-report-page/cld_webp/q90.png"
+      },
+      "within_thresholds": true
+    },
+    "v1": {
+      "pairs": 4292,
+      "input_hashes_verified": true,
+      "max_absolute": 3.1999999947629476e-06,
+      "mean_absolute": 4.253751166229392e-07,
+      "p99_absolute": 1.7999999938922427e-06,
+      "rmse": 6.23159863450221e-07,
+      "worst_pair": {
+        "original": "original/21169144185_3f7977cb5a_o.png",
+        "distorted": "compressed/21169144185_3f7977cb5a_o/aom/s7_q27.png"
+      },
+      "within_thresholds": true
+    }
+  },
+  "performance": [
+    {
+      "source": "vmaf-speed-investigation/verified-native-resident/results.json",
+      "source_sha256": "752f3efeb7f8d2112f35564e2058d8b2f10bb1dffa9a9116c4e670155b3f9dbc",
+      "cases": [
+        {
+          "case": "vmaf-v0-1080",
+          "summary": {
+            "core_ms": {
+              "A": {
+                "median": 0.399315,
+                "min": 0.397195,
+                "max": 0.408094
+              },
+              "B": {
+                "median": 0.37781,
+                "min": 0.376285,
+                "max": 0.379669
+              },
+              "percent_change": -5.38547262186494
+            },
+            "vmaf_luma": {
+              "A": {
+                "median": 0.037267,
+                "min": 0.037171,
+                "max": 0.037286
+              },
+              "B": {
+                "median": 0.037278,
+                "min": 0.037208,
+                "max": 0.037322
+              },
+              "percent_change": 0.02951673061957205
+            },
+            "vmaf_vif": {
+              "A": {
+                "median": 0.169042,
+                "min": 0.168925,
+                "max": 0.169301
+              },
+              "B": {
+                "median": 0.157661,
+                "min": 0.157603,
+                "max": 0.157851
+              },
+              "percent_change": -6.732646324582059
+            },
+            "vmaf_adm": {
+              "A": {
+                "median": 0.086611,
+                "min": 0.086282,
+                "max": 0.086885
+              },
+              "B": {
+                "median": 0.079232,
+                "min": 0.079,
+                "max": 0.079266
+              },
+              "percent_change": -8.519703040029558
+            },
+            "vmaf_motion": {
+              "A": {
+                "median": 0.061176,
+                "min": 0.061066,
+                "max": 0.061232
+              },
+              "B": {
+                "median": 0.060104,
+                "min": 0.060091,
+                "max": 0.060211
+              },
+              "percent_change": -1.752321171701321
+            },
+            "vmaf_score": {
+              "A": {
+                "median": 0.001001,
+                "min": 0.000995,
+                "max": 0.001028
+              },
+              "B": {
+                "median": 0.000998,
+                "min": 0.000994,
+                "max": 0.001167
+              },
+              "percent_change": -0.29970029970030065
+            }
+          },
+          "scores_exact": false,
+          "inputs": [
+            {
+              "name": "tenbit1080-orig.y4m",
+              "sha256": "94da8b83cbf5ea2e942162ec16116a3c53d63ba065c610a0f687fc7e83fd1d98"
+            },
+            {
+              "name": "tenbit1080-dist.y4m",
+              "sha256": "1dbcd6a9810e49d96f3e38f735141a0b2c44d27217a96b86612dbb729a781f05"
+            }
+          ],
+          "scores": {
+            "A": [
+              {
+                "score": "92.40520762",
+                "checksum": "2125.319775"
+              }
+            ],
+            "B": [
+              {
+                "score": "92.40523124",
+                "checksum": "2125.320318"
+              }
+            ]
+          },
+          "runs_per_arm": 5
+        },
+        {
+          "case": "vmaf-v0-4k",
+          "summary": {
+            "core_ms": {
+              "A": {
+                "median": 1.707036,
+                "min": 1.704056,
+                "max": 1.730676
+              },
+              "B": {
+                "median": 1.599372,
+                "min": 1.598442,
+                "max": 1.602072
+              },
+              "percent_change": -6.307072610067976
+            },
+            "vmaf_luma": {
+              "A": {
+                "median": 0.153029,
+                "min": 0.152933,
+                "max": 0.153147
+              },
+              "B": {
+                "median": 0.153125,
+                "min": 0.153064,
+                "max": 0.153208
+              },
+              "percent_change": 0.06273320743128696
+            },
+            "vmaf_vif": {
+              "A": {
+                "median": 0.701011,
+                "min": 0.7006,
+                "max": 0.701478
+              },
+              "B": {
+                "median": 0.654781,
+                "min": 0.654603,
+                "max": 0.654851
+              },
+              "percent_change": -6.5947609951912405
+            },
+            "vmaf_adm": {
+              "A": {
+                "median": 0.495267,
+                "min": 0.494702,
+                "max": 0.495429
+              },
+              "B": {
+                "median": 0.450387,
+                "min": 0.450101,
+                "max": 0.450854
+              },
+              "percent_change": -9.061778798102848
+            },
+            "vmaf_motion": {
+              "A": {
+                "median": 0.295579,
+                "min": 0.295544,
+                "max": 0.295838
+              },
+              "B": {
+                "median": 0.285115,
+                "min": 0.28487,
+                "max": 0.28523
+              },
+              "percent_change": -3.540170309798729
+            },
+            "vmaf_score": {
+              "A": {
+                "median": 0.001166,
+                "min": 0.00112,
+                "max": 0.001231
+              },
+              "B": {
+                "median": 0.001074,
+                "min": 0.001064,
+                "max": 0.001105
+              },
+              "percent_change": -7.8902229845626
+            }
+          },
+          "scores_exact": false,
+          "inputs": [
+            {
+              "name": "vmaf4k_orig.y4m",
+              "sha256": "2584ec50663849149448e60a79148bfb0f201c0ca7e4a6390c726afffbd19003"
+            },
+            {
+              "name": "vmaf4k_dist.y4m",
+              "sha256": "4600bae9899fac01bcad9e797101a034ddaa6989db920aac713d3ce5959bf719"
+            }
+          ],
+          "scores": {
+            "A": [
+              {
+                "score": "92.30947114",
+                "checksum": "2123.117836"
+              }
+            ],
+            "B": [
+              {
+                "score": "92.30946642",
+                "checksum": "2123.117728"
+              }
+            ]
+          },
+          "runs_per_arm": 5
+        },
+        {
+          "case": "vmaf-v0-ducks",
+          "summary": {
+            "core_ms": {
+              "A": {
+                "median": 0.402449,
+                "min": 0.400635,
+                "max": 0.430449
+              },
+              "B": {
+                "median": 0.386655,
+                "min": 0.384885,
+                "max": 0.387815
+              },
+              "percent_change": -3.9244724176230927
+            },
+            "vmaf_luma": {
+              "A": {
+                "median": 0.039915,
+                "min": 0.03985,
+                "max": 0.039978
+              },
+              "B": {
+                "median": 0.039856,
+                "min": 0.039819,
+                "max": 0.039898
+              },
+              "percent_change": -0.14781410497305414
+            },
+            "vmaf_vif": {
+              "A": {
+                "median": 0.16939,
+                "min": 0.169187,
+                "max": 0.169661
+              },
+              "B": {
+                "median": 0.162658,
+                "min": 0.162602,
+                "max": 0.162728
+              },
+              "percent_change": -3.9742605820886845
+            },
+            "vmaf_adm": {
+              "A": {
+                "median": 0.086806,
+                "min": 0.08663,
+                "max": 0.086995
+              },
+              "B": {
+                "median": 0.079373,
+                "min": 0.079354,
+                "max": 0.079616
+              },
+              "percent_change": -8.562772158606546
+            },
+            "vmaf_motion": {
+              "A": {
+                "median": 0.061259,
+                "min": 0.061198,
+                "max": 0.06133
+              },
+              "B": {
+                "median": 0.060205,
+                "min": 0.06011,
+                "max": 0.060224
+              },
+              "percent_change": -1.720563509035411
+            },
+            "vmaf_score": {
+              "A": {
+                "median": 0.00106,
+                "min": 0.001001,
+                "max": 0.001519
+              },
+              "B": {
+                "median": 0.000998,
+                "min": 0.000989,
+                "max": 0.001384
+              },
+              "percent_change": -5.849056603773583
+            }
+          },
+          "scores_exact": true,
+          "inputs": [
+            {
+              "name": "vqmducks1080-420-ref.y4m",
+              "sha256": "048bf5d9ffc3ec6a7a57f8101e61a7d61d9d1b69162766d484bd0da21ae863b7"
+            },
+            {
+              "name": "vqmducks1080-420-dist.y4m",
+              "sha256": "01c78d19ac301d6924ac63104bbdb1db679c48e81c6064bcff302092a4e456c1"
+            }
+          ],
+          "scores": {
+            "A": [
+              {
+                "score": "66.94732766",
+                "checksum": "1539.788536"
+              }
+            ],
+            "B": [
+              {
+                "score": "66.94732766",
+                "checksum": "1539.788536"
+              }
+            ]
+          },
+          "runs_per_arm": 5
+        },
+        {
+          "case": "vmaf-v1-1080",
+          "summary": {
+            "core_ms": {
+              "A": {
+                "median": 0.713249,
+                "min": 0.71186,
+                "max": 0.71496
+              },
+              "B": {
+                "median": 0.683736,
+                "min": 0.682766,
+                "max": 0.684535
+              },
+              "percent_change": -4.137825640134096
+            },
+            "vmaf_v1_luma": {
+              "A": {
+                "median": 0.058618,
+                "min": 0.058544,
+                "max": 0.058685
+              },
+              "B": {
+                "median": 0.058757,
+                "min": 0.058726,
+                "max": 0.058787
+              },
+              "percent_change": 0.23712852707358234
+            },
+            "vmaf_v1_adm": {
+              "A": {
+                "median": 0.1222,
+                "min": 0.12211,
+                "max": 0.122381
+              },
+              "B": {
+                "median": 0.105272,
+                "min": 0.105133,
+                "max": 0.105429
+              },
+              "percent_change": -13.852700490998359
+            },
+            "vmaf_v1_speed": {
+              "A": {
+                "median": 0.088733,
+                "min": 0.088378,
+                "max": 0.08881
+              },
+              "B": {
+                "median": 0.078749,
+                "min": 0.078582,
+                "max": 0.078909
+              },
+              "percent_change": -11.251732726268704
+            },
+            "vmaf_v1_cambi": {
+              "A": {
+                "median": 0.309949,
+                "min": 0.30967,
+                "max": 0.310093
+              },
+              "B": {
+                "median": 0.30985,
+                "min": 0.309584,
+                "max": 0.310264
+              },
+              "percent_change": -0.03194073863763691
+            },
+            "vmaf_v1_motion": {
+              "A": {
+                "median": 0.072576,
+                "min": 0.072469,
+                "max": 0.072618
+              },
+              "B": {
+                "median": 0.070301,
+                "min": 0.070277,
+                "max": 0.070334
+              },
+              "percent_change": -3.1346450617283916
+            },
+            "vmaf_v1_score": {
+              "A": {
+                "median": 0.000856,
+                "min": 0.000853,
+                "max": 0.000865
+              },
+              "B": {
+                "median": 0.000854,
+                "min": 0.000852,
+                "max": 0.000861
+              },
+              "percent_change": -0.2336448598130758
+            }
+          },
+          "scores_exact": false,
+          "inputs": [
+            {
+              "name": "tenbit1080-orig.y4m",
+              "sha256": "94da8b83cbf5ea2e942162ec16116a3c53d63ba065c610a0f687fc7e83fd1d98"
+            },
+            {
+              "name": "tenbit1080-dist.y4m",
+              "sha256": "1dbcd6a9810e49d96f3e38f735141a0b2c44d27217a96b86612dbb729a781f05"
+            }
+          ],
+          "scores": {
+            "A": [
+              {
+                "score": "95.95666172",
+                "checksum": "2207.003220"
+              }
+            ],
+            "B": [
+              {
+                "score": "95.95666143",
+                "checksum": "2207.003213"
+              }
+            ]
+          },
+          "runs_per_arm": 5
+        },
+        {
+          "case": "vmaf-v1-4k",
+          "summary": {
+            "core_ms": {
+              "A": {
+                "median": 2.722421,
+                "min": 2.718946,
+                "max": 2.723812
+              },
+              "B": {
+                "median": 2.616188,
+                "min": 2.588778,
+                "max": 2.619298
+              },
+              "percent_change": -3.9021517979768716
+            },
+            "vmaf_v1_luma": {
+              "A": {
+                "median": 0.243234,
+                "min": 0.243195,
+                "max": 0.243315
+              },
+              "B": {
+                "median": 0.243306,
+                "min": 0.24311,
+                "max": 0.243341
+              },
+              "percent_change": 0.02960112484273747
+            },
+            "vmaf_v1_adm": {
+              "A": {
+                "median": 0.598818,
+                "min": 0.598397,
+                "max": 0.59915
+              },
+              "B": {
+                "median": 0.534123,
+                "min": 0.533957,
+                "max": 0.534171
+              },
+              "percent_change": -10.803783453403193
+            },
+            "vmaf_v1_speed": {
+              "A": {
+                "median": 0.160307,
+                "min": 0.160157,
+                "max": 0.160507
+              },
+              "B": {
+                "median": 0.13157,
+                "min": 0.131475,
+                "max": 0.131707
+              },
+              "percent_change": -17.92622904801413
+            },
+            "vmaf_v1_cambi": {
+              "A": {
+                "median": 1.311208,
+                "min": 1.311026,
+                "max": 1.311426
+              },
+              "B": {
+                "median": 1.311056,
+                "min": 1.310451,
+                "max": 1.311184
+              },
+              "percent_change": -0.011592363682955131
+            },
+            "vmaf_v1_motion": {
+              "A": {
+                "median": 0.297531,
+                "min": 0.297419,
+                "max": 0.297701
+              },
+              "B": {
+                "median": 0.287307,
+                "min": 0.28725,
+                "max": 0.287408
+              },
+              "percent_change": -3.4362805892495296
+            },
+            "vmaf_v1_score": {
+              "A": {
+                "median": 0.001239,
+                "min": 0.001164,
+                "max": 0.001327
+              },
+              "B": {
+                "median": 0.001211,
+                "min": 0.001062,
+                "max": 0.001409
+              },
+              "percent_change": -2.259887005649719
+            }
+          },
+          "scores_exact": false,
+          "inputs": [
+            {
+              "name": "vmaf4k_orig.y4m",
+              "sha256": "2584ec50663849149448e60a79148bfb0f201c0ca7e4a6390c726afffbd19003"
+            },
+            {
+              "name": "vmaf4k_dist.y4m",
+              "sha256": "4600bae9899fac01bcad9e797101a034ddaa6989db920aac713d3ce5959bf719"
+            }
+          ],
+          "scores": {
+            "A": [
+              {
+                "score": "96.06500648",
+                "checksum": "2209.495149"
+              }
+            ],
+            "B": [
+              {
+                "score": "96.06500663",
+                "checksum": "2209.495152"
+              }
+            ]
+          },
+          "runs_per_arm": 5
+        },
+        {
+          "case": "vmaf-v1-ducks",
+          "summary": {
+            "core_ms": {
+              "A": {
+                "median": 0.589612,
+                "min": 0.588992,
+                "max": 0.591241
+              },
+              "B": {
+                "median": 0.558952,
+                "min": 0.558427,
+                "max": 0.560642
+              },
+              "percent_change": -5.200029850138743
+            },
+            "vmaf_v1_luma": {
+              "A": {
+                "median": 0.060608,
+                "min": 0.060574,
+                "max": 0.060682
+              },
+              "B": {
+                "median": 0.060613,
+                "min": 0.060587,
+                "max": 0.060704
+              },
+              "percent_change": 0.008249736008436592
+            },
+            "vmaf_v1_adm": {
+              "A": {
+                "median": 0.119456,
+                "min": 0.11936,
+                "max": 0.119669
+              },
+              "B": {
+                "median": 0.102538,
+                "min": 0.102402,
+                "max": 0.102613
+              },
+              "percent_change": -14.162536833645866
+            },
+            "vmaf_v1_speed": {
+              "A": {
+                "median": 0.085845,
+                "min": 0.085707,
+                "max": 0.085982
+              },
+              "B": {
+                "median": 0.075957,
+                "min": 0.075851,
+                "max": 0.076253
+              },
+              "percent_change": -11.518434387558985
+            },
+            "vmaf_v1_cambi": {
+              "A": {
+                "median": 0.189384,
+                "min": 0.189059,
+                "max": 0.189998
+              },
+              "B": {
+                "median": 0.189317,
+                "min": 0.188768,
+                "max": 0.189422
+              },
+              "percent_change": -0.03537785662990345
+            },
+            "vmaf_v1_motion": {
+              "A": {
+                "median": 0.072725,
+                "min": 0.072686,
+                "max": 0.072925
+              },
+              "B": {
+                "median": 0.070398,
+                "min": 0.070392,
+                "max": 0.070478
+              },
+              "percent_change": -3.199724991405972
+            },
+            "vmaf_v1_score": {
+              "A": {
+                "median": 0.00085,
+                "min": 0.000849,
+                "max": 0.000856
+              },
+              "B": {
+                "median": 0.000851,
+                "min": 0.000846,
+                "max": 0.0009
+              },
+              "percent_change": 0.11764705882353343
+            }
+          },
+          "scores_exact": true,
+          "inputs": [
+            {
+              "name": "vqmducks1080-420-ref.y4m",
+              "sha256": "048bf5d9ffc3ec6a7a57f8101e61a7d61d9d1b69162766d484bd0da21ae863b7"
+            },
+            {
+              "name": "vqmducks1080-420-dist.y4m",
+              "sha256": "01c78d19ac301d6924ac63104bbdb1db679c48e81c6064bcff302092a4e456c1"
+            }
+          ],
+          "scores": {
+            "A": [
+              {
+                "score": "75.83908297",
+                "checksum": "1744.298908"
+              }
+            ],
+            "B": [
+              {
+                "score": "75.83908297",
+                "checksum": "1744.298908"
+              }
+            ]
+          },
+          "runs_per_arm": 5
+        }
+      ]
+    },
+    {
+      "source": "vmaf-speed-investigation/verified-native-streaming/results.json",
+      "source_sha256": "d173ee6468e6c2f90465c97e1c4f0cb3f8d4258913006c04e4274cd758ad18a7",
+      "cases": [
+        {
+          "case": "vmaf-v0-1080",
+          "summary": {
+            "core_ms": {
+              "A": {
+                "median": 0.771549,
+                "min": 0.766734,
+                "max": 0.775114
+              },
+              "B": {
+                "median": 0.751559,
+                "min": 0.745435,
+                "max": 0.758479
+              },
+              "percent_change": -2.590891829294062
+            },
+            "vmaf_luma": {
+              "A": {
+                "median": 0.03556,
+                "min": 0.035496,
+                "max": 0.035612
+              },
+              "B": {
+                "median": 0.035532,
+                "min": 0.03546,
+                "max": 0.035588
+              },
+              "percent_change": -0.07874015748031704
+            },
+            "vmaf_vif": {
+              "A": {
+                "median": 0.168244,
+                "min": 0.16816,
+                "max": 0.168524
+              },
+              "B": {
+                "median": 0.157056,
+                "min": 0.15694,
+                "max": 0.157224
+              },
+              "percent_change": -6.649865671286948
+            },
+            "vmaf_adm": {
+              "A": {
+                "median": 0.086428,
+                "min": 0.086304,
+                "max": 0.08674
+              },
+              "B": {
+                "median": 0.079288,
+                "min": 0.078896,
+                "max": 0.079656
+              },
+              "percent_change": -8.26121164437451
+            },
+            "vmaf_motion": {
+              "A": {
+                "median": 0.061212,
+                "min": 0.06112,
+                "max": 0.061264
+              },
+              "B": {
+                "median": 0.060176,
+                "min": 0.060096,
+                "max": 0.060236
+              },
+              "percent_change": -1.6924785989675284
+            },
+            "vmaf_score": {
+              "A": {
+                "median": 0.001107,
+                "min": 0.001054,
+                "max": 0.001359
+              },
+              "B": {
+                "median": 0.001252,
+                "min": 0.001048,
+                "max": 0.001443
+              },
+              "percent_change": 13.098464317976521
+            }
+          },
+          "scores_exact": false,
+          "inputs": [
+            {
+              "name": "tenbit1080-orig.y4m",
+              "sha256": "94da8b83cbf5ea2e942162ec16116a3c53d63ba065c610a0f687fc7e83fd1d98"
+            },
+            {
+              "name": "tenbit1080-dist.y4m",
+              "sha256": "1dbcd6a9810e49d96f3e38f735141a0b2c44d27217a96b86612dbb729a781f05"
+            }
+          ],
+          "scores": {
+            "A": [
+              {
+                "score": "92.40520762",
+                "checksum": "924.052076"
+              }
+            ],
+            "B": [
+              {
+                "score": "92.40523124",
+                "checksum": "924.052312"
+              }
+            ]
+          },
+          "runs_per_arm": 5
+        },
+        {
+          "case": "vmaf-v0-4k",
+          "summary": {
+            "core_ms": {
+              "A": {
+                "median": 3.18417,
+                "min": 3.18082,
+                "max": 3.186514
+              },
+              "B": {
+                "median": 3.077421,
+                "min": 3.073797,
+                "max": 3.079022
+              },
+              "percent_change": -3.3524906019465006
+            },
+            "vmaf_luma": {
+              "A": {
+                "median": 0.15804,
+                "min": 0.157732,
+                "max": 0.158212
+              },
+              "B": {
+                "median": 0.15806,
+                "min": 0.157892,
+                "max": 0.158284
+              },
+              "percent_change": 0.01265502404454999
+            },
+            "vmaf_vif": {
+              "A": {
+                "median": 0.701564,
+                "min": 0.701288,
+                "max": 0.701988
+              },
+              "B": {
+                "median": 0.6548,
+                "min": 0.654612,
+                "max": 0.655128
+              },
+              "percent_change": -6.665678398549513
+            },
+            "vmaf_adm": {
+              "A": {
+                "median": 0.495228,
+                "min": 0.4947,
+                "max": 0.49534
+              },
+              "B": {
+                "median": 0.450216,
+                "min": 0.449348,
+                "max": 0.450972
+              },
+              "percent_change": -9.08914681722358
+            },
+            "vmaf_motion": {
+              "A": {
+                "median": 0.29562,
+                "min": 0.295548,
+                "max": 0.296032
+              },
+              "B": {
+                "median": 0.285024,
+                "min": 0.284684,
+                "max": 0.285176
+              },
+              "percent_change": -3.5843312360462787
+            },
+            "vmaf_score": {
+              "A": {
+                "median": 0.002086,
+                "min": 0.001446,
+                "max": 0.002311
+              },
+              "B": {
+                "median": 0.001592,
+                "min": 0.001483,
+                "max": 0.002065
+              },
+              "percent_change": -23.681687440076704
+            }
+          },
+          "scores_exact": false,
+          "inputs": [
+            {
+              "name": "vmaf4k_orig.y4m",
+              "sha256": "2584ec50663849149448e60a79148bfb0f201c0ca7e4a6390c726afffbd19003"
+            },
+            {
+              "name": "vmaf4k_dist.y4m",
+              "sha256": "4600bae9899fac01bcad9e797101a034ddaa6989db920aac713d3ce5959bf719"
+            }
+          ],
+          "scores": {
+            "A": [
+              {
+                "score": "92.30947114",
+                "checksum": "923.094711"
+              }
+            ],
+            "B": [
+              {
+                "score": "92.30946642",
+                "checksum": "923.094664"
+              }
+            ]
+          },
+          "runs_per_arm": 5
+        },
+        {
+          "case": "vmaf-v0-ducks",
+          "summary": {
+            "core_ms": {
+              "A": {
+                "median": 0.596157,
+                "min": 0.588082,
+                "max": 0.600442
+              },
+              "B": {
+                "median": 0.580472,
+                "min": 0.567677,
+                "max": 0.582087
+              },
+              "percent_change": -2.631018339128799
+            },
+            "vmaf_luma": {
+              "A": {
+                "median": 0.038684,
+                "min": 0.038652,
+                "max": 0.038744
+              },
+              "B": {
+                "median": 0.03866,
+                "min": 0.038608,
+                "max": 0.038744
+              },
+              "percent_change": -0.06204115396547527
+            },
+            "vmaf_vif": {
+              "A": {
+                "median": 0.168356,
+                "min": 0.168204,
+                "max": 0.168396
+              },
+              "B": {
+                "median": 0.16166,
+                "min": 0.161616,
+                "max": 0.161776
+              },
+              "percent_change": -3.97728622680511
+            },
+            "vmaf_adm": {
+              "A": {
+                "median": 0.086744,
+                "min": 0.086564,
+                "max": 0.086888
+              },
+              "B": {
+                "median": 0.079336,
+                "min": 0.079228,
+                "max": 0.079684
+              },
+              "percent_change": -8.540071935811122
+            },
+            "vmaf_motion": {
+              "A": {
+                "median": 0.0612,
+                "min": 0.061072,
+                "max": 0.061304
+              },
+              "B": {
+                "median": 0.060144,
+                "min": 0.06006,
+                "max": 0.060304
+              },
+              "percent_change": -1.7254901960784275
+            },
+            "vmaf_score": {
+              "A": {
+                "median": 0.001111,
+                "min": 0.00104,
+                "max": 0.001325
+              },
+              "B": {
+                "median": 0.001274,
+                "min": 0.00104,
+                "max": 0.001404
+              },
+              "percent_change": 14.671467146714656
+            }
+          },
+          "scores_exact": true,
+          "inputs": [
+            {
+              "name": "vqmducks1080-420-ref.y4m",
+              "sha256": "048bf5d9ffc3ec6a7a57f8101e61a7d61d9d1b69162766d484bd0da21ae863b7"
+            },
+            {
+              "name": "vqmducks1080-420-dist.y4m",
+              "sha256": "01c78d19ac301d6924ac63104bbdb1db679c48e81c6064bcff302092a4e456c1"
+            }
+          ],
+          "scores": {
+            "A": [
+              {
+                "score": "66.94732766",
+                "checksum": "669.473277"
+              }
+            ],
+            "B": [
+              {
+                "score": "66.94732766",
+                "checksum": "669.473277"
+              }
+            ]
+          },
+          "runs_per_arm": 5
+        },
+        {
+          "case": "vmaf-v1-1080",
+          "summary": {
+            "core_ms": {
+              "A": {
+                "median": 1.275072,
+                "min": 1.265772,
+                "max": 1.276942
+              },
+              "B": {
+                "median": 1.243448,
+                "min": 1.241597,
+                "max": 1.244577
+              },
+              "percent_change": -2.480173668624197
+            },
+            "vmaf_v1_luma": {
+              "A": {
+                "median": 0.056912,
+                "min": 0.0568,
+                "max": 0.056956
+              },
+              "B": {
+                "median": 0.056936,
+                "min": 0.05678,
+                "max": 0.057008
+              },
+              "percent_change": 0.042170368287886006
+            },
+            "vmaf_v1_adm": {
+              "A": {
+                "median": 0.121748,
+                "min": 0.121508,
+                "max": 0.1219
+              },
+              "B": {
+                "median": 0.104616,
+                "min": 0.104456,
+                "max": 0.104792
+              },
+              "percent_change": -14.071689062654002
+            },
+            "vmaf_v1_speed": {
+              "A": {
+                "median": 0.088444,
+                "min": 0.0882,
+                "max": 0.088872
+              },
+              "B": {
+                "median": 0.078912,
+                "min": 0.078776,
+                "max": 0.07894
+              },
+              "percent_change": -10.777441092668806
+            },
+            "vmaf_v1_cambi": {
+              "A": {
+                "median": 0.310124,
+                "min": 0.309836,
+                "max": 0.31038
+              },
+              "B": {
+                "median": 0.310112,
+                "min": 0.30958,
+                "max": 0.310472
+              },
+              "percent_change": -0.0038694199739452984
+            },
+            "vmaf_v1_motion": {
+              "A": {
+                "median": 0.072536,
+                "min": 0.072456,
+                "max": 0.072652
+              },
+              "B": {
+                "median": 0.070256,
+                "min": 0.070196,
+                "max": 0.07042
+              },
+              "percent_change": -3.1432667916620805
+            },
+            "vmaf_v1_score": {
+              "A": {
+                "median": 0.000891,
+                "min": 0.000877,
+                "max": 0.000939
+              },
+              "B": {
+                "median": 0.000909,
+                "min": 0.000884,
+                "max": 0.000989
+              },
+              "percent_change": 2.020202020202011
+            }
+          },
+          "scores_exact": false,
+          "inputs": [
+            {
+              "name": "tenbit1080-orig.y4m",
+              "sha256": "94da8b83cbf5ea2e942162ec16116a3c53d63ba065c610a0f687fc7e83fd1d98"
+            },
+            {
+              "name": "tenbit1080-dist.y4m",
+              "sha256": "1dbcd6a9810e49d96f3e38f735141a0b2c44d27217a96b86612dbb729a781f05"
+            }
+          ],
+          "scores": {
+            "A": [
+              {
+                "score": "95.95666172",
+                "checksum": "959.566617"
+              }
+            ],
+            "B": [
+              {
+                "score": "95.95666143",
+                "checksum": "959.566614"
+              }
+            ]
+          },
+          "runs_per_arm": 5
+        },
+        {
+          "case": "vmaf-v1-4k",
+          "summary": {
+            "core_ms": {
+              "A": {
+                "median": 4.910951,
+                "min": 4.90784,
+                "max": 4.92593
+              },
+              "B": {
+                "median": 4.798652,
+                "min": 4.793127,
+                "max": 4.814536
+              },
+              "percent_change": -2.2867057724664797
+            },
+            "vmaf_v1_luma": {
+              "A": {
+                "median": 0.248192,
+                "min": 0.248028,
+                "max": 0.248296
+              },
+              "B": {
+                "median": 0.247972,
+                "min": 0.247868,
+                "max": 0.248376
+              },
+              "percent_change": -0.08864105208870043
+            },
+            "vmaf_v1_adm": {
+              "A": {
+                "median": 0.598876,
+                "min": 0.598604,
+                "max": 0.599228
+              },
+              "B": {
+                "median": 0.53474,
+                "min": 0.53396,
+                "max": 0.534772
+              },
+              "percent_change": -10.709395601092709
+            },
+            "vmaf_v1_speed": {
+              "A": {
+                "median": 0.160348,
+                "min": 0.159884,
+                "max": 0.160492
+              },
+              "B": {
+                "median": 0.131492,
+                "min": 0.131188,
+                "max": 0.131684
+              },
+              "percent_change": -17.99585900666051
+            },
+            "vmaf_v1_cambi": {
+              "A": {
+                "median": 1.310732,
+                "min": 1.310028,
+                "max": 1.311736
+              },
+              "B": {
+                "median": 1.310484,
+                "min": 1.309616,
+                "max": 1.310884
+              },
+              "percent_change": -0.01892072521308963
+            },
+            "vmaf_v1_motion": {
+              "A": {
+                "median": 0.297576,
+                "min": 0.297476,
+                "max": 0.29776
+              },
+              "B": {
+                "median": 0.287324,
+                "min": 0.28696,
+                "max": 0.287444
+              },
+              "percent_change": -3.445170309433554
+            },
+            "vmaf_v1_score": {
+              "A": {
+                "median": 0.00171,
+                "min": 0.001514,
+                "max": 0.001905
+              },
+              "B": {
+                "median": 0.001576,
+                "min": 0.00125,
+                "max": 0.00175
+              },
+              "percent_change": -7.836257309941519
+            }
+          },
+          "scores_exact": false,
+          "inputs": [
+            {
+              "name": "vmaf4k_orig.y4m",
+              "sha256": "2584ec50663849149448e60a79148bfb0f201c0ca7e4a6390c726afffbd19003"
+            },
+            {
+              "name": "vmaf4k_dist.y4m",
+              "sha256": "4600bae9899fac01bcad9e797101a034ddaa6989db920aac713d3ce5959bf719"
+            }
+          ],
+          "scores": {
+            "A": [
+              {
+                "score": "96.06500648",
+                "checksum": "960.650065"
+              }
+            ],
+            "B": [
+              {
+                "score": "96.06500663",
+                "checksum": "960.650066"
+              }
+            ]
+          },
+          "runs_per_arm": 5
+        },
+        {
+          "case": "vmaf-v1-ducks",
+          "summary": {
+            "core_ms": {
+              "A": {
+                "median": 0.874993,
+                "min": 0.865067,
+                "max": 0.878862
+              },
+              "B": {
+                "median": 0.839283,
+                "min": 0.834038,
+                "max": 0.849253
+              },
+              "percent_change": -4.0811755065469075
+            },
+            "vmaf_v1_luma": {
+              "A": {
+                "median": 0.059172,
+                "min": 0.059108,
+                "max": 0.059188
+              },
+              "B": {
+                "median": 0.05918,
+                "min": 0.059056,
+                "max": 0.0592
+              },
+              "percent_change": 0.013519908064618669
+            },
+            "vmaf_v1_adm": {
+              "A": {
+                "median": 0.118744,
+                "min": 0.118624,
+                "max": 0.118784
+              },
+              "B": {
+                "median": 0.101788,
+                "min": 0.101684,
+                "max": 0.102012
+              },
+              "percent_change": -14.279458330526174
+            },
+            "vmaf_v1_speed": {
+              "A": {
+                "median": 0.08566,
+                "min": 0.085452,
+                "max": 0.085952
+              },
+              "B": {
+                "median": 0.07576,
+                "min": 0.075544,
+                "max": 0.075872
+              },
+              "percent_change": -11.557319635769325
+            },
+            "vmaf_v1_cambi": {
+              "A": {
+                "median": 0.189376,
+                "min": 0.189116,
+                "max": 0.189584
+              },
+              "B": {
+                "median": 0.18952,
+                "min": 0.188596,
+                "max": 0.189652
+              },
+              "percent_change": 0.07603920243326456
+            },
+            "vmaf_v1_motion": {
+              "A": {
+                "median": 0.072696,
+                "min": 0.072632,
+                "max": 0.072728
+              },
+              "B": {
+                "median": 0.070512,
+                "min": 0.070436,
+                "max": 0.07052
+              },
+              "percent_change": -3.004291845493545
+            },
+            "vmaf_v1_score": {
+              "A": {
+                "median": 0.000954,
+                "min": 0.000876,
+                "max": 0.001224
+              },
+              "B": {
+                "median": 0.000899,
+                "min": 0.000886,
+                "max": 0.001156
+              },
+              "percent_change": -5.765199161425583
+            }
+          },
+          "scores_exact": true,
+          "inputs": [
+            {
+              "name": "vqmducks1080-420-ref.y4m",
+              "sha256": "048bf5d9ffc3ec6a7a57f8101e61a7d61d9d1b69162766d484bd0da21ae863b7"
+            },
+            {
+              "name": "vqmducks1080-420-dist.y4m",
+              "sha256": "01c78d19ac301d6924ac63104bbdb1db679c48e81c6064bcff302092a4e456c1"
+            }
+          ],
+          "scores": {
+            "A": [
+              {
+                "score": "75.83908297",
+                "checksum": "758.390830"
+              }
+            ],
+            "B": [
+              {
+                "score": "75.83908297",
+                "checksum": "758.390830"
+              }
+            ]
+          },
+          "runs_per_arm": 5
+        }
+      ]
+    },
+    {
+      "source": "vmaf-speed-investigation/verified-rgb-resident/results.json",
+      "source_sha256": "4dbeca23afea1559d5fe940d1597a5c1f1e22e38c6304cd0f4d1c6cd8f2e2a02",
+      "cases": [
+        {
+          "case": "vmaf-v0-rgb1080",
+          "summary": {
+            "core_ms": {
+              "A": {
+                "median": 0.446744,
+                "min": 0.445783,
+                "max": 0.459929
+              },
+              "B": {
+                "median": 0.423464,
+                "min": 0.423064,
+                "max": 0.424639
+              },
+              "percent_change": -5.211038088927877
+            },
+            "vmaf_luma": {
+              "A": {
+                "median": 0.077565,
+                "min": 0.077323,
+                "max": 0.077653
+              },
+              "B": {
+                "median": 0.07479,
+                "min": 0.074714,
+                "max": 0.07491
+              },
+              "percent_change": -3.577644556178694
+            },
+            "vmaf_vif": {
+              "A": {
+                "median": 0.175794,
+                "min": 0.175786,
+                "max": 0.176472
+              },
+              "B": {
+                "median": 0.166608,
+                "min": 0.166504,
+                "max": 0.166646
+              },
+              "percent_change": -5.2254343151643345
+            },
+            "vmaf_adm": {
+              "A": {
+                "median": 0.086986,
+                "min": 0.086763,
+                "max": 0.087027
+              },
+              "B": {
+                "median": 0.079046,
+                "min": 0.078944,
+                "max": 0.079346
+              },
+              "percent_change": -9.127905639988033
+            },
+            "vmaf_motion": {
+              "A": {
+                "median": 0.061208,
+                "min": 0.061149,
+                "max": 0.06136
+              },
+              "B": {
+                "median": 0.060139,
+                "min": 0.06009,
+                "max": 0.060155
+              },
+              "percent_change": -1.7465037250032678
+            },
+            "vmaf_score": {
+              "A": {
+                "median": 0.001,
+                "min": 0.000993,
+                "max": 0.001211
+              },
+              "B": {
+                "median": 0.000998,
+                "min": 0.000992,
+                "max": 0.001008
+              },
+              "percent_change": -0.20000000000000018
+            }
+          },
+          "scores_exact": false,
+          "inputs": [
+            {
+              "name": "rgb1080-orig.png",
+              "sha256": "7fcc357aa73a09e8bbc0bfb833725566977c7202cd32361cf3af0459cf41c621"
+            },
+            {
+              "name": "rgb1080-dist.png",
+              "sha256": "f2ec0d9ddc37f7540ac4ef3ee39f3dedd24ab25db120db8ba2ff87355bc66c3f"
+            }
+          ],
+          "scores": {
+            "A": [
+              {
+                "score": "89.49939491",
+                "checksum": "2058.486083"
+              }
+            ],
+            "B": [
+              {
+                "score": "89.49939900",
+                "checksum": "2058.486177"
+              }
+            ]
+          },
+          "runs_per_arm": 5
+        },
+        {
+          "case": "vmaf-v0-rgb4k",
+          "summary": {
+            "core_ms": {
+              "A": {
+                "median": 1.914217,
+                "min": 1.912987,
+                "max": 1.926793
+              },
+              "B": {
+                "median": 1.811844,
+                "min": 1.81066,
+                "max": 1.829004
+              },
+              "percent_change": -5.3480352541012905
+            },
+            "vmaf_luma": {
+              "A": {
+                "median": 0.286475,
+                "min": 0.286032,
+                "max": 0.286912
+              },
+              "B": {
+                "median": 0.285168,
+                "min": 0.285051,
+                "max": 0.285326
+              },
+              "percent_change": -0.45623527358408245
+            },
+            "vmaf_vif": {
+              "A": {
+                "median": 0.771077,
+                "min": 0.770731,
+                "max": 0.771296
+              },
+              "B": {
+                "median": 0.73171,
+                "min": 0.731219,
+                "max": 0.731946
+              },
+              "percent_change": -5.10545639410851
+            },
+            "vmaf_adm": {
+              "A": {
+                "median": 0.495216,
+                "min": 0.494906,
+                "max": 0.49532
+              },
+              "B": {
+                "median": 0.450166,
+                "min": 0.450139,
+                "max": 0.450552
+              },
+              "percent_change": -9.097040483344642
+            },
+            "vmaf_motion": {
+              "A": {
+                "median": 0.29581,
+                "min": 0.295795,
+                "max": 0.295939
+              },
+              "B": {
+                "median": 0.285026,
+                "min": 0.284926,
+                "max": 0.285157
+              },
+              "percent_change": -3.6455833136134763
+            },
+            "vmaf_score": {
+              "A": {
+                "median": 0.001238,
+                "min": 0.001183,
+                "max": 0.001369
+              },
+              "B": {
+                "median": 0.001197,
+                "min": 0.001143,
+                "max": 0.001218
+              },
+              "percent_change": -3.3117932148626794
+            }
+          },
+          "scores_exact": false,
+          "inputs": [
+            {
+              "name": "uhd_orig.png",
+              "sha256": "756b05ccfb73363a0baf14c6909e8da9fd8938fb68847858cbf34f9892d563f8"
+            },
+            {
+              "name": "uhd_dist.png",
+              "sha256": "aa1b297ab18ed2c4bce9b6c6a920ae2218f02811d389f45c57a9545cd7ad6d28"
+            }
+          ],
+          "scores": {
+            "A": [
+              {
+                "score": "88.35260140",
+                "checksum": "2032.109832"
+              }
+            ],
+            "B": [
+              {
+                "score": "88.35260165",
+                "checksum": "2032.109838"
+              }
+            ]
+          },
+          "runs_per_arm": 5
+        },
+        {
+          "case": "vmaf-v1-rgb1080",
+          "summary": {
+            "core_ms": {
+              "A": {
+                "median": 0.740194,
+                "min": 0.738274,
+                "max": 0.743964
+              },
+              "B": {
+                "median": 0.706889,
+                "min": 0.704735,
+                "max": 0.725049
+              },
+              "percent_change": -4.499496078055221
+            },
+            "vmaf_v1_luma": {
+              "A": {
+                "median": 0.086227,
+                "min": 0.086117,
+                "max": 0.086331
+              },
+              "B": {
+                "median": 0.083019,
+                "min": 0.082709,
+                "max": 0.083141
+              },
+              "percent_change": -3.7204123998283656
+            },
+            "vmaf_v1_adm": {
+              "A": {
+                "median": 0.118146,
+                "min": 0.117998,
+                "max": 0.118358
+              },
+              "B": {
+                "median": 0.101242,
+                "min": 0.100898,
+                "max": 0.101368
+              },
+              "percent_change": -14.307720955428028
+            },
+            "vmaf_v1_speed": {
+              "A": {
+                "median": 0.089126,
+                "min": 0.088864,
+                "max": 0.08927
+              },
+              "B": {
+                "median": 0.080006,
+                "min": 0.079854,
+                "max": 0.08019
+              },
+              "percent_change": -10.232704261382764
+            },
+            "vmaf_v1_cambi": {
+              "A": {
+                "median": 0.311022,
+                "min": 0.310531,
+                "max": 0.311542
+              },
+              "B": {
+                "median": 0.311174,
+                "min": 0.310413,
+                "max": 0.311437
+              },
+              "percent_change": 0.048871140948225644
+            },
+            "vmaf_v1_motion": {
+              "A": {
+                "median": 0.072624,
+                "min": 0.072544,
+                "max": 0.072803
+              },
+              "B": {
+                "median": 0.070459,
+                "min": 0.07037,
+                "max": 0.070466
+              },
+              "percent_change": -2.981108173606517
+            },
+            "vmaf_v1_score": {
+              "A": {
+                "median": 0.000862,
+                "min": 0.000852,
+                "max": 0.000872
+              },
+              "B": {
+                "median": 0.000858,
+                "min": 0.000852,
+                "max": 0.001233
+              },
+              "percent_change": -0.46403712296984034
+            }
+          },
+          "scores_exact": false,
+          "inputs": [
+            {
+              "name": "rgb1080-orig.png",
+              "sha256": "7fcc357aa73a09e8bbc0bfb833725566977c7202cd32361cf3af0459cf41c621"
+            },
+            {
+              "name": "rgb1080-dist.png",
+              "sha256": "f2ec0d9ddc37f7540ac4ef3ee39f3dedd24ab25db120db8ba2ff87355bc66c3f"
+            }
+          ],
+          "scores": {
+            "A": [
+              {
+                "score": "93.17405391",
+                "checksum": "2143.003240"
+              }
+            ],
+            "B": [
+              {
+                "score": "93.17405310",
+                "checksum": "2143.003221"
+              }
+            ]
+          },
+          "runs_per_arm": 5
+        },
+        {
+          "case": "vmaf-v1-rgb4k",
+          "summary": {
+            "core_ms": {
+              "A": {
+                "median": 2.767035,
+                "min": 2.749826,
+                "max": 2.773016
+              },
+              "B": {
+                "median": 2.656218,
+                "min": 2.649132,
+                "max": 2.657217
+              },
+              "percent_change": -4.0049005523963395
+            },
+            "vmaf_v1_luma": {
+              "A": {
+                "median": 0.312542,
+                "min": 0.312344,
+                "max": 0.312613
+              },
+              "B": {
+                "median": 0.309194,
+                "min": 0.30907,
+                "max": 0.309326
+              },
+              "percent_change": -1.0712160285657468
+            },
+            "vmaf_v1_adm": {
+              "A": {
+                "median": 0.578354,
+                "min": 0.578256,
+                "max": 0.578408
+              },
+              "B": {
+                "median": 0.513536,
+                "min": 0.513365,
+                "max": 0.513805
+              },
+              "percent_change": -11.20732285071082
+            },
+            "vmaf_v1_speed": {
+              "A": {
+                "median": 0.159811,
+                "min": 0.159616,
+                "max": 0.160234
+              },
+              "B": {
+                "median": 0.131064,
+                "min": 0.131005,
+                "max": 0.13143
+              },
+              "percent_change": -17.98812347084994
+            },
+            "vmaf_v1_cambi": {
+              "A": {
+                "median": 1.30973,
+                "min": 1.309288,
+                "max": 1.310272
+              },
+              "B": {
+                "median": 1.309698,
+                "min": 1.309187,
+                "max": 1.31031
+              },
+              "percent_change": -0.0024432516625538803
+            },
+            "vmaf_v1_motion": {
+              "A": {
+                "median": 0.29763,
+                "min": 0.297518,
+                "max": 0.297712
+              },
+              "B": {
+                "median": 0.287397,
+                "min": 0.287314,
+                "max": 0.287477
+              },
+              "percent_change": -3.4381614756576973
+            },
+            "vmaf_v1_score": {
+              "A": {
+                "median": 0.001333,
+                "min": 0.00106,
+                "max": 0.001757
+              },
+              "B": {
+                "median": 0.001324,
+                "min": 0.001225,
+                "max": 0.001675
+              },
+              "percent_change": -0.6751687921980443
+            }
+          },
+          "scores_exact": true,
+          "inputs": [
+            {
+              "name": "uhd_orig.png",
+              "sha256": "756b05ccfb73363a0baf14c6909e8da9fd8938fb68847858cbf34f9892d563f8"
+            },
+            {
+              "name": "uhd_dist.png",
+              "sha256": "aa1b297ab18ed2c4bce9b6c6a920ae2218f02811d389f45c57a9545cd7ad6d28"
+            }
+          ],
+          "scores": {
+            "A": [
+              {
+                "score": "92.11456420",
+                "checksum": "2118.634977"
+              }
+            ],
+            "B": [
+              {
+                "score": "92.11456420",
+                "checksum": "2118.634977"
+              }
+            ]
+          },
+          "runs_per_arm": 5
+        }
+      ]
+    },
+    {
+      "source": "vmaf-speed-investigation/verified-rgb-streaming/results.json",
+      "source_sha256": "c62092e5883b8486bfa9c4a9c4beb2f15b022b68fce4cb6d44b4d5b63afa8198",
+      "cases": [
+        {
+          "case": "vmaf-v0-rgb1080",
+          "summary": {
+            "core_ms": {
+              "A": {
+                "median": 1.008196,
+                "min": 1.006355,
+                "max": 1.011456
+              },
+              "B": {
+                "median": 0.984266,
+                "min": 0.974997,
+                "max": 0.98598
+              },
+              "percent_change": -2.3735464135941964
+            },
+            "vmaf_luma": {
+              "A": {
+                "median": 0.075892,
+                "min": 0.075592,
+                "max": 0.07594
+              },
+              "B": {
+                "median": 0.07352,
+                "min": 0.073408,
+                "max": 0.073724
+              },
+              "percent_change": -3.1254941232277456
+            },
+            "vmaf_vif": {
+              "A": {
+                "median": 0.176432,
+                "min": 0.176028,
+                "max": 0.176508
+              },
+              "B": {
+                "median": 0.167116,
+                "min": 0.167068,
+                "max": 0.167192
+              },
+              "percent_change": -5.280221275052154
+            },
+            "vmaf_adm": {
+              "A": {
+                "median": 0.08722,
+                "min": 0.086932,
+                "max": 0.087264
+              },
+              "B": {
+                "median": 0.07964,
+                "min": 0.079204,
+                "max": 0.07988
+              },
+              "percent_change": -8.690667278147213
+            },
+            "vmaf_motion": {
+              "A": {
+                "median": 0.061348,
+                "min": 0.061244,
+                "max": 0.061468
+              },
+              "B": {
+                "median": 0.060456,
+                "min": 0.060336,
+                "max": 0.060552
+              },
+              "percent_change": -1.4540001304035988
+            },
+            "vmaf_score": {
+              "A": {
+                "median": 0.001155,
+                "min": 0.001043,
+                "max": 0.001209
+              },
+              "B": {
+                "median": 0.001155,
+                "min": 0.001074,
+                "max": 0.001189
+              },
+              "percent_change": 0.0
+            }
+          },
+          "scores_exact": false,
+          "inputs": [
+            {
+              "name": "rgb1080-orig.png",
+              "sha256": "7fcc357aa73a09e8bbc0bfb833725566977c7202cd32361cf3af0459cf41c621"
+            },
+            {
+              "name": "rgb1080-dist.png",
+              "sha256": "f2ec0d9ddc37f7540ac4ef3ee39f3dedd24ab25db120db8ba2ff87355bc66c3f"
+            }
+          ],
+          "scores": {
+            "A": [
+              {
+                "score": "89.49939491",
+                "checksum": "894.993949"
+              }
+            ],
+            "B": [
+              {
+                "score": "89.49939900",
+                "checksum": "894.993990"
+              }
+            ]
+          },
+          "runs_per_arm": 5
+        },
+        {
+          "case": "vmaf-v0-rgb4k",
+          "summary": {
+            "core_ms": {
+              "A": {
+                "median": 4.117171,
+                "min": 4.111261,
+                "max": 4.161631
+              },
+              "B": {
+                "median": 4.017893,
+                "min": 4.013788,
+                "max": 4.020863
+              },
+              "percent_change": -2.4113159254254946
+            },
+            "vmaf_luma": {
+              "A": {
+                "median": 0.293148,
+                "min": 0.292244,
+                "max": 0.29756
+              },
+              "B": {
+                "median": 0.290812,
+                "min": 0.290596,
+                "max": 0.29532
+              },
+              "percent_change": -0.7968671114931714
+            },
+            "vmaf_vif": {
+              "A": {
+                "median": 0.771788,
+                "min": 0.771396,
+                "max": 0.784348
+              },
+              "B": {
+                "median": 0.731848,
+                "min": 0.731356,
+                "max": 0.74034
+              },
+              "percent_change": -5.174996242491458
+            },
+            "vmaf_adm": {
+              "A": {
+                "median": 0.495332,
+                "min": 0.495076,
+                "max": 0.495644
+              },
+              "B": {
+                "median": 0.450328,
+                "min": 0.44986,
+                "max": 0.450788
+              },
+              "percent_change": -9.085623379874509
+            },
+            "vmaf_motion": {
+              "A": {
+                "median": 0.295772,
+                "min": 0.295748,
+                "max": 0.29592
+              },
+              "B": {
+                "median": 0.284972,
+                "min": 0.284836,
+                "max": 0.2856
+              },
+              "percent_change": -3.6514612607008057
+            },
+            "vmaf_score": {
+              "A": {
+                "median": 0.001741,
+                "min": 0.001685,
+                "max": 0.00207
+              },
+              "B": {
+                "median": 0.001689,
+                "min": 0.0016,
+                "max": 0.001929
+              },
+              "percent_change": -2.986789201608264
+            }
+          },
+          "scores_exact": false,
+          "inputs": [
+            {
+              "name": "uhd_orig.png",
+              "sha256": "756b05ccfb73363a0baf14c6909e8da9fd8938fb68847858cbf34f9892d563f8"
+            },
+            {
+              "name": "uhd_dist.png",
+              "sha256": "aa1b297ab18ed2c4bce9b6c6a920ae2218f02811d389f45c57a9545cd7ad6d28"
+            }
+          ],
+          "scores": {
+            "A": [
+              {
+                "score": "88.35260140",
+                "checksum": "883.526014"
+              }
+            ],
+            "B": [
+              {
+                "score": "88.35260165",
+                "checksum": "883.526017"
+              }
+            ]
+          },
+          "runs_per_arm": 5
+        },
+        {
+          "case": "vmaf-v1-rgb1080",
+          "summary": {
+            "core_ms": {
+              "A": {
+                "median": 1.299376,
+                "min": 1.295832,
+                "max": 1.299826
+              },
+              "B": {
+                "median": 1.266157,
+                "min": 1.258847,
+                "max": 1.267132
+              },
+              "percent_change": -2.5565348290256362
+            },
+            "vmaf_v1_luma": {
+              "A": {
+                "median": 0.084496,
+                "min": 0.084352,
+                "max": 0.084724
+              },
+              "B": {
+                "median": 0.0812,
+                "min": 0.08106,
+                "max": 0.081268
+              },
+              "percent_change": -3.9007763681121133
+            },
+            "vmaf_v1_adm": {
+              "A": {
+                "median": 0.117852,
+                "min": 0.117516,
+                "max": 0.11786
+              },
+              "B": {
+                "median": 0.1007,
+                "min": 0.100624,
+                "max": 0.100852
+              },
+              "percent_change": -14.553847198180769
+            },
+            "vmaf_v1_speed": {
+              "A": {
+                "median": 0.089364,
+                "min": 0.089004,
+                "max": 0.089568
+              },
+              "B": {
+                "median": 0.079608,
+                "min": 0.07924,
+                "max": 0.080004
+              },
+              "percent_change": -10.917147844769703
+            },
+            "vmaf_v1_cambi": {
+              "A": {
+                "median": 0.311232,
+                "min": 0.310732,
+                "max": 0.31174
+              },
+              "B": {
+                "median": 0.3114,
+                "min": 0.310796,
+                "max": 0.31228
+              },
+              "percent_change": 0.05397902529302723
+            },
+            "vmaf_v1_motion": {
+              "A": {
+                "median": 0.072656,
+                "min": 0.07258,
+                "max": 0.072844
+              },
+              "B": {
+                "median": 0.070444,
+                "min": 0.070288,
+                "max": 0.070484
+              },
+              "percent_change": -3.0444835939220316
+            },
+            "vmaf_v1_score": {
+              "A": {
+                "median": 0.000912,
+                "min": 0.000889,
+                "max": 0.001014
+              },
+              "B": {
+                "median": 0.000903,
+                "min": 0.000893,
+                "max": 0.000914
+              },
+              "percent_change": -0.9868421052631526
+            }
+          },
+          "scores_exact": false,
+          "inputs": [
+            {
+              "name": "rgb1080-orig.png",
+              "sha256": "7fcc357aa73a09e8bbc0bfb833725566977c7202cd32361cf3af0459cf41c621"
+            },
+            {
+              "name": "rgb1080-dist.png",
+              "sha256": "f2ec0d9ddc37f7540ac4ef3ee39f3dedd24ab25db120db8ba2ff87355bc66c3f"
+            }
+          ],
+          "scores": {
+            "A": [
+              {
+                "score": "93.17405391",
+                "checksum": "931.740539"
+              }
+            ],
+            "B": [
+              {
+                "score": "93.17405310",
+                "checksum": "931.740531"
+              }
+            ]
+          },
+          "runs_per_arm": 5
+        },
+        {
+          "case": "vmaf-v1-rgb4k",
+          "summary": {
+            "core_ms": {
+              "A": {
+                "median": 4.962079,
+                "min": 4.936995,
+                "max": 4.977449
+              },
+              "B": {
+                "median": 4.850382,
+                "min": 4.836276,
+                "max": 4.861856
+              },
+              "percent_change": -2.2510121261672844
+            },
+            "vmaf_v1_luma": {
+              "A": {
+                "median": 0.318176,
+                "min": 0.318104,
+                "max": 0.318356
+              },
+              "B": {
+                "median": 0.315236,
+                "min": 0.315124,
+                "max": 0.31558
+              },
+              "percent_change": -0.9240168963089657
+            },
+            "vmaf_v1_adm": {
+              "A": {
+                "median": 0.578208,
+                "min": 0.577964,
+                "max": 0.578348
+              },
+              "B": {
+                "median": 0.513428,
+                "min": 0.513292,
+                "max": 0.513532
+              },
+              "percent_change": -11.20358071835742
+            },
+            "vmaf_v1_speed": {
+              "A": {
+                "median": 0.159748,
+                "min": 0.159576,
+                "max": 0.160296
+              },
+              "B": {
+                "median": 0.131232,
+                "min": 0.130876,
+                "max": 0.131408
+              },
+              "percent_change": -17.850614718181145
+            },
+            "vmaf_v1_cambi": {
+              "A": {
+                "median": 1.30938,
+                "min": 1.308716,
+                "max": 1.310292
+              },
+              "B": {
+                "median": 1.309832,
+                "min": 1.309192,
+                "max": 1.310872
+              },
+              "percent_change": 0.03452015457698909
+            },
+            "vmaf_v1_motion": {
+              "A": {
+                "median": 0.297496,
+                "min": 0.297324,
+                "max": 0.297664
+              },
+              "B": {
+                "median": 0.287368,
+                "min": 0.287204,
+                "max": 0.287532
+              },
+              "percent_change": -3.404415521553217
+            },
+            "vmaf_v1_score": {
+              "A": {
+                "median": 0.001925,
+                "min": 0.001501,
+                "max": 0.002009
+              },
+              "B": {
+                "median": 0.002006,
+                "min": 0.001534,
+                "max": 0.002051
+              },
+              "percent_change": 4.207792207792194
+            }
+          },
+          "scores_exact": true,
+          "inputs": [
+            {
+              "name": "uhd_orig.png",
+              "sha256": "756b05ccfb73363a0baf14c6909e8da9fd8938fb68847858cbf34f9892d563f8"
+            },
+            {
+              "name": "uhd_dist.png",
+              "sha256": "aa1b297ab18ed2c4bce9b6c6a920ae2218f02811d389f45c57a9545cd7ad6d28"
+            }
+          ],
+          "scores": {
+            "A": [
+              {
+                "score": "92.11456420",
+                "checksum": "921.145642"
+              }
+            ],
+            "B": [
+              {
+                "score": "92.11456420",
+                "checksum": "921.145642"
+              }
+            ]
+          },
+          "runs_per_arm": 5
+        }
+      ]
+    },
+    {
+      "source": "vmaf-speed-investigation/verified-dense-resident/results.json",
+      "source_sha256": "ae96eeb20577c24942296030815641aa930b0fe9e128dc718a545868f77d5dc2",
+      "cases": [
+        {
+          "case": "vmaf-v0-dense1080",
+          "summary": {
+            "core_ms": {
+              "A": {
+                "median": 0.399364,
+                "min": 0.398894,
+                "max": 0.400439
+              },
+              "B": {
+                "median": 0.376005,
+                "min": 0.375399,
+                "max": 0.39244
+              },
+              "percent_change": -5.849049989483279
+            },
+            "vmaf_luma": {
+              "A": {
+                "median": 0.037286,
+                "min": 0.037205,
+                "max": 0.037326
+              },
+              "B": {
+                "median": 0.037299,
+                "min": 0.037214,
+                "max": 0.03736
+              },
+              "percent_change": 0.0348656332135322
+            },
+            "vmaf_vif": {
+              "A": {
+                "median": 0.16943,
+                "min": 0.169362,
+                "max": 0.16948
+              },
+              "B": {
+                "median": 0.155669,
+                "min": 0.155483,
+                "max": 0.15601
+              },
+              "percent_change": -8.121938263589678
+            },
+            "vmaf_adm": {
+              "A": {
+                "median": 0.086994,
+                "min": 0.086782,
+                "max": 0.087104
+              },
+              "B": {
+                "median": 0.07927,
+                "min": 0.07899,
+                "max": 0.079342
+              },
+              "percent_change": -8.87877324872981
+            },
+            "vmaf_motion": {
+              "A": {
+                "median": 0.061334,
+                "min": 0.061173,
+                "max": 0.061379
+              },
+              "B": {
+                "median": 0.060227,
+                "min": 0.060213,
+                "max": 0.060274
+              },
+              "percent_change": -1.8048716861773229
+            },
+            "vmaf_score": {
+              "A": {
+                "median": 0.001003,
+                "min": 0.000996,
+                "max": 0.00104
+              },
+              "B": {
+                "median": 0.000998,
+                "min": 0.000994,
+                "max": 0.001205
+              },
+              "percent_change": -0.49850448654038537
+            }
+          },
+          "scores_exact": true,
+          "inputs": [
+            {
+              "name": "vqmdense1080-420-ref.y4m",
+              "sha256": "63ede268c76eaa59ab63280979c35c257c585aed971ffc0e705b987f91dad712"
+            },
+            {
+              "name": "vqmdense1080-420-dist.y4m",
+              "sha256": "1872cc66ea3d70afe1c9f270f1dc840adf9afb3d86d67645682ba9616718fc06"
+            }
+          ],
+          "scores": {
+            "A": [
+              {
+                "score": "97.42802428",
+                "checksum": "2240.844558"
+              }
+            ],
+            "B": [
+              {
+                "score": "97.42802428",
+                "checksum": "2240.844558"
+              }
+            ]
+          },
+          "runs_per_arm": 5
+        },
+        {
+          "case": "vmaf-v0-dense4k",
+          "summary": {
+            "core_ms": {
+              "A": {
+                "median": 1.711541,
+                "min": 1.705322,
+                "max": 1.723205
+              },
+              "B": {
+                "median": 1.598227,
+                "min": 1.594867,
+                "max": 1.617692
+              },
+              "percent_change": -6.620583439134675
+            },
+            "vmaf_luma": {
+              "A": {
+                "median": 0.153106,
+                "min": 0.153058,
+                "max": 0.153176
+              },
+              "B": {
+                "median": 0.153069,
+                "min": 0.15297,
+                "max": 0.153112
+              },
+              "percent_change": -0.024166263895586404
+            },
+            "vmaf_vif": {
+              "A": {
+                "median": 0.702003,
+                "min": 0.701634,
+                "max": 0.702182
+              },
+              "B": {
+                "median": 0.649474,
+                "min": 0.649258,
+                "max": 0.649613
+              },
+              "percent_change": -7.482731555278255
+            },
+            "vmaf_adm": {
+              "A": {
+                "median": 0.49535,
+                "min": 0.495162,
+                "max": 0.49577
+              },
+              "B": {
+                "median": 0.450717,
+                "min": 0.450371,
+                "max": 0.450955
+              },
+              "percent_change": -9.010396689209655
+            },
+            "vmaf_motion": {
+              "A": {
+                "median": 0.295765,
+                "min": 0.295694,
+                "max": 0.29616
+              },
+              "B": {
+                "median": 0.285246,
+                "min": 0.284906,
+                "max": 0.285406
+              },
+              "percent_change": -3.5565398204655763
+            },
+            "vmaf_score": {
+              "A": {
+                "median": 0.001175,
+                "min": 0.001129,
+                "max": 0.001231
+              },
+              "B": {
+                "median": 0.001129,
+                "min": 0.001083,
+                "max": 0.001227
+              },
+              "percent_change": -3.9148936170212756
+            }
+          },
+          "scores_exact": true,
+          "inputs": [
+            {
+              "name": "vqmdense4k-420-ref.y4m",
+              "sha256": "d049de19d4223a5a58f979b94b41ca3221276c2a2bd77ac45f8d1b99aa3c14e3"
+            },
+            {
+              "name": "vqmdense4k-420-dist.y4m",
+              "sha256": "16b9e0ad3fd7cbceaf7e066d32f87d3a8a32d6fdba0b30adaeeea8368fb2805e"
+            }
+          ],
+          "scores": {
+            "A": [
+              {
+                "score": "97.42806325",
+                "checksum": "2240.845455"
+              }
+            ],
+            "B": [
+              {
+                "score": "97.42806325",
+                "checksum": "2240.845455"
+              }
+            ]
+          },
+          "runs_per_arm": 5
+        },
+        {
+          "case": "vmaf-v1-dense1080",
+          "summary": {
+            "core_ms": {
+              "A": {
+                "median": 0.813643,
+                "min": 0.805743,
+                "max": 0.826648
+              },
+              "B": {
+                "median": 0.780564,
+                "min": 0.778989,
+                "max": 0.789614
+              },
+              "percent_change": -4.065542258705602
+            },
+            "vmaf_v1_luma": {
+              "A": {
+                "median": 0.05864,
+                "min": 0.058547,
+                "max": 0.058672
+              },
+              "B": {
+                "median": 0.058763,
+                "min": 0.058746,
+                "max": 0.058795
+              },
+              "percent_change": 0.2097544338335755
+            },
+            "vmaf_v1_adm": {
+              "A": {
+                "median": 0.121963,
+                "min": 0.121762,
+                "max": 0.122162
+              },
+              "B": {
+                "median": 0.104925,
+                "min": 0.10472,
+                "max": 0.104986
+              },
+              "percent_change": -13.969810516304126
+            },
+            "vmaf_v1_speed": {
+              "A": {
+                "median": 0.045562,
+                "min": 0.045395,
+                "max": 0.04569
+              },
+              "B": {
+                "median": 0.039536,
+                "min": 0.039147,
+                "max": 0.039592
+              },
+              "percent_change": -13.225933892278652
+            },
+            "vmaf_v1_cambi": {
+              "A": {
+                "median": 0.44481,
+                "min": 0.444382,
+                "max": 0.445021
+              },
+              "B": {
+                "median": 0.445098,
+                "min": 0.444984,
+                "max": 0.446003
+              },
+              "percent_change": 0.06474674580159157
+            },
+            "vmaf_v1_motion": {
+              "A": {
+                "median": 0.072699,
+                "min": 0.072595,
+                "max": 0.072763
+              },
+              "B": {
+                "median": 0.07045,
+                "min": 0.070416,
+                "max": 0.070504
+              },
+              "percent_change": -3.0935776283030014
+            },
+            "vmaf_v1_score": {
+              "A": {
+                "median": 0.00086,
+                "min": 0.000854,
+                "max": 0.000929
+              },
+              "B": {
+                "median": 0.000856,
+                "min": 0.000854,
+                "max": 0.00088
+              },
+              "percent_change": -0.46511627906976605
+            }
+          },
+          "scores_exact": true,
+          "inputs": [
+            {
+              "name": "vqmdense1080-420-ref.y4m",
+              "sha256": "63ede268c76eaa59ab63280979c35c257c585aed971ffc0e705b987f91dad712"
+            },
+            {
+              "name": "vqmdense1080-420-dist.y4m",
+              "sha256": "1872cc66ea3d70afe1c9f270f1dc840adf9afb3d86d67645682ba9616718fc06"
+            }
+          ],
+          "scores": {
+            "A": [
+              {
+                "score": "100.00000000",
+                "checksum": "2300.000000"
+              }
+            ],
+            "B": [
+              {
+                "score": "100.00000000",
+                "checksum": "2300.000000"
+              }
+            ]
+          },
+          "runs_per_arm": 5
+        },
+        {
+          "case": "vmaf-v1-dense4k",
+          "summary": {
+            "core_ms": {
+              "A": {
+                "median": 3.271604,
+                "min": 3.263859,
+                "max": 3.272988
+              },
+              "B": {
+                "median": 3.17466,
+                "min": 3.17171,
+                "max": 3.17699
+              },
+              "percent_change": -2.9631948120860674
+            },
+            "vmaf_v1_luma": {
+              "A": {
+                "median": 0.24328,
+                "min": 0.243189,
+                "max": 0.243299
+              },
+              "B": {
+                "median": 0.243403,
+                "min": 0.24327,
+                "max": 0.243461
+              },
+              "percent_change": 0.05055902663597678
+            },
+            "vmaf_v1_adm": {
+              "A": {
+                "median": 0.598635,
+                "min": 0.598563,
+                "max": 0.598942
+              },
+              "B": {
+                "median": 0.534384,
+                "min": 0.534088,
+                "max": 0.534418
+              },
+              "percent_change": -10.732917387055563
+            },
+            "vmaf_v1_speed": {
+              "A": {
+                "median": 0.117494,
+                "min": 0.117296,
+                "max": 0.117576
+              },
+              "B": {
+                "median": 0.092054,
+                "min": 0.091826,
+                "max": 0.092269
+              },
+              "percent_change": -21.652169472483706
+            },
+            "vmaf_v1_cambi": {
+              "A": {
+                "median": 1.903043,
+                "min": 1.901115,
+                "max": 1.90333
+              },
+              "B": {
+                "median": 1.903525,
+                "min": 1.902773,
+                "max": 1.904381
+              },
+              "percent_change": 0.025327856490897638
+            },
+            "vmaf_v1_motion": {
+              "A": {
+                "median": 0.298042,
+                "min": 0.297954,
+                "max": 0.298072
+              },
+              "B": {
+                "median": 0.287862,
+                "min": 0.287816,
+                "max": 0.288058
+              },
+              "percent_change": -3.4156259855993354
+            },
+            "vmaf_v1_score": {
+              "A": {
+                "median": 0.001276,
+                "min": 0.001119,
+                "max": 0.001605
+              },
+              "B": {
+                "median": 0.001299,
+                "min": 0.00126,
+                "max": 0.001323
+              },
+              "percent_change": 1.8025078369906078
+            }
+          },
+          "scores_exact": true,
+          "inputs": [
+            {
+              "name": "vqmdense4k-420-ref.y4m",
+              "sha256": "d049de19d4223a5a58f979b94b41ca3221276c2a2bd77ac45f8d1b99aa3c14e3"
+            },
+            {
+              "name": "vqmdense4k-420-dist.y4m",
+              "sha256": "16b9e0ad3fd7cbceaf7e066d32f87d3a8a32d6fdba0b30adaeeea8368fb2805e"
+            }
+          ],
+          "scores": {
+            "A": [
+              {
+                "score": "100.00000000",
+                "checksum": "2300.000000"
+              }
+            ],
+            "B": [
+              {
+                "score": "100.00000000",
+                "checksum": "2300.000000"
+              }
+            ]
+          },
+          "runs_per_arm": 5
+        }
+      ]
+    }
+  ]
+}

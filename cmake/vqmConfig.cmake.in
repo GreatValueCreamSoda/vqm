@@ -1,0 +1,7 @@
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+find_dependency(Vulkan)
+find_dependency(Threads)
+include("${CMAKE_CURRENT_LIST_DIR}/vqmTargets.cmake")
+check_required_components(vqm)

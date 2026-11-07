@@ -1,0 +1,127 @@
+// VMAF SpEED: Copyright 2016-2025 Netflix, Inc.
+// BSD-2-Clause-Patent; see licenses/NETFLIX-VMAF-LICENSE.
+// Experimental work distribution for the existing per-block forward solve.
+// The host must select full 32-lane subgroups with compute shuffle support.
+#version 450
+#extension GL_KHR_shader_subgroup_basic : require
+#extension GL_KHR_shader_subgroup_shuffle : require
+#include "vmaf_speed_stats_common.glsl"
+#ifndef SPEED_POOL_SUBGROUPS
+#define SPEED_POOL_SUBGROUPS 4
+#endif
+#if SPEED_POOL_SUBGROUPS != 1 && SPEED_POOL_SUBGROUPS != 2 && \
+    SPEED_POOL_SUBGROUPS != 4
+#error "SPEED_POOL_SUBGROUPS must be 1, 2 or 4"
+#endif
+// 0: one reduced partial per workgroup; pc.groups uses the new group count.
+// 1: one raw score per block at pc.partials + channel * blocks + block.
+// 2: one raw score per block in the dead means/covariance scratch region.
+// The latter requires blocks <= kCholesky (1300), and no later covariance use.
+#ifndef SPEED_POOL_WRITE_SCORES
+#define SPEED_POOL_WRITE_SCORES 0
+#endif
+#if SPEED_POOL_WRITE_SCORES < 0 || SPEED_POOL_WRITE_SCORES > 2
+#error "SPEED_POOL_WRITE_SCORES must be 0, 1 or 2"
+#endif
+layout(local_size_x = 32 * SPEED_POOL_SUBGROUPS) in;
+shared float factors[2 * 625];
+shared float eigenvalues[2 * 25];
+#if SPEED_POOL_WRITE_SCORES == 0
+shared float partial[SPEED_POOL_SUBGROUPS];
+#endif
+
+void main() {
+    uint row = gl_SubgroupInvocationID;
+    uint block = gl_WorkGroupID.x * SPEED_POOL_SUBGROUPS + gl_SubgroupID;
+    uint channel = gl_WorkGroupID.y;
+    uint channel_base = 2u * channel;
+    uint nw = pc.width / 5u, nh = pc.height / 5u, blocks = nw * nh;
+    bool regular =
+        status(channel_base) == 0.0 && status(channel_base + 1u) == 0.0;
+    // Every invocation, including edge subgroups, participates in publication.
+    if (regular) {
+        for (uint at = gl_LocalInvocationIndex; at < 2u * 625u;
+             at += gl_WorkGroupSize.x) {
+            uint component = at / 625u, entry = at % 625u;
+            factors[at] = arena[cholesky(
+                channel_base + component, entry / 25u, entry % 25u
+            )];
+        }
+        for (uint at = gl_LocalInvocationIndex; at < 2u * 25u;
+             at += gl_WorkGroupSize.x)
+            eigenvalues[at] = arena[eigen(channel_base + at / 25u, at % 25u)];
+    }
+    barrier();
+    float score = 0.0;
+    // Both conditions are uniform within each subgroup. A live subgroup has
+    // all 32 lanes, including the 25 source lanes used by every shuffle.
+    if (block < blocks && regular) {
+        uint by = block / nw, bx = block % nw;
+        vec2 variance = vec2(0.0), entropy = vec2(0.0);
+        for (uint component = 0u; component < 2u; ++component) {
+            uint ch = channel_base + component;
+            float value = 0.0;
+            if (row < 25u)
+                value = arena
+                    [source(ch) + (by * 5u + row / 5u) * pc.width + bx * 5u +
+                     row % 5u];
+            float sum = 0.0;
+            // Lane r owns row r. Its earlier-column subtractions occur in
+            // exactly the scalar j=0..r-1 order; only row ownership changes.
+            // Pooling solves the original filtered patch, not a centered one.
+            for (uint k = 0u; k < 25u; ++k) {
+                float solution = 0.0;
+                if (row == k)
+                    solution = value / factors[component * 625u + k * 25u + k];
+                solution = subgroupShuffle(solution, k);
+                if (row > k && row < 25u)
+                    value -=
+                        factors[component * 625u + row * 25u + k] * solution;
+                if (row == 0u) sum += solution * solution;
+            }
+            float v = subgroupShuffle(sum / 25.0, 0u);
+            float term = 0.0;
+            if (row < 25u)
+                term =
+                    log2(
+                        max(eigenvalues[component * 25u + row], 0.0) * v + 0.19
+                    ) +
+                    4.09419117;
+            float e = 0.0;
+            // Compute log terms concurrently but retain their scalar add order.
+            for (uint k = 0u; k < 25u; ++k) {
+                float next_term = subgroupShuffle(term, k);
+                if (row == 0u) e += next_term;
+            }
+            variance[component] = v;
+            entropy[component] = e;
+        }
+        if (row == 0u) {
+            const float base = 25.0 * (log2(1.1 * 0.19) + 4.09419117);
+            if (entropy.x >= base || entropy.y >= base) {
+                float a = entropy.x * log2(1.0 + variance.x);
+                float b = entropy.y *
+                          log2(1.0 + 0.75 * variance.x + 0.25 * variance.y);
+                score = abs(a - b);
+            }
+        }
+    }
+#if SPEED_POOL_WRITE_SCORES == 1
+    if (row == 0u && block < blocks)
+        arena[pc.partials + channel * blocks + block] = score;
+#elif SPEED_POOL_WRITE_SCORES == 2
+    if (row == 0u && block < blocks)
+        arena[bank(channel_base) + kMeans + block] = score;
+#else
+    if (row == 0u) partial[gl_SubgroupID] = score;
+    barrier();
+    for (uint step = SPEED_POOL_SUBGROUPS / 2u; step > 0u; step >>= 1u) {
+        if (gl_LocalInvocationIndex < step)
+            partial[gl_LocalInvocationIndex] +=
+                partial[gl_LocalInvocationIndex + step];
+        barrier();
+    }
+    if (gl_LocalInvocationIndex == 0u)
+        arena[pc.partials + channel * pc.groups + gl_WorkGroupID.x] = partial[0];
+#endif
+}

@@ -1,0 +1,51 @@
+// VMAF SpEED: Copyright 2016-2025 Netflix, Inc.
+// BSD-2-Clause-Patent; see licenses/NETFLIX-VMAF-LICENSE.
+#version 450
+#include "vmaf_speed_stats_common.glsl"
+#ifndef COOP_SPLIT_K
+#define COOP_SPLIT_K 8
+#endif
+#ifndef COOP_PRODUCTS
+#define COOP_PRODUCTS 1
+#endif
+layout(local_size_x = 64) in;
+void main() {
+    uint i = gl_GlobalInvocationID.x;
+    if (i >= 325u * 2u * pc.op) return;
+    uint channel = i / 325u, pos = i % 325u, a = 0u;
+    while (a < 24u && pos >= 25u - a) {
+        pos -= 25u - a;
+        ++a;
+    }
+    uint b = a + pos;
+    uint tile = (a / 16u) * 2u + b / 16u;
+    uint cell = (a % 16u) * 16u + b % 16u;
+    float total = 0.0;
+#if COOP_PRODUCTS == 2
+    float cross_ab = 0.0, cross_ba = 0.0;
+#endif
+    for (uint slice = 0u; slice < COOP_SPLIT_K; ++slice) {
+        uint partial = pc.scratch + pc.op * 2604u +
+                       ((channel * COOP_SPLIT_K + slice) * 4u + tile) * 256u;
+        total += arena[partial + cell];
+#if COOP_PRODUCTS == 2
+        uint cross_base =
+            pc.scratch + pc.op * 2604u + 2u * pc.op * COOP_SPLIT_K * 4u * 256u;
+        uint transposed_tile = (b / 16u) * 2u + a / 16u;
+        uint transposed_cell = (b % 16u) * 16u + a % 16u;
+        cross_ab +=
+            arena[partial + cell + 2u * pc.op * COOP_SPLIT_K * 4u * 256u];
+        cross_ba += arena
+            [cross_base +
+             ((channel * COOP_SPLIT_K + slice) * 4u + transposed_tile) * 256u +
+             transposed_cell];
+#endif
+    }
+#if COOP_PRODUCTS == 2
+    total += (cross_ab + cross_ba) * (1.0 / 2048.0);
+#endif
+    uint samples = ((pc.width / 5u) * 5u - 4u) * ((pc.height / 5u) * 5u - 4u);
+    float value = total / float(samples);
+    arena[cov(channel, a, b)] = value;
+    if (a != b) arena[cov(channel, b, a)] = value;
+}

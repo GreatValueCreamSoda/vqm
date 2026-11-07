@@ -1,0 +1,111 @@
+{
+  "metric": "butteraugli",
+  "direction": "lower",
+  "reference_revision": "e47d2a2b5bb418f2947ce07f36cb048861db3820",
+  "input": "native-source-files",
+  "implementations": {
+    "ours": {
+      "command": [
+        "build/vqm_bench",
+        "--metric",
+        "butteraugli",
+        "--score-only",
+        "--pairs-file",
+        "{pairs_file}"
+      ],
+      "binary_sha256": "155eda72e223cdb87b08a300f99e9d6959c7228c2c28b75580854b6adff87ee0"
+    },
+    "libjxl": {
+      "command": [
+        "build/libjxl-build/tools/ss2_libjxl_bench",
+        "--metric",
+        "butteraugli",
+        "--score-only",
+        "--pairs-file",
+        "{pairs_file}"
+      ],
+      "binary_sha256": "6f63cca605f9c717076ba09514ae996199cdb1f12a9b424f84b6c41caa92c37c"
+    }
+  },
+  "manifest": {
+    "direction": "lower",
+    "reference": "libjxl",
+    "implementations": [
+      {
+        "name": "ours",
+        "command": [
+          "build/vqm_bench",
+          "--metric",
+          "butteraugli",
+          "--score-only",
+          "--pairs-file",
+          "{pairs_file}"
+        ],
+        "batch": true,
+        "jobs": 1,
+        "threads": 3,
+        "decode_threads": 16
+      },
+      {
+        "name": "libjxl",
+        "command": [
+          "build/libjxl-build/tools/ss2_libjxl_bench",
+          "--metric",
+          "butteraugli",
+          "--score-only",
+          "--pairs-file",
+          "{pairs_file}"
+        ],
+        "batch": true,
+        "jobs": 1,
+        "threads": 16,
+        "decode_threads": 4
+      },
+      {
+        "name": "vship-cuda",
+        "command": [
+          "build/vship-build-cuda/vship_bench",
+          "--metric",
+          "butteraugli",
+          "--score-only",
+          "--pairs-file",
+          "{pairs_file}"
+        ],
+        "batch": true,
+        "jobs": 1,
+        "threads": 3,
+        "decode_threads": 16
+      },
+      {
+        "name": "vship-vulkan",
+        "command": [
+          "build/vship-build-vulkan/vship_bench",
+          "--metric",
+          "butteraugli",
+          "--score-only",
+          "--pairs-file",
+          "{pairs_file}"
+        ],
+        "batch": true,
+        "jobs": 1,
+        "threads": 3,
+        "decode_threads": 16
+      },
+      {
+        "name": "vship-fast-vulkan",
+        "command": [
+          "build/vship-fast-build-vulkan/vship_bench",
+          "--metric",
+          "butteraugli",
+          "--score-only",
+          "--pairs-file",
+          "{pairs_file}"
+        ],
+        "batch": true,
+        "jobs": 1,
+        "threads": 3,
+        "decode_threads": 16
+      }
+    ]
+  }
+}

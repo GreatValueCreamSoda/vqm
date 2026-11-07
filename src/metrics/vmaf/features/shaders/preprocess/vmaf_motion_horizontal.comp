@@ -1,0 +1,66 @@
+// VMAF motion: Copyright 2016-2020 Netflix, Inc.
+// BSD-2-Clause-Patent; see licenses/NETFLIX-VMAF-LICENSE.
+// Separable convolution followed by the absolute difference between two
+// separately blurred reference frames (libvmaf float_motion.c:317-347,
+// motion.c:44-58 at revision 4611e47a7330cd342498dcc130e1008efbeab6e4).
+// The tiled shared-memory schedule and per-group reduction are VQM's.
+
+#version 450
+#include "vmaf_motion_common.glsl"
+
+layout(local_size_x = 32, local_size_y = 8) in;
+shared float partial[256];
+shared float tile[36 * 12];
+shared float vertical[36 * 8];
+
+void main() {
+    const uvec2 pos = gl_GlobalInvocationID.xy;
+    const uint lane = gl_LocalInvocationIndex;
+    const ivec2 origin = ivec2(gl_WorkGroupID.xy * uvec2(32u, 8u));
+    for (uint i = lane; i < 432u; i += 256u) {
+        const ivec2 source = origin + ivec2(int(i % 36u) - 2, int(i / 36u) - 2);
+        // The last workgroup can extend arbitrarily past a short image.
+        // Only the radius-two halo of valid output positions can be read.
+        if (source.x >= -2 && source.x < int(pc.width) + 2 && source.y >= -2 &&
+            source.y < int(pc.height) + 2) {
+            const int x = motion_mirror(source.x, int(pc.width));
+            const int y = motion_mirror(source.y, int(pc.height));
+            tile[i] = arena[pc.luma + uint(y) * pc.width + uint(x)];
+        } else {
+            tile[i] = 0.0;
+        }
+    }
+    barrier();
+    for (uint i = lane; i < 288u; i += 256u) {
+        const uint x = i % 36u, y = i / 36u;
+        float value = 0.0;
+        for (uint k = 0; k < 5u; ++k)
+            value += kMotionFilter[k] * tile[(y + k) * 36u + x];
+        vertical[i] = value;
+    }
+    barrier();
+    float difference = 0.0;
+    if (pos.x < pc.width && pos.y < pc.height) {
+        float value = 0.0;
+        for (int k = 0; k < 5; ++k) {
+            value += kMotionFilter[k] * vertical
+                                            [gl_LocalInvocationID.y * 36u +
+                                             gl_LocalInvocationID.x + uint(k)];
+        }
+        const uint index = pos.y * pc.width + pos.x;
+        arena[pc.blurred + index] = value;
+        if (pc.has_previous != 0u)
+            difference = abs(value - arena[pc.previous + index]);
+    }
+    partial[lane] = difference;
+    barrier();
+    for (uint stride = 128u; stride > 0u; stride >>= 1u) {
+        if (lane < stride) partial[lane] += partial[lane + stride];
+        barrier();
+    }
+    if (lane == 0u) {
+        const uint groups_x = (pc.width + 31u) / 32u;
+        const uint index = gl_WorkGroupID.y * groups_x + gl_WorkGroupID.x;
+        arena[pc.partials + index] = partial[0];
+    }
+}

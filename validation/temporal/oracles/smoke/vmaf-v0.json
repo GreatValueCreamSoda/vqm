@@ -1,0 +1,361 @@
+{
+  "schema_version": 1,
+  "metric": "vmaf-v0",
+  "implementation": "pinned-original",
+  "revision": "4611e47a7330cd342498dcc130e1008efbeab6e4",
+  "configuration_hash": "ebd685938b1f8522c1b566042c568fed186610f62bef733dfebce9127c42493c",
+  "input_manifest_hash": "53d5a1ad72f6a73dfb786576cf87fb95d6ea6e907794b4fdf405c0257e96d75a",
+  "samples": [
+    {
+      "sample_id": "bus_cif/quantize8",
+      "source_id": "bus",
+      "stratum": "sdr-native-444",
+      "distortion_family": "quantization",
+      "configuration_id": "vmaf-v0-native444-8bit",
+      "input_hash": "9964a5a4de693569524d162ca3a22bac671a48dfb0375a5ecc2e8c8620108ef7",
+      "score": 99.6746015
+    },
+    {
+      "sample_id": "bus_cif/quantize32",
+      "source_id": "bus",
+      "stratum": "sdr-native-444",
+      "distortion_family": "quantization",
+      "configuration_id": "vmaf-v0-native444-8bit",
+      "input_hash": "45516e0946c23bc22c7aeaec72bcd1a23f76cfc4c52de5888482ac6a3a21d429",
+      "score": 96.88031933333333
+    },
+    {
+      "sample_id": "bus_cif/flicker8",
+      "source_id": "bus",
+      "stratum": "sdr-native-444",
+      "distortion_family": "flicker",
+      "configuration_id": "vmaf-v0-native444-8bit",
+      "input_hash": "8a05fec644dc388bba0edcc72076b002183149e3aa3d9caa495366b7111f78c7",
+      "score": 99.77484450000001
+    },
+    {
+      "sample_id": "bus_cif/flicker24",
+      "source_id": "bus",
+      "stratum": "sdr-native-444",
+      "distortion_family": "flicker",
+      "configuration_id": "vmaf-v0-native444-8bit",
+      "input_hash": "7424c66b3b48eaa9eb5d4d42b3985b94d3b216bdabe312d281d825a3d1cb1b00",
+      "score": 99.675843
+    },
+    {
+      "sample_id": "bus_cif/flicker64",
+      "source_id": "bus",
+      "stratum": "sdr-native-444",
+      "distortion_family": "flicker",
+      "configuration_id": "vmaf-v0-native444-8bit",
+      "input_hash": "6dd09668c73cc2c73038bd2b07901b2525846fa2a155b990f8df035b68ac9e99",
+      "score": 63.36895558333333
+    },
+    {
+      "sample_id": "bus_cif/flicker96",
+      "source_id": "bus",
+      "stratum": "sdr-native-444",
+      "distortion_family": "flicker",
+      "configuration_id": "vmaf-v0-native444-8bit",
+      "input_hash": "4c9565bc2ac328a38ead1970fc4b22093592e65df0b9525bd24bbb9ae11e8575",
+      "score": 34.7416495
+    },
+    {
+      "sample_id": "bus_cif/freeze3",
+      "source_id": "bus",
+      "stratum": "sdr-native-444",
+      "distortion_family": "freeze",
+      "configuration_id": "vmaf-v0-native444-8bit",
+      "input_hash": "a7cbcb5506ebbb296c001e3f7d7087ea9b851fb235e07f6001918f58b7baea2f",
+      "score": 54.87088541666666
+    },
+    {
+      "sample_id": "bus_cif/freeze8",
+      "source_id": "bus",
+      "stratum": "sdr-native-444",
+      "distortion_family": "freeze",
+      "configuration_id": "vmaf-v0-native444-8bit",
+      "input_hash": "0a9a08e3ec9f13a4ae32aacf53a3975012e0ef26de2586d04f55e9cd1f93a729",
+      "score": 38.65135308333333
+    },
+    {
+      "sample_id": "bus_cif/pulse12",
+      "source_id": "bus",
+      "stratum": "sdr-native-444",
+      "distortion_family": "impulse",
+      "configuration_id": "vmaf-v0-native444-8bit",
+      "input_hash": "0311cd4c6ac157a9d2a889283e7f134596f59c8caef944d7fa97ee6afbd25d64",
+      "score": 99.78566483333333
+    },
+    {
+      "sample_id": "bus_cif/pulse32",
+      "source_id": "bus",
+      "stratum": "sdr-native-444",
+      "distortion_family": "impulse",
+      "configuration_id": "vmaf-v0-native444-8bit",
+      "input_hash": "015ec54e358fcd8b8bb691256304f00a988dc4fca8f31d329e96948847c3c988",
+      "score": 99.68946225
+    },
+    {
+      "sample_id": "bus_cif/pulse64",
+      "source_id": "bus",
+      "stratum": "sdr-native-444",
+      "distortion_family": "impulse",
+      "configuration_id": "vmaf-v0-native444-8bit",
+      "input_hash": "dfb51a9505d7b3ccf09b1f6713505ac2ffad545d59e0c0e2cf755bd4c6681e3a",
+      "score": 97.7703605
+    },
+    {
+      "sample_id": "bus_cif/pulse128",
+      "source_id": "bus",
+      "stratum": "sdr-native-444",
+      "distortion_family": "impulse",
+      "configuration_id": "vmaf-v0-native444-8bit",
+      "input_hash": "22a835a6f94f9f721383042df6dce4ec4719c626adb10279cf711b25c3dbe973",
+      "score": 92.50332625
+    },
+    {
+      "sample_id": "bus_cif/pulse224",
+      "source_id": "bus",
+      "stratum": "sdr-native-444",
+      "distortion_family": "impulse",
+      "configuration_id": "vmaf-v0-native444-8bit",
+      "input_hash": "b0979c542116ec3063b58ebd6f5844ce046e838f0c8eea61fa1f102e660e82d3",
+      "score": 92.08847541666667
+    },
+    {
+      "sample_id": "foreman_cif/quantize8",
+      "source_id": "foreman",
+      "stratum": "sdr-native-444",
+      "distortion_family": "quantization",
+      "configuration_id": "vmaf-v0-native444-8bit",
+      "input_hash": "0cd863546bfe0a26f307b160f14cd4200b3299cebbfccd31d2dfd7946e34e953",
+      "score": 98.65745141666667
+    },
+    {
+      "sample_id": "foreman_cif/quantize32",
+      "source_id": "foreman",
+      "stratum": "sdr-native-444",
+      "distortion_family": "quantization",
+      "configuration_id": "vmaf-v0-native444-8bit",
+      "input_hash": "78d15bc6f6874e8912529c816e828ac80cdefdf4aa8f7d1b9daed0037900c4a2",
+      "score": 66.52153558333333
+    },
+    {
+      "sample_id": "foreman_cif/flicker8",
+      "source_id": "foreman",
+      "stratum": "sdr-native-444",
+      "distortion_family": "flicker",
+      "configuration_id": "vmaf-v0-native444-8bit",
+      "input_hash": "9df2568fe6afba8becb6e2c7e6895c5552a1536747b8250dd6dcf2e24f02e514",
+      "score": 99.78543075
+    },
+    {
+      "sample_id": "foreman_cif/flicker24",
+      "source_id": "foreman",
+      "stratum": "sdr-native-444",
+      "distortion_family": "flicker",
+      "configuration_id": "vmaf-v0-native444-8bit",
+      "input_hash": "00b38f4ffd93a7bf98020ee2f3e3b7ed6ec158ec3382ca486682f32f9119a90e",
+      "score": 99.77973633333333
+    },
+    {
+      "sample_id": "foreman_cif/flicker64",
+      "source_id": "foreman",
+      "stratum": "sdr-native-444",
+      "distortion_family": "flicker",
+      "configuration_id": "vmaf-v0-native444-8bit",
+      "input_hash": "2ccb997a617f975b33e9312df37c5e837b41558e8a57b69e6fe151a9bf145689",
+      "score": 75.14362858333332
+    },
+    {
+      "sample_id": "foreman_cif/flicker96",
+      "source_id": "foreman",
+      "stratum": "sdr-native-444",
+      "distortion_family": "flicker",
+      "configuration_id": "vmaf-v0-native444-8bit",
+      "input_hash": "eb2611ab5db68f92f0524ede427a23121e520c38daf1de564b342929b4127448",
+      "score": 42.030836083333334
+    },
+    {
+      "sample_id": "foreman_cif/freeze3",
+      "source_id": "foreman",
+      "stratum": "sdr-native-444",
+      "distortion_family": "freeze",
+      "configuration_id": "vmaf-v0-native444-8bit",
+      "input_hash": "198dc2bc6199e15796dcbb409680a2ae557955ec2cff1dbe38c887ef827656a8",
+      "score": 62.92371666666667
+    },
+    {
+      "sample_id": "foreman_cif/freeze8",
+      "source_id": "foreman",
+      "stratum": "sdr-native-444",
+      "distortion_family": "freeze",
+      "configuration_id": "vmaf-v0-native444-8bit",
+      "input_hash": "0c71878a01bce133c8e2717693c04a87c8e25aa78f5c9005729a2f7f77010923",
+      "score": 44.96569733333334
+    },
+    {
+      "sample_id": "foreman_cif/pulse12",
+      "source_id": "foreman",
+      "stratum": "sdr-native-444",
+      "distortion_family": "impulse",
+      "configuration_id": "vmaf-v0-native444-8bit",
+      "input_hash": "5483f767b230ff0916ea79e9a133d6bcc5d17a56feb2ce2d7fb8fd492fd32814",
+      "score": 99.78566274999999
+    },
+    {
+      "sample_id": "foreman_cif/pulse32",
+      "source_id": "foreman",
+      "stratum": "sdr-native-444",
+      "distortion_family": "impulse",
+      "configuration_id": "vmaf-v0-native444-8bit",
+      "input_hash": "14753ab492379b01a56395bd60df378b106b09e0075e7a96dd8d4dd43db2fc79",
+      "score": 99.69417025
+    },
+    {
+      "sample_id": "foreman_cif/pulse64",
+      "source_id": "foreman",
+      "stratum": "sdr-native-444",
+      "distortion_family": "impulse",
+      "configuration_id": "vmaf-v0-native444-8bit",
+      "input_hash": "dc6ec0502c9c01d7110100dfbdbbd8031c1238da74ec0020c034f84591aa23f3",
+      "score": 96.140671
+    },
+    {
+      "sample_id": "foreman_cif/pulse128",
+      "source_id": "foreman",
+      "stratum": "sdr-native-444",
+      "distortion_family": "impulse",
+      "configuration_id": "vmaf-v0-native444-8bit",
+      "input_hash": "e7a06b59d1baa43158b7e597645de3924c517e715c51cf307e87e88d2e88ede4",
+      "score": 91.45232941666666
+    },
+    {
+      "sample_id": "foreman_cif/pulse224",
+      "source_id": "foreman",
+      "stratum": "sdr-native-444",
+      "distortion_family": "impulse",
+      "configuration_id": "vmaf-v0-native444-8bit",
+      "input_hash": "dfe8ec90665bb2d05e205ced7da537c9a86e8955b80d2e9c55135b8e4f0855d5",
+      "score": 91.65139683333332
+    },
+    {
+      "sample_id": "mobile_cif/quantize8",
+      "source_id": "mobile",
+      "stratum": "sdr-native-444",
+      "distortion_family": "quantization",
+      "configuration_id": "vmaf-v0-native444-8bit",
+      "input_hash": "1415468ac43e15b3dba66d36987628cc47ab9ac32d6a77f4e38e9b1e7f2abeed",
+      "score": 99.63435716666667
+    },
+    {
+      "sample_id": "mobile_cif/quantize32",
+      "source_id": "mobile",
+      "stratum": "sdr-native-444",
+      "distortion_family": "quantization",
+      "configuration_id": "vmaf-v0-native444-8bit",
+      "input_hash": "de23aadab66fa85f798df054c8d5a81485eebdcba8b46e2a8cd0721d6bf01c40",
+      "score": 84.95494891666667
+    },
+    {
+      "sample_id": "mobile_cif/flicker8",
+      "source_id": "mobile",
+      "stratum": "sdr-native-444",
+      "distortion_family": "flicker",
+      "configuration_id": "vmaf-v0-native444-8bit",
+      "input_hash": "3a95de60c9fe3e7bf9dbe92c3b8fc64e5b1fdaed13374dfa64167307f9641793",
+      "score": 99.76802075
+    },
+    {
+      "sample_id": "mobile_cif/flicker24",
+      "source_id": "mobile",
+      "stratum": "sdr-native-444",
+      "distortion_family": "flicker",
+      "configuration_id": "vmaf-v0-native444-8bit",
+      "input_hash": "b422ae44a0345b9a8aa7dd4a937635cdaa670085a6b7396ad43829b69567ee70",
+      "score": 99.6415035
+    },
+    {
+      "sample_id": "mobile_cif/flicker64",
+      "source_id": "mobile",
+      "stratum": "sdr-native-444",
+      "distortion_family": "flicker",
+      "configuration_id": "vmaf-v0-native444-8bit",
+      "input_hash": "fd080c42e1668a9f3ac2dbb835d7df6117122654e0a3b13b77259f81247ce438",
+      "score": 74.37733316666667
+    },
+    {
+      "sample_id": "mobile_cif/flicker96",
+      "source_id": "mobile",
+      "stratum": "sdr-native-444",
+      "distortion_family": "flicker",
+      "configuration_id": "vmaf-v0-native444-8bit",
+      "input_hash": "9220de64c92a0188173fdfba0262cb756f9f2cbe540c32d29a574e506484a6d2",
+      "score": 28.698956499999998
+    },
+    {
+      "sample_id": "mobile_cif/freeze3",
+      "source_id": "mobile",
+      "stratum": "sdr-native-444",
+      "distortion_family": "freeze",
+      "configuration_id": "vmaf-v0-native444-8bit",
+      "input_hash": "744ef3c45b6d326dccc14c8aeaa0c4a1b93e6d74969a3198ecae016bffd75f1f",
+      "score": 62.36392166666667
+    },
+    {
+      "sample_id": "mobile_cif/freeze8",
+      "source_id": "mobile",
+      "stratum": "sdr-native-444",
+      "distortion_family": "freeze",
+      "configuration_id": "vmaf-v0-native444-8bit",
+      "input_hash": "8c9e47979fd14884ab316a3edce85218937df97678d451ce62e5ad67ed65c3b0",
+      "score": 36.1562575
+    },
+    {
+      "sample_id": "mobile_cif/pulse12",
+      "source_id": "mobile",
+      "stratum": "sdr-native-444",
+      "distortion_family": "impulse",
+      "configuration_id": "vmaf-v0-native444-8bit",
+      "input_hash": "0fb59333e03cabfecad957aaf1194cef7d8ac53c14b6153a049b376c63160f8e",
+      "score": 99.78566983333333
+    },
+    {
+      "sample_id": "mobile_cif/pulse32",
+      "source_id": "mobile",
+      "stratum": "sdr-native-444",
+      "distortion_family": "impulse",
+      "configuration_id": "vmaf-v0-native444-8bit",
+      "input_hash": "bbcab5662f4575eff7ef4a5fa8b93fd7c6a6894269c1f50bca30197fdab9df3b",
+      "score": 99.78566983333333
+    },
+    {
+      "sample_id": "mobile_cif/pulse64",
+      "source_id": "mobile",
+      "stratum": "sdr-native-444",
+      "distortion_family": "impulse",
+      "configuration_id": "vmaf-v0-native444-8bit",
+      "input_hash": "7ccbffb8e036e26a49ee055d91996697fb42fddd0ebec7ca213928f78f463f87",
+      "score": 97.16053025000001
+    },
+    {
+      "sample_id": "mobile_cif/pulse128",
+      "source_id": "mobile",
+      "stratum": "sdr-native-444",
+      "distortion_family": "impulse",
+      "configuration_id": "vmaf-v0-native444-8bit",
+      "input_hash": "7dfa29f3016e9a1385cf6006b1221541af0ff719b6c9362c507fee030fcfff9a",
+      "score": 91.4523365
+    },
+    {
+      "sample_id": "mobile_cif/pulse224",
+      "source_id": "mobile",
+      "stratum": "sdr-native-444",
+      "distortion_family": "impulse",
+      "configuration_id": "vmaf-v0-native444-8bit",
+      "input_hash": "4c47967c2644b0e8e17057655527e95e79b05e6e6e70ece67380d71fb3c828ab",
+      "score": 91.74970291666666
+    }
+  ]
+}

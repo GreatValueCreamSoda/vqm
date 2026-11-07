@@ -1,0 +1,41 @@
+// Original CVVDP FIR: Graphics and Displays Group (2024), MIT.
+#version 450
+#extension GL_GOOGLE_include_directive : require
+layout(local_size_x = 256) in;
+#include "bindings.glsl"
+layout(std430, binding = 4) readonly buffer ReferenceHistory {
+    float ref_history[];
+};
+layout(std430, binding = 5) readonly buffer DistortedHistory {
+    float dist_history[];
+};
+layout(push_constant) uniform Push {
+    uint pixels;
+    uint taps;
+    uint current;
+    uint available;
+    uint filters;
+    uint reference;
+    uint distorted;
+}
+pc;
+void main() {
+    uint pixel = gl_GlobalInvocationID.x;
+    uint channel = gl_WorkGroupID.y;
+    if (pixel >= pc.pixels) return;
+    uint source_channel = channel == 3u ? 0u : channel;
+    float r = 0.0;
+    float d = 0.0;
+    for (uint lag = 0u; lag < pc.taps; ++lag) {
+        // Missing prefix samples replicate frame zero, including the first
+        // video frame. Current sample multiplies coefficient zero.
+        uint slot =
+            (pc.current + pc.taps - min(lag, pc.available - 1u)) % pc.taps;
+        uint source = (slot * 3u + source_channel) * pc.pixels + pixel;
+        float weight = arena[pc.filters + channel * pc.taps + lag];
+        r += ref_history[source] * weight;
+        d += dist_history[source] * weight;
+    }
+    arena[pc.reference + channel * pc.pixels + pixel] = r;
+    arena[pc.distorted + channel * pc.pixels + pixel] = d;
+}

@@ -1,0 +1,32 @@
+// VMAF SpEED: Copyright 2016-2025 Netflix, Inc.
+// BSD-2-Clause-Patent; see licenses/NETFLIX-VMAF-LICENSE.
+#version 450
+#include "vmaf_speed_filter_common.glsl"
+layout(local_size_x = 16, local_size_y = 16) in;
+
+void main() {
+    uvec2 p = gl_GlobalInvocationID.xy;
+    const uint width = pc.width / 16u;
+    const uint height = pc.height / 16u;
+    if (p.x >= width || p.y >= height) return;
+    const uint input_width = pc.op == 0u ? 9u * width : width;
+    const int taps = pc.op == 0u ? 9 : 3;
+    const int center = pc.op == 0u ? int(p.x * 9u) : int(p.x);
+    float value = 0.0;
+    for (int k = 0; k < taps; ++k) {
+        int x = pc.op == 0u
+                    ? center + k
+                    : speed_mirror(center + k - taps / 2, int(input_width));
+        float weight = pc.op == 0u ? kAntialias[k] : kMean[k];
+        value += weight * arena
+                              [pc.scratch_offset[gl_WorkGroupID.z] +
+                               p.y * input_width + uint(x)];
+    }
+    const uint index = p.y * width + p.x;
+    if (pc.op == 0u) {
+        arena[pc.down_offset[gl_WorkGroupID.z] + index] = value;
+    } else {
+        arena[pc.result_offset[gl_WorkGroupID.z] + index] =
+            arena[pc.down_offset[gl_WorkGroupID.z] + index] - value;
+    }
+}

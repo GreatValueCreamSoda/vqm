@@ -1,0 +1,70 @@
+// VMAF ADM: Copyright 2016-2020 Netflix, Inc.
+// BSD-2-Clause-Patent; see licenses/NETFLIX-VMAF-LICENSE.
+// Wavelet coefficients, orientation and edge reflection follow Netflix's
+// adm_tools.c:43-44,1017-1153 at
+// 4611e47a7330cd342498dcc130e1008efbeab6e4.
+
+#version 450
+#include "bindings.glsl"
+
+layout(local_size_x = 16, local_size_y = 16) in;
+layout(push_constant) uniform Params {
+    uint width;
+    uint height;
+    uint source;
+    uint low;
+    uint horizontal;
+    uint vertical;
+    uint diagonal;
+}
+pc;
+
+const float kLow[4] = float[4](
+    0.482962913144690, 0.836516303737469, 0.224143868041857, -0.129409522550921
+);
+const float kHigh[4] = float[4](
+    -0.129409522550921, -0.224143868041857, 0.836516303737469, -0.482962913144690
+);
+
+int dwt_mirror(int coordinate, int extent) {
+    if (coordinate < 0) return -coordinate;
+    if (coordinate >= extent) return 2 * extent - coordinate - 1;
+    return coordinate;
+}
+
+void main() {
+    const uvec2 pos = gl_GlobalInvocationID.xy;
+    const uvec2 out_size = (uvec2(pc.width, pc.height) + 1u) / 2u;
+    if (any(greaterThanEqual(pos, out_size))) return;
+    float low_rows[4];
+    float high_rows[4];
+    for (int x = 0; x < 4; ++x) {
+        const int sx = dwt_mirror(2 * int(pos.x) - 1 + x, int(pc.width));
+        precise float low = 0.0;
+        precise float high = 0.0;
+        for (int y = 0; y < 4; ++y) {
+            const int sy = dwt_mirror(2 * int(pos.y) - 1 + y, int(pc.height));
+            const float value =
+                arena[pc.source + uint(sy) * pc.width + uint(sx)];
+            low += kLow[y] * value;
+            high += kHigh[y] * value;
+        }
+        low_rows[x] = low;
+        high_rows[x] = high;
+    }
+    precise float ll = 0.0;
+    precise float hl = 0.0;
+    precise float lh = 0.0;
+    precise float hh = 0.0;
+    for (int x = 0; x < 4; ++x) {
+        ll += kLow[x] * low_rows[x];
+        lh += kHigh[x] * low_rows[x];
+        hl += kLow[x] * high_rows[x];
+        hh += kHigh[x] * high_rows[x];
+    }
+    const uint index = pos.y * out_size.x + pos.x;
+    arena[pc.low + index] = ll;
+    arena[pc.horizontal + index] = hl;
+    arena[pc.vertical + index] = lh;
+    arena[pc.diagonal + index] = hh;
+}

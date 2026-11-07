@@ -1,0 +1,26 @@
+// Copyright (c) 2026 VQM contributors. BSD-3-Clause; see LICENSE.
+
+#version 450
+
+#include "psnr_hvs_common.glsl"
+
+layout(local_size_x = 128) in;
+shared float partial[128];
+
+void main() {
+    const uint lane = gl_LocalInvocationIndex;
+    float sum = 0.0;
+    // First-level groups partition the stream by global lane index. A
+    // single group uses the same kernel to finish the compact group sums.
+    const uint stride = gl_NumWorkGroups.x * 128u;
+    for (uint block = gl_GlobalInvocationID.x; block < pc.blocks;
+         block += stride)
+        sum += arena[pc.reference + block];
+    partial[lane] = sum;
+    barrier();
+    for (uint step = 64u; step > 0u; step >>= 1u) {
+        if (lane < step) partial[lane] += partial[lane + step];
+        barrier();
+    }
+    if (lane == 0u) arena[pc.destination + gl_WorkGroupID.x] = partial[0];
+}

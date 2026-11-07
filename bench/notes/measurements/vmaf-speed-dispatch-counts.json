@@ -1,0 +1,156 @@
+{
+  "date": "2026-11-05",
+  "scope": "Source-derived launch counts for the unmodified current SpEED, two chroma channels and four image planes. Not measured occupancy or speed.",
+  "source_sha256": {
+    "src/metrics/vmaf/speed/vmaf_speed.cc": "cd0a983697208b0537ea183c9a187fc5205c282fe0c31483997795622c7389c5",
+    "src/metrics/vmaf/speed/shaders/vmaf_speed_filter_vertical.comp": "e2ec0c3c0b4dd23b7ef9fe5a9afa68db142ed72bee2b4227b16f2258882e634e",
+    "src/metrics/vmaf/speed/shaders/vmaf_speed_filter_horizontal.comp": "906aa7834a6e0740424d75f7f3519eee860f6cb5dd3b1700af8c18f072d6e874",
+    "src/metrics/vmaf/speed/shaders/vmaf_speed_stats_cov.comp": "6d9e65d8b37971429feaf672b147186d9c23b7317fe8d5de73a4958bf7fe6918",
+    "src/metrics/vmaf/speed/shaders/vmaf_speed_stats_eigen.comp": "898f1fd6943d6f4322976fae85b2ca9b22d30138a7185e0bfe2a1bc85f2db371",
+    "src/metrics/vmaf/speed/shaders/vmaf_speed_stats_pool.comp": "feca37b9fc6a39ef2d4e717d906f68300b67caf822dc9f3fd2ee58201ed0e4e1",
+    "src/metrics/vmaf/speed/shaders/vmaf_speed_stats_reduce.comp": "c2891421a6f666808fb35c11e3d4c6313158f591cdfde69c9f2d42ce975f090a",
+    "src/metrics/vmaf/speed/shaders/vmaf_speed_combine.comp": "3e1a825558af86e4d6cf5b0aeca08259bd35a04385de84e295004fc8d5c13128"
+  },
+  "cases": [
+    {
+      "input": [
+        1920,
+        1080
+      ],
+      "sampling": "420",
+      "chroma": [
+        960,
+        540
+      ],
+      "filtered": [
+        60,
+        33
+      ],
+      "covariance_samples": 1456,
+      "pool_blocks_per_channel": 72,
+      "dispatch_workgroups": {
+        "filter_vertical_9tap": 408,
+        "filter_horizontal_9tap": 48,
+        "filter_vertical_3tap": 48,
+        "filter_horizontal_3tap": 48,
+        "means": 100,
+        "covariance": 1300,
+        "eigen_and_cholesky": 8,
+        "pool": 4,
+        "reduce": 2,
+        "combine": 1
+      },
+      "subgroup_pool_candidate": {
+        "one_block_per_workgroup": 144,
+        "two_blocks_per_workgroup": 72,
+        "four_blocks_per_workgroup": 36,
+        "separate_score_buffer_bytes": 576
+      }
+    },
+    {
+      "input": [
+        3840,
+        2160
+      ],
+      "sampling": "420",
+      "chroma": [
+        1920,
+        1080
+      ],
+      "filtered": [
+        120,
+        67
+      ],
+      "covariance_samples": 7076,
+      "pool_blocks_per_channel": 312,
+      "dispatch_workgroups": {
+        "filter_vertical_9tap": 1360,
+        "filter_horizontal_9tap": 160,
+        "filter_vertical_3tap": 160,
+        "filter_horizontal_3tap": 160,
+        "means": 100,
+        "covariance": 1300,
+        "eigen_and_cholesky": 8,
+        "pool": 10,
+        "reduce": 2,
+        "combine": 1
+      },
+      "subgroup_pool_candidate": {
+        "one_block_per_workgroup": 624,
+        "two_blocks_per_workgroup": 312,
+        "four_blocks_per_workgroup": 156,
+        "separate_score_buffer_bytes": 2496
+      }
+    },
+    {
+      "input": [
+        1920,
+        1080
+      ],
+      "sampling": "444",
+      "chroma": [
+        1920,
+        1080
+      ],
+      "filtered": [
+        120,
+        67
+      ],
+      "covariance_samples": 7076,
+      "pool_blocks_per_channel": 312,
+      "dispatch_workgroups": {
+        "filter_vertical_9tap": 1360,
+        "filter_horizontal_9tap": 160,
+        "filter_vertical_3tap": 160,
+        "filter_horizontal_3tap": 160,
+        "means": 100,
+        "covariance": 1300,
+        "eigen_and_cholesky": 8,
+        "pool": 10,
+        "reduce": 2,
+        "combine": 1
+      },
+      "subgroup_pool_candidate": {
+        "one_block_per_workgroup": 624,
+        "two_blocks_per_workgroup": 312,
+        "four_blocks_per_workgroup": 156,
+        "separate_score_buffer_bytes": 2496
+      }
+    },
+    {
+      "input": [
+        3840,
+        2160
+      ],
+      "sampling": "444",
+      "chroma": [
+        3840,
+        2160
+      ],
+      "filtered": [
+        240,
+        135
+      ],
+      "covariance_samples": 30916,
+      "pool_blocks_per_channel": 1296,
+      "dispatch_workgroups": {
+        "filter_vertical_9tap": 4860,
+        "filter_horizontal_9tap": 540,
+        "filter_vertical_3tap": 540,
+        "filter_horizontal_3tap": 540,
+        "means": 100,
+        "covariance": 1300,
+        "eigen_and_cholesky": 8,
+        "pool": 42,
+        "reduce": 2,
+        "combine": 1
+      },
+      "subgroup_pool_candidate": {
+        "one_block_per_workgroup": 2592,
+        "two_blocks_per_workgroup": 1296,
+        "four_blocks_per_workgroup": 648,
+        "separate_score_buffer_bytes": 10368
+      }
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+// VMAF SpEED: Copyright 2016-2025 Netflix, Inc.
+// BSD-2-Clause-Patent; see licenses/NETFLIX-VMAF-LICENSE.
+#version 450
+#include "vmaf_speed_stats_common.glsl"
+layout(local_size_x = 64) in;
+shared float partial[64];
+void main() {
+    uint lane = gl_LocalInvocationIndex, bank_id = gl_WorkGroupID.x;
+    float total = 0.0;
+    for (uint i = lane; i < pc.groups; i += 64u)
+        total += arena[pc.partials + bank_id * pc.groups + i];
+    partial[lane] = total;
+    barrier();
+    for (uint step = 32u; step > 0u; step >>= 1u) {
+        if (lane < step) partial[lane] += partial[lane + step];
+        barrier();
+    }
+    if (lane == 0u) {
+        arena[pc.result + 2u * bank_id] =
+            partial[0] / float((pc.width / 5u) * (pc.height / 5u));
+        arena[pc.result + 2u * bank_id + 1u] =
+            max(status(2u * bank_id), status(2u * bank_id + 1u));
+    }
+}

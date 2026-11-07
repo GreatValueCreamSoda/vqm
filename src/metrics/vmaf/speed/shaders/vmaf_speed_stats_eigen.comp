@@ -1,0 +1,340 @@
+// VMAF SpEED: Copyright 2016-2025 Netflix, Inc.
+// BSD-2-Clause-Patent; see licenses/NETFLIX-VMAF-LICENSE.
+// Householder reduction follows Netflix/vmaf feature/speed.c:259-571,
+// revision 4611e47a7330cd342498dcc130e1008efbeab6e4. The cooperative
+// reduction, Sturm bisection and Cholesky variance representation are ours.
+#version 450
+#include "vmaf_speed_stats_common.glsl"
+#ifndef VQM_SPEED_EIGEN_LANES
+#define VQM_SPEED_EIGEN_LANES 128
+#endif
+layout(local_size_x = VQM_SPEED_EIGEN_LANES) in;
+shared float matrix[625];
+shared float factor[625];
+shared float householder[25], product[25];
+shared float diagonal[25], subdiagonal[25];
+shared float tau, lower_bound, upper_bound, minimum_eigen;
+shared uint fallback;
+shared uint failed;
+
+float hypotenuse(float a, float b) { return sqrt(a * a + b * b); }
+vec2 givens(float a, float b) {
+    if (b == 0.0) return vec2(1.0, 0.0);
+    if (abs(b) > abs(a)) {
+        float t = -a / b;
+        float s = inversesqrt(1.0 + t * t);
+        return vec2(s * t, s);
+    }
+    float t = -b / a;
+    float c = inversesqrt(1.0 + t * t);
+    return vec2(c, c * t);
+}
+void chop(int start, int n) {
+    for (int i = start; i < start + n - 1; ++i)
+        if (abs(subdiagonal[i]) <
+            1e-6 * (abs(diagonal[i]) + abs(diagonal[i + 1])))
+            subdiagonal[i] = 0.0;
+}
+void qr_step(int start, int n) {
+    float ta = diagonal[start + n - 2];
+    float tb = diagonal[start + n - 1];
+    float tab = subdiagonal[start + n - 2];
+    float dt = (ta - tb) / 2.0;
+    float mu;
+    if (dt > 0.0)
+        mu = tb - tab * (tab / (dt + hypotenuse(dt, tab)));
+    else if (dt == 0.0)
+        mu = tb - abs(tab);
+    else
+        mu = tb + tab * (tab / (-dt + hypotenuse(dt, tab)));
+    if (1e-6 * abs(mu) > abs(diagonal[start]) + abs(subdiagonal[start]))
+        mu = 0.0;
+    float x = diagonal[start] - mu, z = subdiagonal[start];
+    float ak = 0.0, bk = 0.0, zk = 0.0;
+    float ap = diagonal[start], bp = subdiagonal[start];
+    float aq = diagonal[start + 1];
+    if (n == 2) {
+        vec2 rotation = givens(x, z);
+        float c = rotation.x, s = rotation.y;
+        // Preserve the 2x2 trace algebraically instead of multiplying both
+        // diagonals by the rounded c*c+s*s normalization.
+        float delta = s * (s * (aq - ap) - 2.0 * c * bp);
+        diagonal[start] = ap + delta;
+        subdiagonal[start] = c * (s * ap + c * bp) - s * (s * bp + c * aq);
+        diagonal[start + 1] = aq - delta;
+        return;
+    }
+    float bq = subdiagonal[start + 1];
+    for (int k = 0; k < n - 1; ++k) {
+        vec2 rotation = givens(x, z);
+        float c = rotation.x, s = rotation.y;
+        float bk1 = c * bk - s * zk;
+        float delta = s * (s * (aq - ap) - 2.0 * c * bp);
+        float ap1 = ap + delta;
+        float bp1 = c * (s * ap + c * bp) - s * (s * bp + c * aq);
+        float zp1 = -s * bq;
+        float aq1 = aq - delta;
+        float bq1 = c * bq;
+        ak = ap1;
+        bk = bp1;
+        zk = zp1;
+        ap = aq1;
+        bp = bq1;
+        if (k < n - 2) aq = diagonal[start + k + 2];
+        if (k < n - 3) bq = subdiagonal[start + k + 2];
+        diagonal[start + k] = ak;
+        if (k > 0) subdiagonal[start + k - 1] = bk1;
+        if (k < n - 2) subdiagonal[start + k + 1] = bp;
+        x = bk;
+        z = zk;
+    }
+    diagonal[start + n - 1] = ap;
+    subdiagonal[start + n - 2] = bk;
+}
+
+// Sturm count for a symmetric tridiagonal matrix: number of eigenvalues
+// below x. Each invocation runs an independent bisection for one eigenvalue.
+uint sturm_count(float x) {
+    uint count = 0u;
+    float pivot = diagonal[0] - x;
+    if (isnan(pivot)) return 26u;
+    // The floor is a normal binary32 value on implementations that flush
+    // subnormal numbers. Retain the sign so the Sturm count stays monotonic.
+    if (abs(pivot) < 1e-37) pivot = pivot < 0.0 ? -1e-37 : 1e-37;
+    if (pivot < 0.0) ++count;
+    for (uint i = 1u; i < 25u; ++i) {
+        float edge = subdiagonal[i - 1u];
+        pivot = diagonal[i] - x - edge * (edge / pivot);
+        // Overflow to an infinity has a definite sign. An indeterminate NaN
+        // does not: report invalid instead of silently miscounting it.
+        if (isnan(pivot)) return 26u;
+        if (abs(pivot) < 1e-37) pivot = pivot < 0.0 ? -1e-37 : 1e-37;
+        if (pivot < 0.0) ++count;
+    }
+    return count;
+}
+void main() {
+    uint ch = gl_WorkGroupID.x, lane = gl_LocalInvocationIndex;
+    if (gl_WorkGroupID.y == 1u) {
+        if (lane == 0u) failed = 0u;
+        for (uint at = lane; at < 625u; at += gl_WorkGroupSize.x)
+            factor[at] = 0.0;
+        barrier();
+        for (uint col = 0u; col < 25u; ++col) {
+            if (lane == 0u) {
+                float diagonal_value = arena[cov(ch, col, col)];
+                for (uint k = 0u; k < col; ++k) {
+                    float a = factor[col * 25u + k];
+                    diagonal_value -= a * a;
+                }
+                if (!(diagonal_value > 0.0) || isinf(diagonal_value)) {
+                    failed = 2u;
+                    factor[col * 25u + col] = 1.0;
+                } else
+                    factor[col * 25u + col] = sqrt(diagonal_value);
+            }
+            barrier();
+            if (lane > col && lane < 25u) {
+                float value = arena[cov(ch, lane, col)];
+                for (uint k = 0u; k < col; ++k)
+                    value -= factor[lane * 25u + k] * factor[col * 25u + k];
+                factor[lane * 25u + col] = value / factor[col * 25u + col];
+            }
+            barrier();
+        }
+        if (lane == 0u) arena[factor_status(ch)] = float(failed);
+        for (uint at = lane; at < 625u; at += gl_WorkGroupSize.x)
+            arena[cholesky(ch, at / 25u, at % 25u)] = factor[at];
+        return;
+    }
+    if (lane == 0u) {
+        failed = 0u;
+        minimum_eigen = 0.0;
+    }
+    barrier();
+    for (uint at = lane; at < 625u; at += gl_WorkGroupSize.x) {
+        float a = arena[cov(ch, at / 25u, at % 25u)];
+        matrix[at] = a;
+        if (isnan(a) || isinf(a)) atomicMax(failed, 2u);
+    }
+    barrier();
+    if (failed != 0u) {
+        if (lane == 0u) arena[singular(ch)] = 2.0;
+        return;
+    }
+    // Only eigenvalues are needed for entropy. Do not form the orthogonal
+    // eigenvector matrix: variance is y' K^-1 y, obtained from a separate
+    // Cholesky solve below. Each Householder step updates the trailing block.
+    for (uint col = 0u; col < 23u; ++col) {
+        uint start = col + 1u;
+        if (lane == 0u) {
+            float norm = 0.0;
+            for (uint row = start + 1u; row < 25u; ++row) {
+                float a = matrix[row * 25u + col];
+                norm += a * a;
+            }
+            norm = sqrt(norm);
+            tau = 0.0;
+            if (norm != 0.0) {
+                float alpha = matrix[start * 25u + col];
+                float beta =
+                    (alpha >= 0.0 ? -1.0 : 1.0) * hypotenuse(alpha, norm);
+                tau = (beta - alpha) / beta;
+                float scale = alpha - beta;
+                householder[start] = 1.0;
+                for (uint row = start + 1u; row < 25u; ++row)
+                    householder[row] = matrix[row * 25u + col] / scale;
+                matrix[start * 25u + col] = beta;
+            }
+        }
+        barrier();
+        if (tau != 0.0 && lane >= start && lane < 25u) {
+            float total = 0.0;
+            for (uint j = start; j < 25u; ++j)
+                total += tau * matrix[lane * 25u + j] * householder[j];
+            product[lane] = total;
+        }
+        barrier();
+        if (tau != 0.0 && lane == 0u) {
+            float dotp = 0.0;
+            for (uint j = start; j < 25u; ++j)
+                dotp += product[j] * householder[j];
+            float alpha = -0.5 * tau * dotp;
+            for (uint j = start; j < 25u; ++j)
+                product[j] += alpha * householder[j];
+        }
+        barrier();
+        if (tau != 0.0) {
+            for (uint at = lane; at < 625u; at += gl_WorkGroupSize.x) {
+                uint row = at / 25u, j = at % 25u;
+                if (row >= start && j >= start) {
+                    uint a = min(row, j), b = max(row, j);
+                    matrix[at] -= product[a] * householder[b] +
+                                  householder[a] * product[b];
+                }
+            }
+        }
+        barrier();
+    }
+    // The tridiagonal eigenvalues can be found independently. Gershgorin
+    // discs provide a shared enclosing interval, and the Sturm sequence
+    // ranks each candidate without forming eigenvectors or running serial QR.
+    if (lane == 0u) {
+        for (uint row = 0u; row < 25u; ++row) {
+            diagonal[row] = matrix[row * 25u + row];
+            if (isnan(diagonal[row]) || isinf(diagonal[row])) failed = 2u;
+        }
+        for (uint row = 0u; row < 24u; ++row) {
+            subdiagonal[row] = matrix[(row + 1u) * 25u + row];
+            if (isnan(subdiagonal[row]) || isinf(subdiagonal[row])) failed = 2u;
+        }
+        lower_bound = diagonal[0] - abs(subdiagonal[0]);
+        upper_bound = diagonal[0] + abs(subdiagonal[0]);
+        for (uint row = 1u; row < 25u; ++row) {
+            float radius = abs(subdiagonal[row - 1u]);
+            if (row < 24u) radius += abs(subdiagonal[row]);
+            lower_bound = min(lower_bound, diagonal[row] - radius);
+            upper_bound = max(upper_bound, diagonal[row] + radius);
+        }
+        // Protect the enclosing discs against floating-point rounding.
+        float padding = 1e-6 * max(abs(lower_bound), abs(upper_bound));
+        lower_bound -= padding;
+        upper_bound += padding;
+        if (isnan(lower_bound) || isnan(upper_bound) || isinf(lower_bound) ||
+            isinf(upper_bound))
+            failed = 2u;
+    }
+    barrier();
+    bool bounds_valid = failed == 0u;
+    barrier();
+    if (lane < 25u && bounds_valid) {
+        float lo = lower_bound, hi = upper_bound;
+        // Stop only at adjacent representable FP32 endpoints. The 320-step
+        // guard covers the entire finite binary32 exponent range, including
+        // a spectrum spanning zero. A failure to converge is invalid, not an
+        // approximate eigenvalue silently accepted as regular.
+        bool converged = false;
+        for (uint iteration = 0u; iteration < 320u; ++iteration) {
+            float mid = lo * 0.5 + hi * 0.5;
+            if (mid == lo || mid == hi) {
+                converged = true;
+                break;
+            }
+            uint count = sturm_count(mid);
+            if (count > 25u) break;
+            if (count <= lane)
+                lo = mid;
+            else
+                hi = mid;
+        }
+        float value = lo * 0.5 + hi * 0.5;
+        arena[eigen(ch, lane)] = value;
+        if (lane == 0u) minimum_eigen = value;
+        if (!converged || isnan(value) || isinf(value)) atomicMax(failed, 2u);
+        // Count directly at the strict singular threshold. An eigenvalue
+        // rounded up by the final midpoint must not change classification.
+        if (lane == 0u) {
+            uint count = sturm_count(1e-6);
+            if (count > 25u)
+                atomicMax(failed, 2u);
+            else if (count > 0u)
+                atomicMax(failed, 1u);
+        }
+    }
+    barrier();
+    if (lane == 0u) {
+        // Heuristic, not a formal bound: covariance eigenvalues near the
+        // singular threshold are sensitive to FP32 rounding. Preserve the
+        // pre-bisection QR behavior throughout a scale-relative safety band.
+        float scale = max(abs(lower_bound), abs(upper_bound));
+#ifdef VQM_SPEED_FORCE_LEGACY_QR
+        // Test-only oracle: evaluate the original QR path on this device,
+        // including its floating-point contraction and convergence behavior.
+        fallback = 1u;
+#else
+        fallback =
+            failed == 2u || minimum_eigen <= 1e-6 + 1e-3 * scale ? 1u : 0u;
+#endif
+    }
+    barrier();
+    if (fallback != 0u) {
+        if (lane == 0u) {
+            failed = 0u;
+            for (uint row = 0u; row < 25u; ++row)
+                diagonal[row] = matrix[row * 25u + row];
+            for (uint row = 0u; row < 24u; ++row)
+                subdiagonal[row] = matrix[(row + 1u) * 25u + row];
+            chop(0, 25);
+            int last = 24, iteration = 0;
+            while (last > 0 && iteration < 500) {
+                if (subdiagonal[last - 1] == 0.0) {
+                    --last;
+                    continue;
+                }
+                int first = last - 1;
+                while (first > 0 && subdiagonal[first - 1] != 0.0) --first;
+                qr_step(first, last - first + 1);
+                chop(first, last - first + 1);
+                ++iteration;
+            }
+            if (last > 0) failed = 2u;
+            float diagonal_max = 0.0, residual_max = 0.0;
+            for (uint row = 0u; row < 25u; ++row) {
+                float value = diagonal[row];
+                if (isnan(value) || isinf(value))
+                    failed = 2u;
+                else if (value < 1e-6)
+                    failed = max(failed, 1u);
+                diagonal_max = max(diagonal_max, abs(value));
+                if (row < 24u)
+                    residual_max = max(residual_max, abs(subdiagonal[row]));
+                arena[eigen(ch, row)] = value;
+            }
+            if (residual_max > 1e-5 * diagonal_max) failed = 2u;
+        }
+    }
+    // Both the parallel bisection and the fallback can update failure state.
+    // Publish it only after every invocation has completed the selected path.
+    barrier();
+    if (lane == 0u) arena[singular(ch)] = float(failed);
+}

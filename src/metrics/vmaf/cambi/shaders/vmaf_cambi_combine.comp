@@ -1,0 +1,21 @@
+// VMAF CAMBI: Copyright 2016-2020 Netflix, Inc.
+// BSD-2-Clause-Patent; see licenses/NETFLIX-VMAF-LICENSE.
+// Scale weights and max 17 follow libvmaf cambi.c weight_scores_per_scale
+// and the pinned vmaf_v1.0.16_3d0h.json model at
+// Netflix/vmaf 4611e47a7330cd342498dcc130e1008efbeab6e4.
+#version 450
+#include "bindings.glsl"
+layout(local_size_x = 1) in;
+layout(push_constant) uniform Push {
+    uint scale_scores;
+    uint result;
+    uint window;
+}
+pc;
+void main() {
+    float score =
+        16.0 * arena[pc.scale_scores] + 8.0 * arena[pc.scale_scores + 1u] +
+        4.0 * arena[pc.scale_scores + 2u] + 2.0 * arena[pc.scale_scores + 3u] +
+        arena[pc.scale_scores + 4u];
+    arena[pc.result] = min(score / float(pc.window * pc.window), 17.0);
+}

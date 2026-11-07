@@ -1,0 +1,179 @@
+// Derived from Cloudinary SSIMULACRA 2 (Copyright (c) Jon Sneyers, Cloudinary).
+// BSD-3-Clause; see LICENSE.
+// Butteraugli portions: Copyright (c) the JPEG XL Project Authors.
+// BSD-3-Clause; see licenses/JPEG-XL-LICENSE.
+
+// Fused mask erosion and final combine, butteraugli.cc:1136-1318.
+//
+// FuzzyErosion of image 0's blurred pre-mask (:1174-1207) computes the mask,
+// and the same pixel adds the mask-to-error term
+//   ac[Y] += 10 * (blurred0 - blurred1)^2
+// into the Y channel only (:1252-1266: MaskPsychoImage passes
+// &block_diff_ac.Plane(1)). libjxl's StoreMin3 keeps the three smallest of the
+// own value and the eight neighbours at distance kStep = 3, then weights them
+// 0.45 / 0.3 / 0.25.
+//
+// The dc image is derived from the two lf planes (they are stored
+// raw, so XybLowFreqToVals runs here -- the same call libjxl made when it built
+// lf), the ac image is combined with xmul on channel 0, and the diffmap is
+//   sqrt(MaskColor(dc, MaskDcY(mask)) + MaskColor(ac, MaskY(mask)))
+// (:1268-1318). On level 0 with a sub level the result folds as
+//   0.85*own + 0.5*sub[y/2][x/2]      (AddSupersampled2x with w = 0.5).
+//
+// The 32x32 erosion tile feeds its mask and error increment directly into the
+// pointwise combine, without writing and reloading those intermediate values.
+
+#version 450
+
+#include "butter_common.glsl"
+
+layout(local_size_x = 16, local_size_y = 16) in;
+
+const uint kTile = 32u;
+const uint kHalo = 3u;
+const uint kWin = kTile + 2u * kHalo;  // 38
+
+shared float window0[kWin * kWin];
+shared float window1[kWin * kWin];
+
+const float kWmulLf[3] = float[](29.2353797994, 0.844626970982, 0.703646627719);
+const float kGlobalScale = 1.0 / (17.83 * 0.79079917404);
+
+float mask_y(float delta) {
+    const float c = 2.5485944793 / (0.451936922203 * delta + 0.829591754942);
+    const float v = kGlobalScale * (1.0 + c);
+    return v * v;
+}
+
+float mask_dc_y(float delta) {
+    const float c = 0.505054525019 / (3.87449418804 * delta + 0.20025578522);
+    const float v = kGlobalScale * (1.0 + c);
+    return v * v;
+}
+
+void store_min3(float v, inout float m0, inout float m1, inout float m2) {
+    if (v < m2) {
+        if (v < m0) {
+            m2 = m1;
+            m1 = m0;
+            m0 = v;
+        } else if (v < m1) {
+            m2 = m1;
+            m1 = v;
+        } else {
+            m2 = v;
+        }
+    }
+}
+
+void combine(uint index, float mask, float mask_diff);
+
+void erode() {
+    const uint tid = gl_LocalInvocationIndex;
+    const uint width = butter_width();
+    const uint height = butter_height();
+    const uint x0 = gl_WorkGroupID.x * kTile;
+    const uint y0 = gl_WorkGroupID.y * kTile;
+
+    for (uint i = tid; i < kWin * kWin; i += 256u) {
+        const uint r = i / kWin;
+        const uint c = i % kWin;
+        const int gx = int(x0) + int(c) - int(kHalo);
+        const int gy = int(y0) + int(r) - int(kHalo);
+        float v0 = 0.0;
+        float v1 = 0.0;
+        if (gx >= 0 && uint(gx) < width && gy >= 0 && uint(gy) < height) {
+            const uint index = uint(gy) * width + uint(gx);
+            v0 = arena[scratch_b(0u) + index];
+            v1 = arena[scratch_b(1u) + index];
+        }
+        window0[i] = v0;
+        window1[i] = v1;
+    }
+    barrier();
+
+    for (uint i = tid; i < kTile * kTile; i += 256u) {
+        const uint x = i % kTile;
+        const uint y = i / kTile;
+        const uint gx = x0 + x;
+        const uint gy = y0 + y;
+        if (gx >= width || gy >= height) continue;
+        const uint center = (y + kHalo) * kWin + x + kHalo;
+        float m0 = window0[center];
+        float m1 = 2.0 * m0;
+        float m2 = m1;
+        // The eight neighbours at distance kStep, skipping out-of-image ones.
+        for (int dy = -1; dy <= 1; ++dy) {
+            for (int dx = -1; dx <= 1; ++dx) {
+                if (dx == 0 && dy == 0) continue;
+                const int ny = int(gy) + dy * int(kHalo);
+                const int nx = int(gx) + dx * int(kHalo);
+                if (nx < 0 || ny < 0 || nx >= int(width) || ny >= int(height)) {
+                    continue;
+                }
+                store_min3(
+                    window0
+                        [uint((y + kHalo) + dy * int(kHalo)) * kWin +
+                         (x + kHalo) + dx * int(kHalo)],
+                    m0, m1, m2
+                );
+            }
+        }
+        const float mask = 0.45 * m0 + 0.3 * m1 + 0.25 * m2;
+        const uint index = gy * width + gx;
+        const float diff = window0[center] - window1[center];
+        combine(index, mask, diff);
+    }
+}
+
+void combine(uint index, float mask, float mask_diff) {
+    const uint width = butter_width();
+    const uint area = butter_area();
+
+    const uint chain0 = butter_chain(0u);
+    const uint chain1 = butter_chain(1u);
+    const uint lf0 = chain_lf(chain0);
+    const uint lf1 = chain_lf(chain1);
+    const uint ac = butter_here(R_AC);
+
+    vec3 a;
+    vec3 b;
+    a.x = arena[lf0 + index];
+    a.y = arena[lf0 + area + index];
+    a.z = arena[lf0 + 2u * area + index];
+    b.x = arena[lf1 + index];
+    b.y = arena[lf1 + area + index];
+    b.z = arena[lf1 + 2u * area + index];
+    float acc[3];
+    for (uint c = 0u; c < 3u; ++c) acc[c] = arena[ac + c * area + index];
+    acc[1] += 10.0 * mask_diff * mask_diff;
+
+    const vec3 va = xyb_lf_to_vals(a);
+    const vec3 vb = xyb_lf_to_vals(b);
+    const float dc[3] = float[](
+        kWmulLf[0] * (va.x - vb.x) * (va.x - vb.x),
+        kWmulLf[1] * (va.y - vb.y) * (va.y - vb.y),
+        kWmulLf[2] * (va.z - vb.z) * (va.z - vb.z)
+    );
+
+    // xmul applies to the X channel of both images before the masked sum.
+    const float xmul = pc.q1;
+    const float dc_sum = dc[0] * xmul + dc[1] + dc[2];
+    const float ac_sum = acc[0] * xmul + acc[1] + acc[2];
+    float diff = sqrt(dc_sum * mask_dc_y(mask) + ac_sum * mask_y(mask));
+
+    if (pc.q3 != 0.0) {
+        // AddSupersampled2x with w = 0.5: dest = dest*(1 - 0.3*w) + w*sub.
+        const uint x = index % width;
+        const uint y = index / width;
+        const uint sub_w = butter_here(R_SUBW);
+        const uint sub_index = (y >> 1u) * sub_w + (x >> 1u);
+        diff = (1.0 - 0.3 * 0.5) * diff + pc.q3 * arena[pc.a + sub_index];
+    }
+    arena[butter_here(R_DIFFMAP) + index] = diff;
+}
+
+void main() {
+    if (gl_WorkGroupID.z != 0u) return;
+    erode();
+}

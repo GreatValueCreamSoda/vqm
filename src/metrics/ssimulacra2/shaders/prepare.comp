@@ -1,0 +1,232 @@
+// Derived from Cloudinary SSIMULACRA 2 (Copyright (c) Jon Sneyers, Cloudinary).
+// BSD-3-Clause; see LICENSE.
+
+// One dispatch per image builds the whole scale pyramid: the input decode of
+// whatever the image's descriptor describes, its transfer and primaries to
+// linear Rec.709, linear -> XYB and the 2x box downsample of every level.
+//
+// The box downsample is a plain 2x2 average, so it nests exactly: a workgroup
+// of 16 x 16 invocations covers 32 x 32 pixels of the base level, and level l
+// keeps 32 >> l pixels per side inside that same workgroup. Every sample the
+// pyramid needs is therefore owned by one workgroup, from the base level down
+// to the single pixel of level 5. The alternative -- one dispatch per level --
+// moved the linear plane through device memory twice per level (write, read
+// back); the only thing that crosses an invocation here is the level ladder,
+// and that lives in shared memory.
+//
+// Per level this computes the same arithmetic the per-level dispatches did:
+// level 0 reads the image's raw planes, which the per-image descriptor
+// (src/vulkan/vulkan_support.h) locates and color.glsl decodes and converts all
+// the way to linear Rec.709; every later level averages the four samples of its
+// 2x2 block of the previous level in (0,0), (1,0), (0,1), (1,1) order, clamped
+// to the previous level's last column and row, and stores the XYB value of that
+// average. The association of that sum and the clamp are what keep the scores
+// of the old version bit for bit.
+//
+// Levels 0 and 1 stay in registers: level 1's four samples are the four the
+// invocation decoded itself. From level 2 on the four samples of a block belong
+// to four different invocations, so the ladder below passes level l-1's tile
+// along -- two buffers alternate, so each level costs one barrier.
+
+#version 450
+
+#include "ssimu2_common.glsl"
+#include "color.glsl"
+
+layout(local_size_x = 16, local_size_y = 16) in;
+
+// The XYB matrix, the cube-root bias and the MakePositiveXYB offsets of the
+// reference's XYBPixel.
+const float kM00 = 0.30;
+const float kM02 = 0.078;
+const float kM01 = 1.0 - 0.078 - 0.30;
+const float kM10 = 0.23;
+const float kM12 = 0.078;
+const float kM11 = 1.0 - 0.078 - 0.23;
+const float kM20 = 0.24342268924547819;
+const float kM21 = 0.20476744424496821;
+const float kM22 = 1.0 - 0.24342268924547819 - 0.20476744424496821;
+const float kOpsinBias = 0.0037930732552754493;
+const float kCbrtBias = 0.15595419704914093;  // cbrt(kOpsinBias) in float
+const float kXYBXScale = 14.0;
+const float kXYBXOffset = 0.42;
+const float kXYBYOffset = 0.01;
+const float kXYBBOffset = 0.55;
+
+// Base-level pixels per workgroup side: 16 invocations of two pixels each.
+const uint kBaseSide = 32u;
+// The largest ladder tile is level 1's, 16 x 16 samples of three channels.
+const uint kLadderFloats = 256u * 3u;
+
+// Level l's tile of linear samples, handed from the invocations that produced
+// it to the four that average it. Two buffers alternate: level l reads buffer
+// (l-1)&1 and writes buffer l&1, so one barrier between the write and the next
+// level's read is enough.
+shared float ladder[2][kLadderFloats];
+
+// pow(v, 1/3): a few ulp off the exact cube root, which XYB then multiplies by
+// kXYBXScale = 14 on the X channel. One Newton refinement on r^3 - v was
+// measured and made the norm delta worse (3.5e-6 instead of 2.9e-6), so the
+// plain cube root stays -- and a Newton cube root that replaces the pow
+// outright is slower here too (prepare 0.43 -> 0.47 ms), measured against
+// Vship-fast's cubeRootAndAdd construction.
+//
+// The caller clamps v to at least zero, so the sign branch this used to carry
+// was dead: glslc emitted 61 cube-root instructions and 148 selects for the
+// module with it, against 55 and 142 without (glslc -O -S,
+// --target-env=vulkan1.1), and prepare measures 0.43 -> 0.42 ms.
+float cbrt_(float v) { return pow(v, 1.0 / 3.0); }
+
+// XYBPixel's conversion of one linear Rec.709 sample.
+vec3 xyb_of(vec3 linear) {
+    float mixed0 =
+        kM00 * linear.x + (kM01 * linear.y + (kM02 * linear.z + kOpsinBias));
+    float mixed1 =
+        kM10 * linear.x + (kM11 * linear.y + (kM12 * linear.z + kOpsinBias));
+    float mixed2 =
+        kM20 * linear.x + (kM21 * linear.y + (kM22 * linear.z + kOpsinBias));
+    mixed0 = max(mixed0, 0.0);
+    mixed1 = max(mixed1, 0.0);
+    mixed2 = max(mixed2, 0.0);
+    const float c0 = cbrt_(mixed0) - kCbrtBias;
+    const float c1 = cbrt_(mixed1) - kCbrtBias;
+    const float c2 = cbrt_(mixed2) - kCbrtBias;
+    return vec3(
+        (0.5 * (c0 - c1)) * kXYBXScale + kXYBXOffset,
+        0.5 * (c0 + c1) + kXYBYOffset, (c2 - 0.5 * (c0 + c1)) + kXYBBOffset
+    );
+}
+
+// The average the old downsample computed, in the same order: four samples
+// accumulated from zero, scaled by 0.25 and rounded the way its plane store
+// rounded them.
+vec3 box_average(vec3 a, vec3 b, vec3 c, vec3 d) {
+    vec3 sum = vec3(0.0);
+    sum += a;
+    sum += b;
+    sum += c;
+    sum += d;
+    sum *= 0.25;
+    return vec3(plane_round(sum.x), plane_round(sum.y), plane_round(sum.z));
+}
+
+// One pixel of `level` at the image's plane offset for it: the three channel
+// planes of that level, at the level's own pitch.
+void StoreXyb(uint level, uint x, uint y, vec3 value) {
+    // Channels whose maps are pruned for this level are not stored at all: no
+    // dispatch reads those planes. Vship suppresses the same stores with a mask
+    // that needs all three of a channel's maps pruned
+    // (.reference/Vship/src/Vulkan/ssimu2/main.hpp:32-42, from the per-map
+    // decision at score.hpp:125-131); here the mask comes from the score's
+    // weights (src/metrics/ssimulacra2/pipeline.cc).
+    const uint mask = (pc.channel_mask >> (3u * level)) & 7u;
+    if (mask == 0u) return;
+    const vec3 xyb = xyb_of(value);
+    // Fields 0 and 1 of a level row are the pair's two images.
+    const uint index = level_u(level, pc.image) + y * level_u(level, 4u) + x;
+    const uint stride = level_stride(level);
+    if ((mask & 1u) != 0u) plane_store(index, xyb.x);
+    if ((mask & 2u) != 0u) plane_store(index + stride, xyb.y);
+    if ((mask & 4u) != 0u) plane_store(index + 2u * stride, xyb.z);
+}
+
+vec3 ladder_load(uint slot, uint index) {
+    return vec3(
+        ladder[slot][index * 3u + 0u], ladder[slot][index * 3u + 1u],
+        ladder[slot][index * 3u + 2u]
+    );
+}
+
+void ladder_store(uint slot, uint index, vec3 value) {
+    ladder[slot][index * 3u + 0u] = value.x;
+    ladder[slot][index * 3u + 1u] = value.y;
+    ladder[slot][index * 3u + 2u] = value.z;
+}
+
+// Level 2 and up: the 2x2 block of the ladder the previous iteration
+// published, averaged in the old downsample's order and with its global clamp
+// applied in this workgroup's local coordinates.
+vec3 LadderAverage(uint level, uint side, uint gx, uint gy, uint jx, uint jy) {
+    const uint slot = (level - 1u) & 1u;
+    const uint prev_side = side * 2u;
+    // The last column and row of the previous level inside this tile; min()
+    // keeps the subtraction defined.
+    const uint origin_x = min(gx * prev_side, level_u(level - 1u, 4u) - 1u);
+    const uint origin_y = min(gy * prev_side, level_u(level - 1u, 5u) - 1u);
+    const uint last_x = level_u(level - 1u, 4u) - 1u - origin_x;
+    const uint last_y = level_u(level - 1u, 5u) - 1u - origin_y;
+    const uint cx0 = min(2u * jx, last_x);
+    const uint cx1 = min(2u * jx + 1u, last_x);
+    const uint cy0 = min(2u * jy, last_y);
+    const uint cy1 = min(2u * jy + 1u, last_y);
+    return box_average(
+        ladder_load(slot, cy0 * prev_side + cx0),
+        ladder_load(slot, cy0 * prev_side + cx1),
+        ladder_load(slot, cy1 * prev_side + cx0),
+        ladder_load(slot, cy1 * prev_side + cx1)
+    );
+}
+
+void main() {
+    const uint tid = gl_LocalInvocationIndex;
+    const uint gx = gl_WorkGroupID.x;
+    const uint gy = gl_WorkGroupID.y;
+    const uint levels = pc.scale_count;
+
+    const uint width = source_width();
+    const uint height = source_height();
+    // The 2x2 block grid covers every base pixel: the next level's size, or
+    // for a one-level pyramid the size a downsample would have had.
+    const uint bx = gx * 16u + tid % 16u;
+    const uint by = gy * 16u + tid / 16u;
+    const bool in_block = bx < (width + 1u) / 2u && by < (height + 1u) / 2u;
+
+    // Level 0: the four samples in (iy, ix) = (0,0), (0,1), (1,0), (1,1)
+    // order, kept in registers for level 1, with their XYB written to level
+    // 0's plane. A block outside the grid writes nothing and passes zeros up.
+    vec3 linear[4] = vec3[4](vec3(0.0), vec3(0.0), vec3(0.0), vec3(0.0));
+    if (in_block) {
+        const Rgb4 block = block_linear_rgb(bx, by);
+        for (uint i = 0u; i < 4u; ++i) {
+            const uint x = min(2u * bx + (i & 1u), width - 1u);
+            const uint y = min(2u * by + (i >> 1u), height - 1u);
+            linear[i] = vec3(block.r[i], block.g[i], block.b[i]);
+            StoreXyb(0u, x, y, linear[i]);
+        }
+    }
+
+    // Level 1 to the last: one sample per invocation per level. Level 1
+    // averages the invocation's own four registers, every later level reads
+    // the ladder the previous iteration published.
+    for (uint level = 1u; level < levels; ++level) {
+        const uint side = kBaseSide >> level;  // 16, 8, 4, 2, 1 samples
+        const uint jx = tid % side;
+        const uint jy = tid / side;
+        const bool in_tile = tid < side * side;
+
+        vec3 value = vec3(0.0);
+        if (in_tile) {
+            if (level == 1u) {
+                // The invocation's own four registers, decoded at level 0.
+                value = box_average(linear[0], linear[1], linear[2], linear[3]);
+            } else {
+                // Inactive invocations have jy >= side: their ladder reads
+                // would leave the previous tile, even though they store nothing.
+                value = LadderAverage(level, side, gx, gy, jx, jy);
+            }
+        }
+
+        const uint x = gx * side + jx;
+        const uint y = gy * side + jy;
+        if (in_tile && x < level_u(level, 4u) && y < level_u(level, 5u)) {
+            StoreXyb(level, x, y, value);
+        }
+        // Publish this level's whole tile, in-plane or not, for the level
+        // above: its clamp can land on a sample outside the level. Every
+        // invocation reaches the barrier, so none is left behind it.
+        if (level + 1u < levels) {
+            if (in_tile) ladder_store(level & 1u, jy * side + jx, value);
+            barrier();
+        }
+    }
+}

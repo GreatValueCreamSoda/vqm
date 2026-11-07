@@ -1,0 +1,22 @@
+// VMAF SpEED: Copyright 2016-2025 Netflix, Inc.
+// BSD-2-Clause-Patent; see licenses/NETFLIX-VMAF-LICENSE.
+// Channel imputation and clipping follow extract_chroma in Netflix/vmaf's
+// feature/speed.c at 4611e47a7330cd342498dcc130e1008efbeab6e4.
+#version 450
+#include "bindings.glsl"
+layout(local_size_x = 1) in;
+layout(push_constant) uniform Push {
+    uint channels;
+    uint result;
+}
+pc;
+void main() {
+    float u = arena[pc.channels], us = arena[pc.channels + 1u];
+    float v = arena[pc.channels + 2u], vs = arena[pc.channels + 3u];
+    float status = max(us, vs);
+    float score = us == 1.0 && vs == 0.0   ? v
+                  : vs == 1.0 && us == 0.0 ? u
+                                           : 0.5 * (u + v);
+    arena[pc.result] = min(score, 45.0);
+    arena[pc.result + 1u] = status;
+}

@@ -1,0 +1,80 @@
+// Copyright 2016-2020 Netflix, Inc. BSD-2-Clause-Patent.
+// See licenses/NETFLIX-VMAF-LICENSE.
+#version 450
+#include "vmaf_cambi_pool_common.glsl"
+layout(local_size_x = 256) in;
+shared uint rank_snapshot;
+shared uint totals[16];
+shared uint selected_block, selected_rank, selected_prefix;
+shared uint zero_count, zero_bucket;
+void main() {
+    PoolArgs a = pool_args();
+    uint lane = gl_LocalInvocationIndex;
+    if (lane == 0u) rank_snapshot = data[a.state + 1u];
+    barrier();
+    if (rank_snapshot == 0u) {
+        data[a.histogram + lane] = 0u;
+        return;
+    }
+    // Each of sixteen invocations adds one contiguous bin block. The exact
+    // selection order remains descending; only the integer sums are grouped.
+    if (lane < 16u) {
+        uint sum = 0u;
+        for (uint j = 0u; j < 16u; ++j)
+            sum += data[a.histogram + lane * 16u + j];
+        totals[lane] = sum;
+    }
+    barrier();
+    if (lane == 0u) {
+        uint rank = rank_snapshot;
+        uint prefix = data[a.state];
+        zero_count = 0u;
+        zero_bucket = uint(a.pass == 3u && prefix == 0u);
+        if (a.pass == 3u) {
+            uint other = 0u;
+            for (uint block = 0u; block < 16u; ++block) other += totals[block];
+            zero_count = a.count - other;
+            totals[0] += zero_count;
+            prefix = 0u;
+        }
+        selected_block = 0u;
+        selected_rank = rank;
+        selected_prefix = prefix;
+        for (int block = 15; block >= 0; --block) {
+            uint count = totals[block];
+            if (rank <= count) {
+                selected_block = uint(block);
+                selected_rank = rank;
+                break;
+            }
+            rank -= count;
+        }
+    }
+    barrier();
+    if (lane == selected_block) {
+        uint rank = selected_rank;
+        uint prefix = selected_prefix;
+        for (int within = 15; within >= 0; --within) {
+            uint bin = lane * 16u + uint(within);
+            uint count =
+                bin == 0u && a.pass == 3u ? zero_count : data[a.histogram + bin];
+            if (rank <= count) {
+                prefix |= bin << (a.pass * 8u);
+                if ((a.pass == 3u && bin == 0u && zero_bucket != 0u) ||
+                    (a.pass > 0u && rank == count)) {
+                    data[a.state] = prefix == 0u ? 0u : prefix - 1u;
+                    data[a.state + 1u] = 0u;
+                } else {
+                    data[a.state] = prefix;
+                    data[a.state + 1u] = rank;
+                }
+                break;
+            }
+            rank -= count;
+        }
+    }
+    // The selected lane finishes reading before the histogram is cleared.
+    memoryBarrierBuffer();
+    barrier();
+    data[a.histogram + lane] = 0u;
+}

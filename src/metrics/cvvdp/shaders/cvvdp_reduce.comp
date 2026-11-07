@@ -1,0 +1,38 @@
+// ColorVideoVDP: Copyright (c) 2024, Graphics and Displays group.
+// MIT; see licenses/COLORVIDEOVDP-LICENSE.
+
+#version 450
+#include "cvvdp_spatial_common.glsl"
+
+layout(local_size_x = 256) in;
+shared float sums[256];
+
+void main() {
+    const uint lane = gl_LocalInvocationIndex;
+    const uint channel = gl_WorkGroupID.y;
+    const uint area = pc.width * pc.height;
+    const uint count = pc.op == 0u ? area : pc.groups;
+    float value = 0.0;
+    for (uint index = lane; index < count; index += 256u) {
+        if (pc.op == 0u) {
+            const uint image = channel == 0u ? pc.reference : pc.distorted;
+            value += max(arena[image + index], 0.01);
+        } else {
+            value += arena[pc.partials + channel * pc.groups + index];
+        }
+    }
+    sums[lane] = value;
+    barrier();
+    for (uint stride = 128u; stride > 0u; stride >>= 1u) {
+        if (lane < stride) sums[lane] += sums[lane + stride];
+        barrier();
+    }
+    if (lane == 0u) {
+        if (pc.op == 0u) {
+            arena[pc.destination + channel] = sums[0] / float(area);
+        } else {
+            arena[pc.results + channel * pc.bands + pc.band] =
+                safe_pow(sums[0] / float(area), 0.5);
+        }
+    }
+}

@@ -1,0 +1,83 @@
+{
+  "revision": "e47d2a2b5bb418f2947ce07f36cb048861db3820",
+  "numpy": "2.5.4",
+  "runner_sha256": "4326e17fc558ee427bdb5dd4f72c5088f634bbcb0fc346ec373d20176c1cb14b",
+  "executable_sha256": "6f63cca605f9c717076ba09514ae996199cdb1f12a9b424f84b6c41caa92c37c",
+  "build_fingerprint_sha256": "e5fa4c5555d5df074fa3ae32836ea2159d5d24d3fa07d4ecddfbeb4211655723",
+  "build_fingerprint": {
+    "environment": {
+      "CC": null,
+      "CFLAGS": null,
+      "CMAKE_PREFIX_PATH": null,
+      "CMAKE_TOOLCHAIN_FILE": null,
+      "CPPFLAGS": null,
+      "CUDA_HOME": null,
+      "CUDA_PATH": "/opt/cuda",
+      "CXX": null,
+      "CXXFLAGS": null,
+      "LDFLAGS": null,
+      "NVCC": null,
+      "PATH": "/home/creamsoda/.local/bin:/home/creamsoda/.codex/tmp/arg0-linux/codex-arg0LMS23z:/home/creamsoda/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/home/creamsoda/.local/bin:/home/creamsoda/.local/bin:/home/creamsoda/.local/bin:/home/creamsoda/.local/bin:/home/creamsoda/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/bin:/opt/cuda/bin:/home/creamsoda/.local/share/flatpak/exports/bin:/var/lib/flatpak/exports/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl:/usr/lib/rustup/bin:/home/creamsoda/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/opt/codex-desktop/resources",
+      "PKG_CONFIG_LIBDIR": null,
+      "PKG_CONFIG_PATH": null,
+      "VULKAN_SDK": null,
+      "ZIG_GLOBAL_CACHE_DIR": null
+    },
+    "machine": "x86_64",
+    "platform": "Linux-7.2.14-arch1-1-x86_64-with-glibc2.44",
+    "recipe_sha256": "f17290ac0d947bbd52d3adb9b7e65fb7bf00bc6132c92e0c13d735cc3d4804a5",
+    "revision": "e47d2a2b5bb418f2947ce07f36cb048861db3820",
+    "schema": 1,
+    "step": "libjxl",
+    "submodules": "-73695d303670c90e4d506ea89d9901b081385089 testdata\n db24a98aed38a16de78cc05ca15cdd8dc2a0d92d third_party/brotli (db24a98)\n-6910c9d9165801d8827d628cb72eb7ea9dd538c5 third_party/googletest\n 457c891775a7397bdb0376bb1031e6e027af1c48 third_party/highway (457c891)\n 5176347635785e53ee5cee92328f76fda766ecc6 third_party/lcms (5176347)\n-8ecba3647edb6dd940463fedf38ca33a8e2a73d1 third_party/libjpeg-turbo\n-872555f4ba910252783af1507f9e7fe1653be252 third_party/libpng\n 94e0df6d0f8b44228de5be0ff35efb9f946a13c9 third_party/sjpeg (94e0df6)\n 96d9171c94b937a1b5f0293de7309ac16311b722 third_party/skcms (96d9171)\n-51b7f2abdade71cd9bb0e7a373ef2610ec6f9daf third_party/zlib",
+    "tools": {
+      "cc": {
+        "command": "cc",
+        "path": "/usr/bin/cc",
+        "version": "cc (GCC) 16.2.1 20260810\nCopyright (C) 2026 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE."
+      },
+      "cmake": {
+        "command": "cmake",
+        "path": "/usr/bin/cmake",
+        "version": "cmake version 4.4.5\n\nCMake suite maintained and supported by Kitware (kitware.com/cmake)."
+      },
+      "cxx": {
+        "command": "g++",
+        "path": "/usr/bin/g++",
+        "version": "g++ (GCC) 16.2.1 20260810\nCopyright (C) 2026 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE."
+      },
+      "make": {
+        "command": "make",
+        "path": "/usr/bin/make",
+        "version": "GNU Make 4.4.1\nBuilt for x86_64-pc-linux-gnu\nCopyright (C) 1988-2023 Free Software Foundation, Inc.\nLicense GPLv3+: GNU GPL version 3 or later <https://gnu.org/licenses/gpl.html>\nThis is free software: you are free to change and redistribute it.\nThere is NO WARRANTY, to the extent permitted by law."
+      },
+      "ninja": {
+        "command": "ninja",
+        "path": "/usr/bin/ninja",
+        "version": "1.13.2"
+      }
+    }
+  },
+  "source_sha256": {
+    "bench/inmemory/libjxl_bench.cc": "975d5c9e03715f2673cbcb7b73d3d373e28277c411d44d7efabe98b7d9fde7fa",
+    "bench/inmemory/driver.h": "ebd735b4e6b2bf0b2ccc95fdfa798ab71a9a00a418e93a0e4f8056b713a8f2b0",
+    "bench/inmemory/pairs.h": "1293ab84e47995b849be4ba17912308cba3637805ba16f894b0901626dbd545c",
+    "bench/inmemory/prefetch.h": "1aae55153faf863fdf35516653c29e11fc1ddbce30b4a948bdebccd52f319662",
+    ".reference/libjxl/lib/jxl/enc_butteraugli_comparator.cc": "2e6da929ca41a3478a77f72be502d7d1f2283f22f299c18cef939ea4381cf10d",
+    ".reference/libjxl/lib/jxl/butteraugli/butteraugli.cc": "418992b306e5e01ce8850ed811b7154ca83803229a9c23ad1c62f93739e598c6",
+    ".reference/libjxl/lib/extras/dec/pnm.cc": "f4d254122671a3ce58409ea36c296b8ba3fdd0ef657c50484d26d30b22c1f3f1",
+    ".reference/libjxl/lib/extras/dec/color_hints.cc": "b71452d50fa888d3e59ee7e1aea22aff12c04a96445ba1c47c83d0ad7a0fe3e8"
+  },
+  "threads": 1,
+  "decode_threads": 1,
+  "frame_iterations": 1,
+  "frame_warmup": 0,
+  "pooling": "arithmetic-mean-of-original-frame-scores",
+  "input": "bottom-up-interleaved-little-endian-FP32-PFM-encoded-sRGB",
+  "transfer": "sRGB via pinned PNM/PFM reader default ColorHints",
+  "parameters": {
+    "hf_asymmetry": 1.0,
+    "intensity_target": 80.0,
+    "xmul": 1.0
+  }
+}

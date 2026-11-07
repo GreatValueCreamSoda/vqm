@@ -1,0 +1,29 @@
+{
+  "clangd.arguments": [
+    "--background-index",
+    "--clang-tidy",
+    "--header-insertion=never"
+  ],
+  "C_Cpp.intelliSenseEngine": "disabled",
+  "cmake.useCMakePresets": "always",
+  "cmake.configureOnOpen": false,
+  "python.analysis.extraPaths": ["validation", "."],
+  "files.associations": {
+    "*.comp": "glsl",
+    "*.glsl": "glsl"
+  },
+  "files.watcherExclude": {
+    "**/.reference/**": true,
+    "**/build*/**": true,
+    "**/validation/data/**": true,
+    "**/validation/download/**": true
+  },
+  "search.exclude": {
+    "**/.reference": true,
+    "**/build/**": true,
+    "**/build-*/**": true,
+    "**/validation/data": true,
+    "**/validation/download": true
+  },
+  "search.useIgnoreFiles": true
+}

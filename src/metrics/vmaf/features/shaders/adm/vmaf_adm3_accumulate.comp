@@ -1,0 +1,79 @@
+// Copyright 2016-2020 Netflix, Inc. BSD-2-Clause-Patent.
+// See licenses/NETFLIX-VMAF-LICENSE. Contrast masking and norm follow
+// libvmaf adm_tools.c:348-700 and adm_tools.h:25-250, revision
+// 4611e47a7330cd342498dcc130e1008efbeab6e4.
+#version 450
+#include "vmaf_adm_common.glsl"
+layout(local_size_x = 16, local_size_y = 16) in;
+shared float sums[9][256];
+int boundary(int p, int n) { return p < 0 ? 1 : min(p, n - 1); }
+void main() {
+    const uvec2 p = gl_GlobalInvocationID.xy;
+    const uint lane = gl_LocalInvocationIndex;
+    int left = (int(pc.width) - 5) / 10;
+    int top = (int(pc.height) - 5) / 10;
+    const uint group = gl_WorkGroupID.y * gl_NumWorkGroups.x + gl_WorkGroupID.x;
+    const ivec2 origin = ivec2(gl_WorkGroupID.xy * 16u);
+    // Whole groups outside the scored interior contribute zero. Publish the
+    // same partial slots before skipping their shared-memory reduction.
+    if (origin.x + 16 <= left || origin.y + 16 <= top ||
+        origin.x >= int(pc.width) - left || origin.y >= int(pc.height) - top) {
+        if (lane == 0u)
+            for (uint c = 0; c < 9; ++c)
+                arena[pc.partials + group * 9 + c] = 0.0;
+        return;
+    }
+    for (uint c = 0; c < 9; ++c) sums[c][lane] = 0.0;
+    if (p.x < pc.width && p.y < pc.height && int(p.x) >= left &&
+        int(p.y) >= top && int(p.x) < int(pc.width) - left &&
+        int(p.y) < int(pc.height) - top) {
+        const uint i = p.y * pc.width + p.x;
+        float threshold = 0.0, aim_threshold = 0.0;
+        for (uint c = 0; c < 3; ++c) {
+            const float factor = c == 2 ? pc.diagonal : pc.axial;
+            float sum = 0.0, aim_sum = 0.0;
+            for (int y = -1; y <= 1; ++y) {
+                for (int x = -1; x <= 1; ++x) {
+                    uint j =
+                        uint(boundary(int(p.y) + y, int(pc.height))) * pc.width +
+                        uint(boundary(int(p.x) + x, int(pc.width)));
+                    float v =
+                        abs(arena[pc.additive + c * pc.stride + j] * factor);
+                    float weight =
+                        ((x == 0 && y == 0) ? 0.0666666701 : 0.0333333351);
+                    sum += v * weight;
+                    aim_sum +=
+                        abs(arena[pc.restored + c * pc.stride + j] * factor) *
+                        weight;
+                }
+            }
+            threshold += sum;
+            aim_threshold += aim_sum;
+        }
+        for (uint c = 0; c < 3; ++c) {
+            const float factor = c == 2 ? pc.diagonal : pc.axial;
+            float num = max(
+                abs(arena[pc.restored + c * pc.stride + i] * factor) - threshold,
+                0.0
+            );
+            float den = abs(arena[pc.reference + c * pc.stride + i] * factor);
+            sums[c][lane] = num * num * num;
+            sums[c + 3][lane] = den * den * den;
+            float aim =
+                max(abs(arena[pc.additive + c * pc.stride + i] * factor) -
+                        aim_threshold,
+                    0.0);
+            sums[c + 6][lane] = aim * aim * aim;
+        }
+    }
+    barrier();
+    for (uint step = 128; step > 0; step >>= 1) {
+        if (lane < step)
+            for (uint c = 0; c < 9; ++c) sums[c][lane] += sums[c][lane + step];
+        barrier();
+    }
+    if (lane == 0) {
+        for (uint c = 0; c < 9; ++c)
+            arena[pc.partials + group * 9 + c] = sums[c][0];
+    }
+}

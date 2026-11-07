@@ -1,0 +1,122 @@
+// Derived from Cloudinary SSIMULACRA 2 (Copyright (c) Jon Sneyers, Cloudinary).
+// BSD-3-Clause; see LICENSE.
+// Butteraugli portions: Copyright (c) the JPEG XL Project Authors.
+// BSD-3-Clause; see licenses/JPEG-XL-LICENSE.
+
+// The L2 terms and the mask's input, in one pointwise pass.
+//
+// L2 (butteraugli.cc:1894 DiffmapPsychoImage; its L2 calls :1933-1941):
+//   ac[c] += wmul[3+c] * (mf0[c] - mf1[c])^2                 (L2Diff)
+//   ac[c] += L2DiffAsymmetric(hf0[c], hf1[c]) for c in {X, Y}, whose weights
+//            are wmul[c] split by hf_asymmetry and then multiplied by 0.8
+//            inside the function (:1364-1405; that 0.8 is not the param).
+// The dc block (lf) is not accumulated here: lf's L2 is a *set* into the dc
+// image (:1342-1362 SetL2Diff), and the combine pass derives it from the lf
+// planes directly, which is the same arithmetic without a third dc buffer.
+//
+// The mask's input (:1110-1150):
+//   mask_i = sqrt((2.5*(uhfX_i + hfX_i))^2 + (0.4*uhfY_i + 0.4*hfY_i)^2)
+//   pre_i  = sqrt(kMul*|mask_i| + kBias) - sqrt(kMul*kBias)
+// with kMul 6.19424080439 and kBias 12.61050594197; pre overwrites the mask
+// plane in place, because the transform is pointwise. The blur of pre and the
+// erosion follow in butter_blur (13 taps, PLAIN) and butter_erode.
+//
+// The two were separate dispatches until the hff planes they share (four of
+// them per level) were measured to be worth fusing: one pass reads each plane
+// once, writes ac and the two pre-masks, and saves a dispatch. Every value is
+// computed with the same arithmetic as before, so scores are unchanged.
+
+#version 450
+
+#include "butter_common.glsl"
+
+layout(local_size_x = 256) in;
+
+const float kWmulMf[3] = float[](2150.0, 10.6195433239, 16.2176043152);
+const float kWmulHf[2] = float[](400.0, 1.50815703118);
+const float kMaskMul = 6.19424080439;
+// DiffPrecompute folds mul into the bias: bias = mul * bias_arg.
+const float kMaskBias = 6.19424080439 * 12.61050594197;
+const float kMaskBiasSqrt = sqrt(kMaskBias);
+
+void main() {
+    const uint index = gl_WorkGroupID.x * 256u + gl_LocalInvocationIndex;
+    const uint area = butter_area();
+    if (index >= area) return;
+
+    const uint chain0 = butter_chain(0u);
+    const uint chain1 = butter_chain(1u);
+    const uint ac = butter_here(R_AC);
+
+    // All loads first: mf and the post-UHF hf for the L2 terms, the post-UHF hf
+    // and uhf for both masks, and the accumulator.
+    float mf0[3];
+    float mf1[3];
+    for (uint c = 0u; c < 3u; ++c) {
+        mf0[c] = arena[chain_mf(chain0) + c * area + index];
+        mf1[c] = arena[chain_mf(chain1) + c * area + index];
+    }
+    float hf0[2];
+    float hf1[2];
+    for (uint c = 0u; c < 2u; ++c) {
+        hf0[c] = arena[chain_hff(chain0) + c * area + index];
+        hf1[c] = arena[chain_hff(chain1) + c * area + index];
+    }
+    float uhf0[2];
+    float uhf1[2];
+    for (uint c = 0u; c < 2u; ++c) {
+        uhf0[c] = arena[chain_uhf(chain0) + c * area + index];
+        uhf1[c] = arena[chain_uhf(chain1) + c * area + index];
+    }
+    float acc[3];
+    for (uint c = 0u; c < 3u; ++c) acc[c] = arena[ac + c * area + index];
+
+    // L2Diff on mf.
+    for (uint c = 0u; c < 3u; ++c) {
+        const float diff = mf0[c] - mf1[c];
+        acc[c] += kWmulMf[c] * diff * diff;
+    }
+
+    // L2DiffAsymmetric on hf, with the 0.8 folded into both weights.
+    const float asym = pc.q0;
+    for (uint c = 0u; c < 2u; ++c) {
+        const float w_gt1 = kWmulHf[c] * asym * 0.8;
+        const float w_lt1 = kWmulHf[c] / asym * 0.8;
+        const float v0 = hf0[c];
+        const float v1 = hf1[c];
+        const float diff = v0 - v1;
+        float total = acc[c] + (diff * diff) * w_gt1;
+        const float fabs0 = abs(v0);
+        const float too_small = 0.4 * fabs0;
+        const float too_big = fabs0;
+        float impact = 0.0;
+        if (v0 < 0.0) {
+            if (v1 > -too_small) {
+                impact = v1 + too_small;
+            } else if (v1 < -too_big) {
+                impact = -v1 - too_big;
+            }
+        } else {
+            if (v1 < too_small) {
+                impact = too_small - v1;
+            } else if (v1 > too_big) {
+                impact = v1 - too_big;
+            }
+        }
+        total += w_lt1 * impact * impact;
+        acc[c] = total;
+    }
+    for (uint c = 0u; c < 3u; ++c) arena[ac + c * area + index] = acc[c];
+
+    // The two masks' pre-values, image 0 then image 1 (scratch_a(0), (1)).
+    const float xdiff0 = (uhf0[0] + hf0[0]) * 2.5;
+    const float ydiff0 = uhf0[1] * 0.4 + hf0[1] * 0.4;
+    const float mask0 = sqrt(xdiff0 * xdiff0 + ydiff0 * ydiff0);
+    const float xdiff1 = (uhf1[0] + hf1[0]) * 2.5;
+    const float ydiff1 = uhf1[1] * 0.4 + hf1[1] * 0.4;
+    const float mask1 = sqrt(xdiff1 * xdiff1 + ydiff1 * ydiff1);
+    arena[scratch_a(0u) + index] =
+        sqrt(kMaskMul * abs(mask0) + kMaskBias) - kMaskBiasSqrt;
+    arena[scratch_a(1u) + index] =
+        sqrt(kMaskMul * abs(mask1) + kMaskBias) - kMaskBiasSqrt;
+}

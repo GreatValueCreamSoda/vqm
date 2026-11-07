@@ -1,0 +1,99 @@
+// Derived from Cloudinary SSIMULACRA 2 (Copyright (c) Jon Sneyers, Cloudinary).
+// BSD-3-Clause; see LICENSE.
+// VMAF: Copyright (c) Netflix, Inc. BSD-2-Clause-Patent;
+// see licenses/NETFLIX-VMAF-LICENSE.
+//
+// Separable coded-luma resampler for VmafFitMode::FitAndPad. Catmull-Rom
+// bicubic upscaling and Lanczos3 downscaling with widened antialiasing
+// support. The vertical pass also writes the black canvas around the content.
+
+#version 450
+
+#include "bindings.glsl"
+
+layout(local_size_x = 16, local_size_y = 16) in;
+layout(push_constant) uniform Push {
+    uint source;
+    uint destination;
+    uint source_width;
+    uint source_height;
+    uint out_width;
+    uint out_height;
+    uint content_x;
+    uint content_y;
+    uint content_width;
+    uint content_height;
+    uint resample_filter;
+    uint vertical;
+    float pad;
+}
+pc;
+
+const float kPi = 3.14159265358979323846;
+
+float sinc_(float x) { return x == 0.0 ? 1.0 : sin(kPi * x) / (kPi * x); }
+
+float kernel(float x) {
+    x = abs(x);
+    if (pc.resample_filter == 1u) {
+        if (x < 1.0) return 1.0 + x * x * (-2.5 + x * 1.5);
+        if (x < 2.0) return 2.0 + x * (-4.0 + x * (2.5 - 0.5 * x));
+        return 0.0;
+    }
+    return x < 3.0 ? sinc_(x) * sinc_(x / 3.0) : 0.0;
+}
+
+uint clamp_index(int index, uint size) {
+    return uint(clamp(index, 0, int(size) - 1));
+}
+
+// One axis, with the row/column fixed by the caller. `offset` addresses the
+// first sample of the fixed other axis, and `stride` advances along this axis.
+float sample_axis(uint offset, uint stride, uint in_size, uint out_pos) {
+    const uint out_size = pc.vertical != 0u ? pc.content_height : pc.out_width;
+    if (pc.resample_filter == 0u) {
+        const uint index = clamp_index(int(out_pos), in_size);
+        return arena[offset + index * stride];
+    }
+    const float scale = float(in_size) / float(out_size);
+    const float pos = (float(out_pos) + 0.5) * scale - 0.5;
+    const float support_scale = max(1.0, scale);
+    const float radius = pc.resample_filter == 1u ? 2.0 : 3.0;
+    const float support = radius * support_scale;
+    const int first = int(ceil(pos - support));
+    const int last = int(floor(pos + support));
+    float sum = 0.0;
+    float total = 0.0;
+    for (int i = first; i <= last; ++i) {
+        const float weight = kernel((float(i) - pos) / support_scale);
+        const uint index = clamp_index(i, in_size);
+        sum += weight * arena[offset + index * stride];
+        total += weight;
+    }
+    if (abs(total) < 1e-20)
+        return arena[offset + clamp_index(int(round(pos)), in_size) * stride];
+    return sum / total;
+}
+
+void main() {
+    const uvec2 p = gl_GlobalInvocationID.xy;
+    if (p.x >= pc.out_width || p.y >= pc.out_height) return;
+    const uint destination = p.y * pc.out_width + p.x;
+    if (pc.vertical == 0u) {
+        const uint source = p.y * pc.source_width;
+        arena[pc.destination + destination] =
+            sample_axis(pc.source + source, 1u, pc.source_width, p.x);
+        return;
+    }
+
+    if (p.x < pc.content_x || p.x >= pc.content_x + pc.content_width ||
+        p.y < pc.content_y || p.y >= pc.content_y + pc.content_height) {
+        arena[pc.destination + destination] = pc.pad;
+        return;
+    }
+    const uint local_x = p.x - pc.content_x;
+    const uint local_y = p.y - pc.content_y;
+    arena[pc.destination + destination] = sample_axis(
+        pc.source + local_x, pc.source_width, pc.source_height, local_y
+    );
+}

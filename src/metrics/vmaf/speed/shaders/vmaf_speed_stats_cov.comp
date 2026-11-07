@@ -1,0 +1,67 @@
+// VMAF SpEED: Copyright 2016-2025 Netflix, Inc.
+// BSD-2-Clause-Patent; see licenses/NETFLIX-VMAF-LICENSE.
+#version 450
+#include "vmaf_speed_stats_common.glsl"
+layout(local_size_x = 64) in;
+shared float reduction[64];
+void main() {
+    uint i = gl_WorkGroupID.x;
+    uint lane = gl_LocalInvocationIndex;
+    const uint tw = (pc.width / 5u) * 5u;
+    const uint th = (pc.height / 5u) * 5u;
+    const uint sw = tw - 4u, sh = th - 4u;
+    const uint samples = sw * sh;
+    // Count each lane's iterations without rounding the total up in uint,
+    // which could overflow for a formally valid near-maximum geometry.
+    const uint lane_count = samples / 64u + uint(lane < samples % 64u);
+    if (pc.op == 0u) {
+        uint channel = i / 25u, pos = i % 25u;
+        uint row = pos / 5u, col = pos % 5u;
+        float total = 0.0;
+        for (uint step = 0u; step < lane_count; ++step) {
+            uint p = step * 64u + lane;
+            uint y = p / sw, x = p % sw;
+            total += arena[source(channel) + (y + row) * pc.width + x + col];
+        }
+        reduction[lane] = total;
+        barrier();
+        for (uint stride = 32u; stride > 0u; stride >>= 1u) {
+            if (lane < stride) reduction[lane] += reduction[lane + stride];
+            barrier();
+        }
+        if (lane == 0u)
+            arena[means(channel, pos)] = reduction[0] / float(samples);
+    } else {
+        // Map one workgroup to each upper-triangular entry. Row lengths are
+        // 25, 24, ..., 1; the mapping is uniform across the reduction lanes.
+        uint channel = i / 325u, pos = i % 325u, a = 0u;
+        while (a < 24u && pos >= 25u - a) {
+            pos -= 25u - a;
+            ++a;
+        }
+        uint b = a + pos;
+        uint ay = a / 5u, ax = a % 5u, by = b / 5u, bx = b % 5u;
+        float ma = arena[means(channel, a)], mb = arena[means(channel, b)];
+        float total = 0.0;
+        for (uint step = 0u; step < lane_count; ++step) {
+            uint p = step * 64u + lane;
+            uint y = p / sw, x = p % sw;
+            float va = arena[source(channel) + (y + ay) * pc.width + x + ax];
+            float vb = arena[source(channel) + (y + by) * pc.width + x + bx];
+            total += (va - ma) * (vb - mb);
+        }
+        reduction[lane] = total;
+        barrier();
+        for (uint stride = 32u; stride > 0u; stride >>= 1u) {
+            if (lane < stride) reduction[lane] += reduction[lane + stride];
+            barrier();
+        }
+        if (lane == 0u) {
+            // Each entry keeps its former sample order and halving add tree.
+            // The mirrored product differs only in multiplication operand order.
+            const float value = reduction[0] / float(samples);
+            arena[cov(channel, a, b)] = value;
+            if (a != b) arena[cov(channel, b, a)] = value;
+        }
+    }
+}

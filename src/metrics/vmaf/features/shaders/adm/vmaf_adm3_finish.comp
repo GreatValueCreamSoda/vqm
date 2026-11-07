@@ -1,0 +1,20 @@
+// Copyright 2016-2020 Netflix, Inc. BSD-2-Clause-Patent.
+// See licenses/NETFLIX-VMAF-LICENSE. Aggregation follows libvmaf adm.c
+// at revision 4611e47a7330cd342498dcc130e1008efbeab6e4.
+#version 450
+#include "vmaf_adm_common.glsl"
+layout(local_size_x = 1) in;
+void main() {
+    float num = 0.0, den = 0.0, aim = 0.0;
+    for (uint s = 0; s < 4; ++s) {
+        num += arena[pc.results + 3 * s];
+        den += arena[pc.results + 3 * s + 1];
+        aim += arena[pc.results + 3 * s + 2];
+    }
+    float limit = 1e-10 * float(pc.original_pixels) / 2073600.0;
+    if (num < limit) num = 0.0;
+    if (den < limit) den = 0.0;
+    float dlm = den == 0.0 ? 1.0 : num / den;
+    float aim_ratio = den == 0.0 ? 0.0 : aim / den;
+    arena[pc.results + 12] = max(0.7 * dlm + 0.3 * (1.0 - aim_ratio), 0.5);
+}

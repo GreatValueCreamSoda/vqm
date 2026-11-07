@@ -1,0 +1,15 @@
+# SSIMULACRA 2.1 lint configuration.
+#
+# Only the nesting limit is enforced: at most three nested blocks (three nested
+# loops, or loop/loop/if, ...). clang-tidy counts the function body itself as
+# one nesting level, so 3 nested blocks correspond to NestingThreshold 4.
+#
+# Needs a compile database:
+#   cmake -S . -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+#   python3 tools/check_quality.py --lint --build-dir build
+# Production implementations, CLI, benchmarks and image decoding are checked
+# by default. --include-tests also inspects test matrices and reference oracles.
+---
+Checks: '-*,readability-function-size'
+CheckOptions:
+  readability-function-size.NestingThreshold: '4'

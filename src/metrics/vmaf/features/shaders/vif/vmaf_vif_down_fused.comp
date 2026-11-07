@@ -1,0 +1,55 @@
+// VMAF VIF: Copyright 2016-2020 Netflix, Inc.
+// BSD-2-Clause-Patent; see licenses/NETFLIX-VMAF-LICENSE.
+// Separable downsample kernels and mirror rule follow libvmaf vif.c and
+// vif_tools.c at 4611e47a7330cd342498dcc130e1008efbeab6e4.
+#version 450
+#include "vmaf_vif_common.glsl"
+
+#define TAPS ((1 << (4 - VIF_SCALE)) + 1)
+#define TILE (32 + TAPS - 1)
+#define TILE_Y (16 + TAPS - 1)
+#define RADIUS (TAPS / 2)
+
+layout(local_size_x = 16, local_size_y = 8) in;
+shared vec2 source_tile[TILE * TILE_Y];
+shared vec2 vertical_tile[TILE * 8];
+
+void main() {
+    const uint lane = gl_LocalInvocationIndex;
+    const int start_x = int(gl_WorkGroupID.x * 32u) - RADIUS;
+    const int start_y = int(gl_WorkGroupID.y * 16u) - RADIUS;
+    for (uint i = lane; i < TILE * TILE_Y; i += 128u) {
+        // Clamping only affects halo cells that cannot contribute to an
+        // in-bounds output. It also keeps loads valid at small odd sizes.
+        int x =
+            clamp(start_x + int(i % TILE), -RADIUS, int(pc.width) - 1 + RADIUS);
+        int y =
+            clamp(start_y + int(i / TILE), -RADIUS, int(pc.height) - 1 + RADIUS);
+        x = vif_mirror(x, int(pc.width));
+        y = vif_mirror(y, int(pc.height));
+        uint index = uint(y) * pc.width + uint(x);
+        source_tile[i] =
+            vec2(arena[pc.reference + index], arena[pc.distorted + index]);
+    }
+    barrier();
+    for (uint i = lane; i < TILE * 8; i += 128u) {
+        uint x = i % TILE;
+        uint y = i / TILE;
+        vec2 sum = vec2(0.0);
+        for (int k = 0; k < TAPS; ++k)
+            sum += vif_weight(k) * source_tile[(2u * y + uint(k)) * TILE + x];
+        vertical_tile[i] = sum;
+    }
+    barrier();
+    const uvec2 p = gl_GlobalInvocationID.xy;
+    const uvec2 extent = uvec2(pc.width / 2u, pc.height / 2u);
+    if (p.x >= extent.x || p.y >= extent.y) return;
+    vec2 sum = vec2(0.0);
+    const uint start =
+        gl_LocalInvocationID.y * TILE + 2u * gl_LocalInvocationID.x;
+    for (int k = 0; k < TAPS; ++k)
+        sum += vif_weight(k) * vertical_tile[start + uint(k)];
+    const uint index = p.y * extent.x + p.x;
+    arena[pc.reference_out + index] = sum.x;
+    arena[pc.distorted_out + index] = sum.y;
+}

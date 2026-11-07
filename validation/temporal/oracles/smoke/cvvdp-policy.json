@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "metric": "cvvdp",
+  "reference_revision": "2a268bce8d56e2f3abde46df3927d8a633707a24",
+  "margins": {
+    "cvvdp-standard4k-30000:1001": 0.28962389469146727,
+    "cvvdp-standard4k-30:1": 0.19528040504455565
+  },
+  "configuration_hash": "749dece246d54dbe9131c9291af215a3b9e082c85e57fbd50f525e059decb6d8",
+  "input_manifest_hash": "5b2ce25b753872b3434f58d63334cb6abe07bb65dbcf25158026957ad2b39873",
+  "min_total_sources": 3,
+  "min_total_samples": 39,
+  "coverage": {
+    "min_sources": 1,
+    "min_samples": 2,
+    "min_eligible_pairs": 1,
+    "min_eligible_fraction": 0.1
+  },
+  "required_strata": {
+    "sdr-native-444": {
+      "min_sources": 1,
+      "min_samples": 2,
+      "min_eligible_pairs": 1,
+      "min_eligible_fraction": 0.1
+    }
+  },
+  "numerical_max": 0.001,
+  "subjective": {
+    "required": false
+  }
+}
