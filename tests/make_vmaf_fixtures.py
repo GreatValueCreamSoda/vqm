@@ -54,8 +54,9 @@ def _luma_pair(width: int, height: int, shift: int, frame: int,
     return original, distorted
 
 
-def make_pair(width: int, height: int, bitdepth: int, frames: int,
-              low_bits: bool) -> tuple[bytes, bytes]:
+def make_pair(
+    width: int, height: int, bitdepth: int, frames: int, low_bits: bool
+) -> tuple[bytes, bytes]:
     """Build two deterministic YUV420 clips for one bit-depth case.
 
     :param width: Image width in pixels.
@@ -97,8 +98,12 @@ def main() -> None:
         for label, low_bits in [("moving", False),
                                 *([("low-bits", True)] if depth > 8 else [])]:
             name = f"{depth}bit-{label}"
-            ref, dist = make_pair(args.width, args.height, depth, args.frames, low_bits)
-            ref_path, dist_path = directory / f"{name}-ref.yuv", directory / f"{name}-dist.yuv"
+            ref, dist = make_pair(
+                args.width, args.height, depth, args.frames, low_bits
+            )
+            ref_path, dist_path = directory / (f"{name}-ref.yuv"), directory / (
+                f"{name}-dist.yuv"
+            )
             ref_path.write_bytes(ref)
             dist_path.write_bytes(dist)
             cases.append(

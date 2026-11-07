@@ -43,7 +43,8 @@ def strip_icc(data: bytes) -> tuple[bytes, int]:
             return bytes(result), removed
         end = _segment_end(data, offset)
         segment = data[offset:end]
-        if segment.startswith(b"\xff\xe2") and segment[4:16] == b"ICC_PROFILE\x00":
+        if segment.startswith(b"\xff\xe2"
+                              ) and segment[4:16] == b"ICC_PROFILE\x00":
             removed += len(segment)
         else:
             result.extend(segment)

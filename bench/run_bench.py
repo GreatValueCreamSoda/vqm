@@ -20,12 +20,17 @@ import subprocess
 import sys
 import tempfile
 import time
-from concurrent.futures import Future, ThreadPoolExecutor
-from typing import NotRequired, TypedDict
+from concurrent.futures import Future
+from concurrent.futures import ThreadPoolExecutor
+from typing import NotRequired
+from typing import TypedDict
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, os.path.join(REPO_ROOT, "validation"))
-from common import enumerate_pairs, parse_score, run_score  # noqa: E402
+if __package__ in (None, ""):
+    sys.path.insert(0, REPO_ROOT)
+from validation.common import enumerate_pairs  # noqa: E402
+from validation.common import parse_score  # noqa: E402
+from validation.common import run_score  # noqa: E402
 
 DEFAULT_BASELINES = (
     ("reference-scalar", "build/reference-build/ssimulacra2"),
@@ -63,9 +68,12 @@ def parse_args() -> argparse.Namespace:
     :returns: Requested benchmark settings.
     """
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--data-root", default="validation/data/CID22_validation_set")
     parser.add_argument(
-        "--limit", type=int, default=100, help="number of pairs to use (0 = all)"
+        "--data-root", default="validation/data/CID22_validation_set"
+    )
+    parser.add_argument(
+        "--limit", type=int, default=100,
+        help="number of pairs to use (0 = all)"
     )
     parser.add_argument("--offset", type=int, default=0)
     parser.add_argument(
@@ -100,7 +108,9 @@ def parse_args() -> argparse.Namespace:
 def _read_pair(line: str, path: str, line_number: int) -> Pair:
     original, separator, distorted = line.partition("\t")
     if not separator or not original or not distorted:
-        raise ValueError(f"{path}:{line_number}: expected original<TAB>distorted")
+        raise ValueError(
+            f"{path}:{line_number}: expected original<TAB>distorted"
+        )
     return original, distorted
 
 
@@ -114,7 +124,8 @@ def read_pairs(path: str) -> list[Pair]:
     """
     with open(path) as source:
         return [
-            _read_pair(line, path, index) for index, text in enumerate(source, 1)
+            _read_pair(line, path, index)
+            for index, text in enumerate(source, 1)
             if (line := text.rstrip("\n\r")) and not line.startswith("#")
         ]
 
@@ -134,7 +145,10 @@ def parse_baselines(specs: list[str]) -> list[tuple[str, str]]:
         baselines.append((name, path))
     if baselines:
         return baselines
-    return [(name, path) for name, path in DEFAULT_BASELINES if os.path.exists(path)]
+    return [
+        (name, path) for name, path in DEFAULT_BASELINES
+        if os.path.exists(path)
+    ]
 
 
 def _score_arm(pair: Pair, spec: Binary, timeout: float) -> _Arm:
@@ -218,7 +232,8 @@ def _measurement_row(state: _Arm, pair: Pair) -> _Measurement:
 
 
 def measure_pair(
-    pair: Pair, binaries: list[Binary], reps: int, warmup: int, timeout: float = 120.0
+    pair: Pair, binaries: list[Binary], reps: int, warmup: int,
+    timeout: float = 120.0
 ) -> list[_Measurement]:
     """Score each arm, then alternate their warmups and timed invocations.
 
@@ -252,7 +267,8 @@ def _profile_stages(
     with contextlib.suppress(FileNotFoundError):
         os.remove(stages_csv)
     parent = os.path.dirname(stages_csv) or "."
-    with tempfile.TemporaryDirectory(prefix=".vqm-bench-", dir=parent) as directory:
+    with tempfile.TemporaryDirectory(prefix=".vqm-bench-",
+                                     dir=parent) as directory:
         pairs_path = os.path.join(directory, "pairs.txt")
         temp_csv = os.path.join(directory, "stages.csv")
         with open(pairs_path, "w") as target:
@@ -313,8 +329,10 @@ def _select_pairs(args: argparse.Namespace) -> list[Pair]:
             pairs = read_pairs(args.pairs_file)
         else:
             pairs = [
-                (os.path.join(args.data_root, o), os.path.join(args.data_root, d))
-                for o, d in enumerate_pairs(args.data_root)
+                (
+                    os.path.join(args.data_root,
+                                 o), os.path.join(args.data_root, d)
+                ) for o, d in enumerate_pairs(args.data_root)
             ]
     except (OSError, ValueError) as error:
         raise SystemExit(str(error)) from None
@@ -334,7 +352,8 @@ def _select_binaries(args: argparse.Namespace) -> list[Binary]:
     if missing:
         raise SystemExit(f"missing baseline binaries: {', '.join(missing)}")
     binaries = (
-        [("ours", args.ours, [])] + [(name, path, []) for name, path in baselines]
+        [("ours", args.ours, [])] +
+        [(name, path, []) for name, path in baselines]
     )
     names = [name for name, _, _ in binaries]
     if len(set(names)) != len(names):
@@ -381,12 +400,14 @@ def _collect_rows(
     return rows, errors
 
 
-def _measure_pairs(args: argparse.Namespace, pairs: list[Pair],
-                   binaries: list[Binary]) -> tuple[list[_Measurement], int]:
+def _measure_pairs(
+    args: argparse.Namespace, pairs: list[Pair], binaries: list[Binary]
+) -> tuple[list[_Measurement], int]:
     with ThreadPoolExecutor(max_workers=args.jobs) as pool:
         futures = [
             pool.submit(
-                measure_pair, pair, binaries, args.reps, args.warmup, args.timeout
+                measure_pair, pair, binaries, args.reps, args.warmup,
+                args.timeout
             ) for pair in pairs
         ]
         return _collect_rows(futures)

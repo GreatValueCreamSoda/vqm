@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Copyright (c) 2026 VQM contributors. BSD-3-Clause; see LICENSE.
-"""Verify exact floating-point transport and independent spatial clip scoring."""
+"""Verify exact float transport and independent spatial scoring."""
 
 from __future__ import annotations
 
@@ -17,11 +17,13 @@ import numpy as np
 from validation.temporal import spatial_reference as reference
 
 
-def _inputs(root: Path, *, frames: int = 2) -> tuple[dict[str, object], np.ndarray]:
+def _inputs(root: Path, *,
+            frames: int = 2) -> tuple[dict[str, object], np.ndarray]:
     values = np.linspace(.05, .95, frames * 3 * 8 * 8,
                          dtype=np.float32).reshape(frames, 3, 8, 8)
     row: dict[str, object] = {"frames": frames, "width": 8, "height": 8}
-    for side, data in (("original", values), ("distorted", values * np.float32(.9))):
+    for side, data in (("original", values), ("distorted",
+                                              values * np.float32(.9))):
         path = root / f"{side}.y4m"
         raw = data.astype("<f4").tobytes()
         Path(str(path) + ".rgb").write_bytes(raw)
@@ -53,19 +55,26 @@ def _run_response(stdout: str, code: int = 0,
 class SpatialReferenceTests(unittest.TestCase):
     """Exercise transport, clip boundaries, command selection and provenance."""
 
-    def test_pfm_keeps_float32_precision_channel_order_and_orientation(self) -> None:
-        """Round-trip unequal color channels and every row without quantization."""
+    def test_pfm_keeps_float32_precision_channel_order_and_orientation(
+        self
+    ) -> None:
+        """Round-trip all rows and unequal channels without quantization."""
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             _, values = _inputs(root)
             path = root / "frame.pfm"
             fingerprint = reference.write_pfm(path, values[0])
             np.testing.assert_array_equal(_decode_pfm(path), values[0])
-            self.assertEqual(fingerprint, hashlib.sha256(path.read_bytes()).hexdigest())
-            self.assertFalse(np.all(values[0] * 65535 == np.rint(values[0] * 65535)))
+            self.assertEqual(
+                fingerprint,
+                hashlib.sha256(path.read_bytes()).hexdigest()
+            )
+            self.assertFalse(
+                np.all(values[0] * 65535 == np.rint(values[0] * 65535))
+            )
 
     def test_original_batch_scores_every_frame_then_pools(self) -> None:
-        """Invoke one deterministic original process and retain ordered evidence."""
+        """Run one deterministic original and retain ordered evidence."""
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             row, values = _inputs(root)
@@ -84,7 +93,9 @@ class SpatialReferenceTests(unittest.TestCase):
 
             with mock.patch.object(reference.subprocess, "run",
                                    side_effect=original) as run:
-                result = reference.spatial_score(row, "ssimulacra2", root / "report")
+                result = reference.spatial_score(
+                    row, "ssimulacra2", root / "report"
+                )
             self.assertEqual(run.call_count, 1)
             np.testing.assert_array_equal(observed["inputs"][0][0], values[0])
             np.testing.assert_array_equal(observed["inputs"][1][0], values[1])
@@ -105,13 +116,17 @@ class SpatialReferenceTests(unittest.TestCase):
             self.assertTrue(command[0].endswith("ss2_cloudinary_bench"))
             self.assertEqual(command[command.index("--metric") + 1], "ssimu2")
             self.assertEqual(command[command.index("--threads") + 1], "1")
-            self.assertEqual(command[command.index("--decode-threads") + 1], "1")
+            self.assertEqual(
+                command[command.index("--decode-threads") + 1], "1"
+            )
             self.assertEqual(command[command.index("--iterations") + 1], "1")
             self.assertEqual(command[command.index("--warmup") + 1], "0")
-            self.assertFalse(any(path.is_dir() for path in (root / "report").iterdir()))
+            self.assertFalse(
+                any(path.is_dir() for path in (root / "report").iterdir())
+            )
 
     def test_spatial_specific_sidecars_override_generic_inputs(self) -> None:
-        """Consume separately canonicalized spatial YUV/RGB metadata when present."""
+        """Use separate canonical spatial YUV/RGB metadata when present."""
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             row, _ = _inputs(root)
@@ -121,9 +136,13 @@ class SpatialReferenceTests(unittest.TestCase):
                 row[side] = "unavailable-generic-input"
             with mock.patch.object(reference.subprocess, "run",
                                    return_value=_run_response("1\n3\n")) as run:
-                result = reference.spatial_score(row, "butteraugli", root / "report")
+                result = reference.spatial_score(
+                    row, "butteraugli", root / "report"
+                )
             self.assertEqual(result["score"], 2)
-            self.assertTrue(run.call_args.args[0][0].endswith("ss2_libjxl_bench"))
+            self.assertTrue(
+                run.call_args.args[0][0].endswith("ss2_libjxl_bench")
+            )
             self.assertEqual(run.call_args.args[0][2], "butteraugli")
 
     def test_incomplete_spatial_metadata_fails_without_fallback(self) -> None:
@@ -143,13 +162,14 @@ class SpatialReferenceTests(unittest.TestCase):
             row, _ = _inputs(root)
             path = Path(str(row["original"]) + ".rgb")
             _damage(path, row, label)
-            with self.subTest(case=label), mock.patch.object(reference.subprocess, "run") as run, \
-                 self.assertRaises(ValueError):
+            with (self.subTest(case=label
+                               ), mock.patch.object(reference.subprocess, "run")
+                  as run, self.assertRaises(ValueError)):
                 reference.spatial_score(row, "ssimulacra2", root / label)
             run.assert_not_called()
 
     def test_nonfinite_or_out_of_gamut_rgb_is_never_clipped(self) -> None:
-        """Reject invalid samples rather than silently changing the original input."""
+        """Reject invalid samples without altering original inputs."""
         temporary = self.enterContext(tempfile.TemporaryDirectory())
         root = Path(temporary)
         for value in (np.nan, np.inf, -0.01, 1.01):
@@ -157,26 +177,33 @@ class SpatialReferenceTests(unittest.TestCase):
                               ), self.assertRaisesRegex(ValueError,
                                                         "finite encoded RGB"):
                 reference.write_pfm(
-                    root / "bad.pfm", np.full((3, 8, 8), value, dtype=np.float32)
+                    root / "bad.pfm",
+                    np.full((3, 8, 8), value, dtype=np.float32)
                 )
 
-    def test_missing_nonfinite_or_failed_original_frames_are_rejected(self) -> None:
-        """A partial or failed original process cannot produce a pooled score."""
+    def test_missing_nonfinite_or_failed_original_frames_are_rejected(
+        self
+    ) -> None:
+        """Reject pooled scores from partial or failed originals."""
         temporary = self.enterContext(tempfile.TemporaryDirectory())
         root = Path(temporary)
         row, _ = _inputs(root)
         for output in ("1\n", "1\nnan\n", "1\ninf\n", "1\nERROR\n"):
-            with self.subTest(output=output), mock.patch.object(reference.subprocess, "run",
-                                                               return_value=_run_response(output)), \
-                 self.assertRaises(ValueError):
+            with (self.subTest(output=output),
+                  mock.patch.object(reference.subprocess, "run",
+                                    return_value=_run_response(output)),
+                  self.assertRaises(ValueError)):
                 reference.spatial_score(row, "ssimulacra2", root / "report")
-        with mock.patch.object(reference.subprocess, "run",
-                               return_value=_run_response("", 1, "original failed")), \
-             self.assertRaisesRegex(RuntimeError, "original failed"):
+        with (mock.patch.object(reference.subprocess, "run",
+                                return_value=_run_response("", 1,
+                                                           "original failed")),
+              self.assertRaisesRegex(RuntimeError, "original failed")):
             reference.spatial_score(row, "butteraugli", root / "report")
 
-    def test_provenance_fingerprints_binary_build_sources_and_parameters(self) -> None:
-        """Retain the exact original source pin and Butteraugli configuration."""
+    def test_provenance_fingerprints_binary_build_sources_and_parameters(
+        self
+    ) -> None:
+        """Retain original source pins and Butteraugli configuration."""
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             _fake_build(root, "butteraugli")
@@ -196,21 +223,25 @@ class SpatialReferenceTests(unittest.TestCase):
             )
             self.assertEqual(info["threads"], 1)
             self.assertIn("encoded-sRGB", info["input"])
-            self.assertIn("bench/inmemory/libjxl_bench.cc", info["source_sha256"])
+            self.assertIn(
+                "bench/inmemory/libjxl_bench.cc", info["source_sha256"]
+            )
 
     def test_provenance_rejects_a_missing_or_wrong_revision_build(self) -> None:
-        """A reference label cannot substitute for a matching recorded build pin."""
+        """Require matching build pins beyond reference labels."""
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             _fake_build(root, "ssimulacra2")
             stamp = root / "build/reference-fingerprints/cloudinary.json"
             stamp.write_text(json.dumps({"revision": "wrong-revision"}))
-            with mock.patch.object(reference, "ROOT", root), \
-                 self.assertRaisesRegex(RuntimeError, "wrong pinned revision"):
+            with (mock.patch.object(reference, "ROOT", root),
+                  self.assertRaisesRegex(RuntimeError,
+                                         "wrong pinned revision")):
                 reference.spatial_provenance("ssimulacra2")
             stamp.unlink()
-            with mock.patch.object(reference, "ROOT", root), \
-                 self.assertRaisesRegex(RuntimeError, "build pinned spatial reference"):
+            with (mock.patch.object(reference, "ROOT", root),
+                  self.assertRaisesRegex(RuntimeError,
+                                         "build pinned spatial reference")):
                 reference.spatial_provenance("ssimulacra2")
 
 
@@ -228,7 +259,9 @@ def _fake_build(root: Path, metric: str) -> None:
     binary = root / reference.BINARIES[metric]
     binary.parent.mkdir(parents=True)
     binary.write_bytes(b"binary")
-    stamp = root / "build/reference-fingerprints" / f"{reference.STEPS[metric]}.json"
+    stamp = root / "build/reference-fingerprints" / (
+        f"{reference.STEPS[metric]}.json"
+    )
     stamp.parent.mkdir(parents=True, exist_ok=True)
     stamp.write_text(json.dumps({"revision": reference.PINS[metric]}))
     paths = [
@@ -243,14 +276,18 @@ def _fake_build(root: Path, metric: str) -> None:
 
 
 @unittest.skipUnless(
-    all((reference.ROOT / path).is_file() for path in reference.BINARIES.values()),
-    "pinned spatial originals not built"
+    all(
+        (reference.ROOT / path).is_file()
+        for path in reference.BINARIES.values()
+    ), "pinned spatial originals not built"
 )
 class OriginalSpatialIntegration(unittest.TestCase):
-    """Check the actual pinned readers and metric entry points when available."""
+    """Check pinned readers and metric entry points when available."""
 
-    def test_float_pfm_identity_and_nonidentity_through_both_originals(self) -> None:
-        """Run true original processes with exact floating inputs and pooled frames."""
+    def test_float_pfm_identity_and_nonidentity_through_both_originals(
+        self
+    ) -> None:
+        """Run real originals on exact floats and pool complete frames."""
         temporary = self.enterContext(tempfile.TemporaryDirectory())
         root = Path(temporary)
         row, _ = _inputs(root)
@@ -270,7 +307,8 @@ class OriginalSpatialIntegration(unittest.TestCase):
                 self.assertEqual(changed["frames"], 2)
                 self.assertNotEqual(changed["score"], identity)
                 self.assertEqual(
-                    [frame["index"] for frame in changed["frame_results"]], [0, 1]
+                    [frame["index"] for frame in changed["frame_results"]],
+                    [0, 1]
                 )
 
 

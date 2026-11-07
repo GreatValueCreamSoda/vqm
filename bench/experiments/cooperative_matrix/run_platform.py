@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # Derived from Cloudinary SSIMULACRA 2 (Copyright (c) Jon Sneyers, Cloudinary).
 # BSD-3-Clause; see LICENSE.
-"""Build and optionally run the standalone cooperative-matrix correctness probe.
+"""Build and optionally run the cooperative-matrix correctness probe.
 
 There are no performance timers. The default three shape variants match the
 FP16-input/FP32-result shapes observed on the study's RTX 5070. The executable
@@ -59,17 +59,21 @@ def _run_probe(
     env = os.environ.copy()
     if validation:
         env.update(
-            VK_INSTANCE_LAYERS="VK_LAYER_KHRONOS_validation", VK_LAYER_VALIDATE_SYNC="1"
+            VK_INSTANCE_LAYERS="VK_LAYER_KHRONOS_validation",
+            VK_LAYER_VALIDATE_SYNC="1"
         )
     command = [str(executable), str(build)]
     commands.append(command)
-    result = subprocess.run(command, cwd=ROOT, env=env, capture_output=True, text=True)
+    result = subprocess.run(
+        command, cwd=ROOT, env=env, capture_output=True, text=True
+    )
     (out / "results.json").write_text(result.stdout)
     (out / "stderr.log").write_text(result.stderr)
     metadata["exit_code"] = result.returncode
     (out / "provenance.json").write_text(json.dumps(metadata, indent=2) + "\n")
     result.check_returncode()
-    if re.search(r"VUID-|Validation Error|SYNC-HAZARD", result.stderr, re.IGNORECASE):
+    if re.search(r"VUID-|Validation Error|SYNC-HAZARD", result.stderr,
+                 re.IGNORECASE):
         raise RuntimeError("validation reported an error; inspect stderr.log")
     data = json.loads(result.stdout)
     if not data["passed"] or not data["tested_cases"]:
@@ -81,7 +85,8 @@ def main() -> None:
     """Build the matrix probe and optionally run its correctness checks."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--build-dir", type=Path, default=ROOT / "build/cooperative-matrix-probe"
+        "--build-dir", type=Path,
+        default=ROOT / "build/cooperative-matrix-probe"
     )
     parser.add_argument(
         "--out-dir", type=Path,
@@ -118,18 +123,20 @@ def main() -> None:
         modules.append(
             {
                 "shape": [m, n, k],
-                "sha256": sha256(target),
-                "has_cooperative_matrix_multiply": "OpCooperativeMatrixMulAddKHR"
-                in disassembly,
-                "has_vulkan_memory_model": "OpMemoryModel Logical Vulkan" in disassembly
+                "sha256":
+                sha256(target),
+                "has_cooperative_matrix_multiply":
+                "OpCooperativeMatrixMulAddKHR" in disassembly,
+                "has_vulkan_memory_model":
+                "OpMemoryModel Logical Vulkan" in disassembly
             }
         )
     executable = build / "platform_probe"
     execute(
         [
             args.cxx, "-std=c++20", "-O2", "-Wall", "-Wextra", "-Wpedantic",
-            "-Wno-missing-field-initializers", SOURCE / "platform_probe.cc", "-lvulkan",
-            "-o", executable
+            "-Wno-missing-field-initializers", SOURCE / "platform_probe.cc",
+            "-lvulkan", "-o", executable
         ], commands
     )
     metadata = {
@@ -137,10 +144,12 @@ def main() -> None:
         "correctness-only; no performance timers",
         "sources": {
             name: sha256(SOURCE / name)
-            for name in ("platform_probe.cc", "platform.comp", "run_platform.py")
+            for name in
+            ("platform_probe.cc", "platform.comp", "run_platform.py")
         },
         "compiler":
-        subprocess.check_output([args.cxx, "--version"], text=True).splitlines()[0],
+        subprocess.check_output([args.cxx, "--version"],
+                                text=True).splitlines()[0],
         "glslc":
         subprocess.check_output(["glslc", "--version"], text=True).splitlines(),
         "commands":
@@ -157,8 +166,12 @@ def main() -> None:
     if not args.build_only:
         _run_probe(executable, build, out, args.validation, metadata, commands)
     else:
-        (out / "provenance.json").write_text(json.dumps(metadata, indent=2) + "\n")
-        print("Compiled probe and validated three matrix SPIR-V modules; GPU not used")
+        (out /
+         "provenance.json").write_text(json.dumps(metadata, indent=2) + "\n")
+        print(
+            "Compiled probe and validated three matrix SPIR-V modules; GPU "
+            "not used"
+        )
     print(f"Outputs: {out}")
 
 

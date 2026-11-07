@@ -3,10 +3,10 @@
 # BSD-3-Clause; see LICENSE.
 """CPU checks for reproducible CID22 VMAF inputs and reference parsing."""
 
-import importlib.util
 import json
 import shutil
 import struct
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -16,7 +16,6 @@ from types import SimpleNamespace
 from unittest import mock
 
 ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT / "validation"))
 try:
     import numpy as np
     from PIL import Image
@@ -25,23 +24,41 @@ except ImportError:
 else:
     # Only unavailable optional dependencies skip these tests. Import errors
     # in the modules under test must fail collection and remain visible.
-    spec = importlib.util.spec_from_file_location(
-        "vmaf_cid22", ROOT / "validation/vmaf_cid22.py"
-    )
-    cid = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(cid)
-    import vmaf_sdr_cid22 as sdr
+    from validation import vmaf_cid22 as cid
+    from validation import vmaf_sdr_cid22 as sdr
 
 
 @unittest.skipIf(cid is None, "CID22 VMAF preparation needs NumPy and Pillow")
 class VmafCid22Tests(unittest.TestCase):
-    """Exercise CID22 preparation and reference scoring for the VMAF adapters."""
+    """Test CID22 preparation and reference scoring for VMAF adapters."""
 
-    @unittest.skipUnless(shutil.which("ffmpeg"), "RGB16 PNG decode requires ffmpeg")
+    def test_entry_points_support_scripts_and_modules(self) -> None:
+        """Show help through both entry points without starting corpus work."""
+        modules = ("vmaf_cid22", "vmaf_sdr_cid22", "compare_vmaf_scores")
+        commands = [
+            command for module in modules for command in (
+                [sys.executable, "-m", f"validation.{module}", "--help"], [
+                    sys.executable,
+                    str(ROOT / "validation" / f"{module}.py"), "--help"
+                ],
+            )
+        ]
+        for command in commands:
+            with self.subTest(command=command):
+                result = subprocess.run(
+                    command, cwd=ROOT, capture_output=True, text=True,
+                    timeout=30
+                )
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertIn("usage:", result.stdout)
+
+    @unittest.skipUnless(
+        shutil.which("ffmpeg"), "RGB16 PNG decode requires ffmpeg"
+    )
     def test_sdr_source_preserves_16_bit_rgb_low_bits(self) -> None:
         """Preserve the lowest bits when decoding a sixteen-bit source PNG."""
 
-        # A tiny RGB16 PNG written independently of Pillow, which truncates RGB16.
+        # A tiny RGB16 PNG written without Pillow, which truncates RGB16.
         def chunk(name: str, data: bytes) -> bytes:
             return (
                 struct.pack(">I", len(data)) + name + data +
@@ -66,9 +83,10 @@ class VmafCid22Tests(unittest.TestCase):
             self.assertNotEqual(int(decoded[0, 0, 0]) & 255, 0)
 
     def test_sdr_conversion_is_display_referred_16_bit_planar(self) -> None:
-        """Convert SDR sources into display-referred sixteen-bit planar input."""
+        """Convert SDR sources to display-referred sixteen-bit planes."""
         rgb = np.array(
-            [[[0, 0, 0], [255, 255, 255], [255, 0, 0], [128, 128, 128]]], dtype=np.uint8
+            [[[0, 0, 0], [255, 255, 255], [255, 0, 0], [128, 128, 128]]],
+            dtype=np.uint8
         )
         actual = np.frombuffer(sdr.convert_rgb(rgb), dtype="<u2").reshape(3, 4)
         np.testing.assert_array_equal(actual[:, 0], [4096, 32768, 32768])
@@ -91,7 +109,8 @@ class VmafCid22Tests(unittest.TestCase):
         response = SimpleNamespace(
             returncode=0, stdout="frame,v0,v1\n0,42.5,9.25\n", stderr=""
         )
-        with mock.patch.object(sdr.subprocess, "run", return_value=response) as run:
+        with mock.patch.object(sdr.subprocess, "run",
+                               return_value=response) as run:
             self.assertEqual(
                 sdr.reference_score_16(row, "exe", "m0", "m1"), [42.5, 9.25]
             )
@@ -108,7 +127,8 @@ class VmafCid22Tests(unittest.TestCase):
             path = Path(directory) / "scores.csv"
             path.write_text("original,distorted,v0\na,b,1\nc,d,2\n")
             self.assertEqual(
-                sdr.read_score_csv(path, "v0", [("c", "d"), ("a", "b")]), [2, 1]
+                sdr.read_score_csv(path, "v0", [("c", "d"), ("a", "b")]),
+                [2, 1]
             )
             path.write_text("original,distorted,v0\na,b,1\na,b,2\n")
             with self.assertRaisesRegex(ValueError, "duplicate"):
@@ -128,9 +148,12 @@ class VmafCid22Tests(unittest.TestCase):
             mcos.write_text("annotations")
             manifest = report / "inputs.csv"
             manifest.write_text(
-                "original,distorted,original_source_sha256,distorted_source_sha256\n"
-                f"ref,dist,{cid.digest(data / 'ref')},{cid.digest(data / 'dist')}\n"
-                f"ref,other,{cid.digest(data / 'ref')},{cid.digest(data / 'other')}\n"
+                "original,distorted,original_source_sha256,"
+                "distorted_source_sha256\n"
+                f"ref,dist,{cid.digest(data / 'ref')},"
+                f"{cid.digest(data / 'dist')}\n"
+                f"ref,other,{cid.digest(data / 'ref')},"
+                f"{cid.digest(data / 'other')}\n"
             )
             (report / "summary.json").write_text(
                 json.dumps(
@@ -142,7 +165,9 @@ class VmafCid22Tests(unittest.TestCase):
                 )
             )
             (data / "other").write_text("changed, but outside subset")
-            result = sdr.validate_baseline(report, [("ref", "dist")], data, mcos, 1)
+            result = sdr.validate_baseline(
+                report, [("ref", "dist")], data, mcos, 1
+            )
             self.assertEqual(result["source_files_verified"], 2)
             self.assertTrue(result["manifest_verified"])
             (data / "dist").write_text("changed")
@@ -151,7 +176,9 @@ class VmafCid22Tests(unittest.TestCase):
 
     def test_black_white_and_red_planar_samples(self) -> None:
         """Pin the planar codes for black, white and red samples."""
-        rgb = np.array([[[0, 0, 0], [255, 255, 255], [255, 0, 0]]], dtype=np.uint8)
+        rgb = np.array(
+            [[[0, 0, 0], [255, 255, 255], [255, 0, 0]]], dtype=np.uint8
+        )
         actual = np.frombuffer(cid.convert_rgb(rgb), dtype="<u2").reshape(3, 3)
         np.testing.assert_array_equal(
             actual, [[64, 940, 250], [512, 512, 409], [512, 512, 960]]
@@ -160,7 +187,8 @@ class VmafCid22Tests(unittest.TestCase):
     def test_cache_is_repaired_and_transparency_rejected(self) -> None:
         """Repair a damaged conversion cache and reject transparent input."""
         with tempfile.TemporaryDirectory() as directory:
-            path, cache = Path(directory) / "image.png", Path(directory) / "cache"
+            path, cache = Path(directory
+                               ) / "image.png", Path(directory) / "cache"
             cache.mkdir()
             Image.new("RGB", (17, 19), (12, 34, 56)).save(path)
             first = cid.convert_file(path, cache)
@@ -183,9 +211,14 @@ class VmafCid22Tests(unittest.TestCase):
             "height": 19,
             "distorted": "dist.png"
         }
-        with mock.patch.object(cid.subprocess, "run", return_value=SimpleNamespace(
-                returncode=0, stdout="frame,v0,v1\n0,42.5,9.25\n", stderr="")):
-            self.assertEqual(cid.reference_score(row, "exe", "m0", "m1"), [42.5, 9.25])
+        with mock.patch.object(cid.subprocess, "run",
+                               return_value=SimpleNamespace(
+                                   returncode=0,
+                                   stdout="frame,v0,v1\n0,42.5,9.25\n",
+                                   stderr="")):
+            self.assertEqual(
+                cid.reference_score(row, "exe", "m0", "m1"), [42.5, 9.25]
+            )
         for output in ("frame,v0,v1\n0,nan,2\n", "frame,v0,v1\n0,1,2\n1,3,4\n"):
             with (mock.patch.object(cid.subprocess, "run",
                                     return_value=SimpleNamespace(returncode=0,
@@ -200,7 +233,8 @@ class VmafCid22Tests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             raw = root / "picture.yuv"
-            payload = np.array([64, 255, 512, 940, 960, 1023], dtype="<u2").tobytes()
+            payload = np.array([64, 255, 512, 940, 960, 1023],
+                               dtype="<u2").tobytes()
             raw.write_bytes(payload)
             target = Path(cid.write_y4m(str(raw), root, 2, 1))
             header = b"YUV4MPEG2 W2 H1 F1:1 Ip A0:0 C444p10\nFRAME\n"
@@ -232,8 +266,9 @@ class VmafCid22Tests(unittest.TestCase):
                 }
             ]
             response = SimpleNamespace(returncode=0, stdout="42.5\n", stderr="")
-            with mock.patch.object(cid, "ROOT", root), \
-                    mock.patch.object(cid.subprocess, "run", return_value=response) as run:
+            with (mock.patch.object(cid, "ROOT", root),
+                  mock.patch.object(cid.subprocess, "run",
+                                    return_value=response) as run):
                 self.assertEqual(cid.vqm_scores(rows, output, 1, "v1"), [42.5])
                 argv = run.call_args.args[0]
                 self.assertEqual(argv[argv.index("--metric") + 1], "vmaf-v1")

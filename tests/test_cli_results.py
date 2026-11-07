@@ -1,5 +1,5 @@
 # Copyright (c) 2026 VQM contributors. BSD-3-Clause; see LICENSE.
-"""Keep incomplete CLI frame evidence out of validation and benchmark reports."""
+"""Reject incomplete CLI frame evidence in validation reports."""
 
 import argparse
 import copy
@@ -12,7 +12,8 @@ from pathlib import Path
 from unittest import mock
 
 from validation.temporal import run as temporal_run
-from validation.temporal.cli_results import FEATURE_COUNTS, validate_cli_result
+from validation.temporal.cli_results import FEATURE_COUNTS
+from validation.temporal.cli_results import validate_cli_result
 
 
 def _result(metric: str = "ssimulacra2") -> dict[str, object]:
@@ -48,9 +49,9 @@ class CliResultTests(unittest.TestCase):
         """Missing, nonnumeric and inconsistent scalar fields cannot qualify."""
         cases = (
             ("score", True), ("score", "80"), ("score", float("nan")),
-            ("score", 10**400), ("frames", 3.0), ("frames", True), ("frames", 2),
-            ("sample_id", "other"), ("metric", "cvvdp"), ("core_seconds", 0),
-            ("core_seconds", "1"), ("decode_seconds", -1),
+            ("score", 10**400), ("frames", 3.0), ("frames", True),
+            ("frames", 2), ("sample_id", "other"), ("metric", "cvvdp"),
+            ("core_seconds", 0), ("core_seconds", "1"), ("decode_seconds", -1),
             ("decode_seconds", float("inf")), ("frame_results",
                                                None), ("frame_results", [])
         )
@@ -62,11 +63,12 @@ class CliResultTests(unittest.TestCase):
                 validate_cli_result(value, "ssimulacra2", "clip", 3)
 
     def test_frame_indices_features_and_mean_are_required(self) -> None:
-        """A correct declared count cannot conceal reordered or malformed frames."""
+        """Reject malformed or reordered frames despite matching counts."""
         cases = (
-            ("index", 2), ("index", True), ("score", float("inf")), ("score", "80"),
-            ("score", 79.0), ("features", []), ("features", [1.0] * 5 + [float("nan")]),
-            ("features", [1.0] * 5 + [True])
+            ("index", 2), ("index", True), ("score", float("inf")),
+            ("score", "80"), ("score", 79.0), ("features", []),
+            ("features",
+             [1.0] * 5 + [float("nan")]), ("features", [1.0] * 5 + [True])
         )
         for field, invalid in cases:
             value = _result("vmaf-v0")
@@ -90,15 +92,16 @@ class CandidateOutputTests(unittest.TestCase):
         """The direct bootstrap command can inspect its plan before setup."""
         script = Path(__file__).resolve().parents[1] / "bench/video.py"
         result = subprocess.run(
-            [sys.executable, "-I", "-S",
-             str(script), "--dry-run", "--rounds", "1"], capture_output=True, text=True,
-            check=False, timeout=10
+            [
+                sys.executable, "-I", "-S",
+                str(script), "--dry-run", "--rounds", "1"
+            ], capture_output=True, text=True, check=False, timeout=10
         )
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("validation.temporal.run", result.stdout)
 
     def test_complete_frame_evidence_is_required_before_agreement(self) -> None:
-        """A successful process with incomplete stdout cannot create timing evidence."""
+        """Reject timing evidence from incomplete successful stdout."""
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             rows = [
@@ -154,11 +157,13 @@ class CandidateOutputTests(unittest.TestCase):
         completed = subprocess.CompletedProcess(
             [], 0, stdout=json.dumps(payload) + "\n", stderr=""
         )
-        with mock.patch.object(temporal_run.subprocess, "run", return_value=completed):
+        with mock.patch.object(temporal_run.subprocess, "run",
+                               return_value=completed):
             if accepted:
                 observed = temporal_run.candidate_scores(rows, "vmaf-v0", args)
                 self.assertEqual(observed, [payload])
                 return
-            with self.assertRaisesRegex(RuntimeError, "incomplete frame results"):
+            with self.assertRaisesRegex(RuntimeError,
+                                        "incomplete frame results"):
                 temporal_run.candidate_scores(rows, "vmaf-v0", args)
             self.assertFalse((args.out_dir / "vmaf-v0-timing.json").exists())

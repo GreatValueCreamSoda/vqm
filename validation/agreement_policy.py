@@ -4,7 +4,8 @@
 
 import math
 import re
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 
@@ -16,12 +17,15 @@ def mapping(value: object, name: str) -> dict[str, object]:
     :returns: A shallow dictionary copy.
     :raises ValueError: If the value is not a string-keyed mapping.
     """
-    if not isinstance(value, Mapping) or any(not isinstance(key, str) for key in value):
+    if not isinstance(value, Mapping) or any(not isinstance(key, str)
+                                             for key in value):
         raise ValueError(f"{name} must be an object with string keys")
     return dict(value)
 
 
-def _keys(values: Mapping[str, object], required: set[str], optional: set[str]) -> None:
+def _keys(
+    values: Mapping[str, object], required: set[str], optional: set[str]
+) -> None:
     missing = required - values.keys()
     unknown = values.keys() - required - optional
     if missing or unknown:
@@ -58,7 +62,8 @@ def _number(values: Mapping[str, object], key: str, default: float) -> float:
 
 
 def _bounded(
-    values: Mapping[str, object], key: str, default: float, low: float, high: float
+    values: Mapping[str, object], key: str, default: float, low: float,
+    high: float
 ) -> float:
     value = _number(values, key, default)
     if not low <= value <= high:
@@ -112,9 +117,10 @@ class ScoreSample:
         mos = None if "mos" not in values else _number(values, "mos", 0)
         return cls(
             text_field(values, "sample_id"), text_field(values, "source_id"),
-            text_field(values, "configuration_id"), text_field(values, "stratum"),
-            text_field(values, "distortion_family"), _hash(values, "input_hash"),
-            _number(values, "score", 0), mos
+            text_field(values,
+                       "configuration_id"), text_field(values, "stratum"),
+            text_field(values, "distortion_family"),
+            _hash(values, "input_hash"), _number(values, "score", 0), mos
         )
 
 
@@ -209,7 +215,8 @@ class Coverage:
         values = mapping(value, "coverage")
         _keys(values, set(), set(cls.__dataclass_fields__))
         return cls(
-            _integer(values, "min_sources", 2), _integer(values, "min_samples", 4),
+            _integer(values, "min_sources", 2),
+            _integer(values, "min_samples", 4),
             _integer(values, "min_eligible_pairs", 2),
             _bounded(values, "min_eligible_fraction", .1, 0, 1)
         )
@@ -227,7 +234,7 @@ class SubjectivePolicy:
 
     @classmethod
     def parse(cls, value: object) -> "SubjectivePolicy":
-        """Validate subjective settings without allowing frame-level resampling.
+        """Validate subjective settings and forbid frame-level resampling.
 
         :param value: Settings mapping.
         :returns: Validated settings.
@@ -241,7 +248,8 @@ class SubjectivePolicy:
         return cls(
             required, _bounded(values, "margin", .005, 0, 2),
             _integer(values, "min_sources", 30, 2),
-            _integer(values, "resamples", 10000, 100), _integer(values, "seed", 0, 0)
+            _integer(values, "resamples", 10000, 100),
+            _integer(values, "seed", 0, 0)
         )
 
 
@@ -279,9 +287,10 @@ class AgreementPolicy:
                 "schema_version", "metric", "reference_revision", "margins",
                 "required_strata"
             }, {
-                "coverage", "limits", "subjective", "direction", "mos_direction",
-                "numerical_max", "numerical_mean", "min_total_sources",
-                "min_total_samples", "configuration_hash", "input_manifest_hash"
+                "coverage", "limits", "subjective", "direction",
+                "mos_direction", "numerical_max", "numerical_mean",
+                "min_total_sources", "min_total_samples", "configuration_hash",
+                "input_manifest_hash"
             }
         )
         if (not isinstance(values["schema_version"], int)
@@ -293,14 +302,15 @@ class AgreementPolicy:
         if not strata:
             raise ValueError("required_strata must not be empty")
         return cls(
-            text_field(values, "metric"), text_field(values, "reference_revision"),
-            margins, {
+            text_field(values, "metric"),
+            text_field(values, "reference_revision"), margins, {
                 name: Coverage.parse(raw)
                 for name, raw in strata.items()
             }, Coverage.parse(values.get("coverage", {})),
             Limits.parse(values.get("limits", {})),
             SubjectivePolicy.parse(values.get("subjective", {})),
-            _direction(values, "direction"), _direction(values, "mos_direction"),
+            _direction(values, "direction"),
+            _direction(values, "mos_direction"),
             _optional_nonnegative(values, "numerical_max"),
             _optional_nonnegative(values, "numerical_mean"),
             _integer(values, "min_total_sources", 2),
@@ -319,7 +329,9 @@ def _direction(values: Mapping[str, object], key: str) -> str:
     return str(result)
 
 
-def _optional_nonnegative(values: Mapping[str, object], key: str) -> float | None:
+def _optional_nonnegative(
+    values: Mapping[str, object], key: str
+) -> float | None:
     if key not in values:
         return None
     return _bounded(values, key, 0, 0, float("inf"))
@@ -338,11 +350,13 @@ def report_from_rows(
 ) -> dict[str, object]:
     """Build and validate a canonical report without inventing provenance.
 
-    :param rows: Canonical sample dictionaries, including input hashes and scores.
+    :param rows: Canonical sample dictionaries, including input hashes and
+        scores.
     :param metric: Metric/model identity shared with the policy.
     :param implementation: Implementation name.
     :param revision: Exact implementation revision or fingerprint.
-    :param configuration_hash: SHA-256 of resolved input/metric/decoder settings.
+    :param configuration_hash: SHA-256 of resolved input/metric/decoder
+        settings.
     :param input_manifest_hash: SHA-256 of the frozen input manifest.
     :returns: A validated JSON-compatible report dictionary.
     :raises ValueError: If any supplied field or sample is invalid.

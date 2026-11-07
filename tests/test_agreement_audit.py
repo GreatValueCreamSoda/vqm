@@ -11,19 +11,27 @@ from contextlib import redirect_stdout
 from pathlib import Path
 
 from validation.agreement import report_from_rows
-from validation.temporal.audit import main, run_audit
+from validation.temporal.audit import main
+from validation.temporal.audit import run_audit
 
 
 def _report() -> dict[str, object]:
     rows = [
         {
-            "sample_id": f"source-{source}/sample-{severity}",
-            "source_id": f"source-{source}",
-            "configuration_id": "standard",
-            "stratum": "native",
-            "distortion_family": "noise",
-            "input_hash": hashlib.sha256(f"{source}/{severity}".encode()).hexdigest(),
-            "score": float(1 + source * 10 + severity)
+            "sample_id":
+            f"source-{source}/sample-{severity}",
+            "source_id":
+            f"source-{source}",
+            "configuration_id":
+            "standard",
+            "stratum":
+            "native",
+            "distortion_family":
+            "noise",
+            "input_hash":
+            hashlib.sha256(f"{source}/{severity}".encode()).hexdigest(),
+            "score":
+            float(1 + source * 10 + severity)
         } for source in range(3) for severity in range(4)
     ]
     return report_from_rows(
@@ -49,10 +57,10 @@ def _policy() -> dict[str, object]:
 
 
 class AgreementAuditTests(unittest.TestCase):
-    """Verify mutation expectations, failure reporting and portable audit artifacts."""
+    """Verify mutations, failure reporting and portable audit artifacts."""
 
     def test_remaps_pass_and_wrong_associations_fail(self) -> None:
-        """A common score offset and nonlinear scale survive the ranking policy."""
+        """Accept common offsets and nonlinear scales under ranking."""
         report = _report()
         before = json.dumps(report, sort_keys=True)
         result = run_audit(report, _policy())
@@ -67,7 +75,7 @@ class AgreementAuditTests(unittest.TestCase):
         self.assertEqual(json.dumps(report, sort_keys=True), before)
 
     def test_a_missed_fault_is_an_explicit_discrepancy(self) -> None:
-        """An overly permissive policy cannot mark its own sensitivity audit passed."""
+        """Reject sensitivity audits with overly permissive policies."""
         policy = _policy()
         policy["limits"] = {
             "srcc_min": 0,
@@ -79,22 +87,28 @@ class AgreementAuditTests(unittest.TestCase):
         result = run_audit(_report(), policy)
         self.assertFalse(result["passed"])
         self.assertTrue(
-            any("rotated-association" in item for item in result["discrepancies"])
+            any(
+                "rotated-association" in item
+                for item in result["discrepancies"]
+            )
         )
 
     def test_numerical_remapping_failure_is_not_assumed(self) -> None:
-        """Large old tolerances remain visible without changing ranking expectations."""
+        """Show old tolerances without changing ranking expectations."""
         policy = {**_policy(), "numerical_max": 1e6, "numerical_mean": 1e6}
         result = run_audit(_report(), policy)
         self.assertTrue(result["passed"])
-        self.assertTrue(all(row["numerical"] == "pass" for row in result["audits"]))
+        self.assertTrue(
+            all(row["numerical"] == "pass" for row in result["audits"])
+        )
 
     def test_cli_writes_hashes_and_all_mutation_statuses(self) -> None:
-        """The standalone artifact identifies the exact original and policy files."""
+        """Identify exact original and policy files in audit artifacts."""
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             original, policy, output = (
-                root / name for name in ("original.json", "policy.json", "audit.json")
+                root / name
+                for name in ("original.json", "policy.json", "audit.json")
             )
             original.write_text(json.dumps(_report()))
             policy.write_text(json.dumps(_policy()))

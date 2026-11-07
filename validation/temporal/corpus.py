@@ -1,4 +1,4 @@
-"""Prepare byte-identical temporal inputs and deterministic distortion variants."""
+"""Prepare byte-identical inputs and deterministic distortion variants."""
 
 from __future__ import annotations
 
@@ -11,7 +11,9 @@ from typing import BinaryIO
 import numpy as np
 from numpy.typing import NDArray
 
-from .fetch import Source, load_manifest, select_sources
+from .fetch import Source
+from .fetch import load_manifest
+from .fetch import select_sources
 
 ROOT = Path(__file__).resolve().parents[2]
 MANIFEST = Path(__file__).with_name("sources.json")
@@ -28,13 +30,13 @@ class Variant:
 
 
 VARIANTS = (
-    Variant("quantize8", "quantization", 8), Variant("quantize32", "quantization", 32),
-    Variant("flicker8", "flicker", 8), Variant("flicker24", "flicker",
-                                               24), Variant("flicker64", "flicker", 64),
-    Variant("flicker96", "flicker", 96), Variant("freeze3", "freeze",
-                                                 3), Variant("freeze8", "freeze", 8),
-    Variant("pulse12", "impulse", 12), Variant("pulse32", "impulse",
-                                               32), Variant("pulse64", "impulse", 64),
+    Variant("quantize8", "quantization",
+            8), Variant("quantize32", "quantization",
+                        32), Variant("flicker8", "flicker", 8),
+    Variant("flicker24", "flicker", 24), Variant("flicker64", "flicker", 64),
+    Variant("flicker96", "flicker", 96), Variant("freeze3", "freeze", 3),
+    Variant("freeze8", "freeze", 8), Variant("pulse12", "impulse", 12),
+    Variant("pulse32", "impulse", 32), Variant("pulse64", "impulse", 64),
     Variant("pulse128", "impulse", 128), Variant("pulse224", "impulse", 224),
 )
 SMOKE_SOURCES = "foreman_cif,bus_cif,mobile_cif"
@@ -74,12 +76,17 @@ def read_source(source: Source, directory: Path, frames: int) -> ByteArray:
     :raises ValueError: If source bytes or framing differ from the pin.
     """
     path = directory / source.filename
-    if not source.chroma.startswith("420") or source.width % 2 or source.height % 2:
-        raise ValueError("temporal preparation requires even 8-bit YUV420 sources")
+    if not source.chroma.startswith("420"
+                                    ) or source.width % 2 or source.height % 2:
+        raise ValueError(
+            "temporal preparation requires even 8-bit YUV420 sources"
+        )
     if not 1 <= frames <= source.frames:
         raise ValueError("requested frame count exceeds the pinned prefix")
     if digest(path) != source.sha256:
-        raise ValueError(f"{path}: source checksum mismatch; run temporal.fetch")
+        raise ValueError(
+            f"{path}: source checksum mismatch; run temporal.fetch"
+        )
     size = source.width * source.height * 3 // 2
     values = []
     with path.open("rb") as stream:
@@ -184,8 +191,8 @@ def write_clip(path: Path, values: ByteArray, source: Source) -> dict[str, str]:
 
 
 def prepare_source(
-    source: Source, download: Path, cache: Path, frames: int, variants: tuple[Variant,
-                                                                              ...]
+    source: Source, download: Path, cache: Path, frames: int,
+    variants: tuple[Variant, ...]
 ) -> list[dict[str, object]]:
     """Prepare all requested variants of one verified source.
 
@@ -207,7 +214,8 @@ def prepare_source(
     for variant in variants:
         target = directory / (variant.name + ".y4m")
         hashes = write_clip(
-            target, distort(values, variant, source.width * source.height), source
+            target, distort(values, variant, source.width * source.height),
+            source
         )
         rows.append(
             {
@@ -251,12 +259,13 @@ def prepare(
     download: Path, cache: Path, profile: str, only: str | None = None,
     manifest: Path = MANIFEST
 ) -> list[dict[str, object]]:
-    """Prepare a reproducible smoke or full hosted-video qualification corpus.
+    """Prepare a reproducible smoke or full qualification corpus.
 
     :param download: Verified original prefixes.
     :param cache: Disposable derived corpus destination.
     :param profile: Either smoke or qualification.
-    :param only: Optional source IDs; qualification still requires full coverage.
+    :param only: Optional source IDs; qualification still requires full
+        coverage.
     :param manifest: Pinned source manifest.
     :returns: Prepared clip-pair records.
     :raises ValueError: If the profile or requested sources are invalid.
@@ -276,7 +285,7 @@ def prepare(
 
 
 def verify_inputs(rows: list[dict[str, object]]) -> None:
-    """Reject prepared media changed between reference and candidate execution.
+    """Reject media changed between reference and candidate execution.
 
     :param rows: Prepared clip records with expected representation hashes.
     :raises ValueError: If any prepared file no longer matches its fingerprint.
@@ -286,7 +295,9 @@ def verify_inputs(rows: list[dict[str, object]]) -> None:
         files.update(_clip_hashes(row))
     for path, expected in files.items():
         if digest(path) != expected:
-            raise ValueError(f"{path}: prepared input changed during validation")
+            raise ValueError(
+                f"{path}: prepared input changed during validation"
+            )
 
 
 def _clip_hashes(row: dict[str, object]) -> dict[Path, str]:

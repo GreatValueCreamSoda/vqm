@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Copyright (c) 2026 VQM contributors. BSD-3-Clause; see LICENSE.
-"""Challenge a frozen ranking policy with explicit conceptual score mutations.
+"""Challenge a frozen ranking policy with conceptual score mutations.
 
 These mutations operate on recorded original score vectors, not on production
 GPU implementations. Temporal ingestion and history faults require independent
@@ -13,10 +13,13 @@ import hashlib
 import json
 import sys
 from collections import defaultdict
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable
+from collections.abc import Mapping
+from collections.abc import Sequence
 from pathlib import Path
 
-from ..agreement import evaluate_agreement, load_report
+from ..agreement import evaluate_agreement
+from ..agreement import load_report
 
 
 def _candidate(reference: Mapping[str, object], name: str) -> dict[str, object]:
@@ -27,7 +30,8 @@ def _candidate(reference: Mapping[str, object], name: str) -> dict[str, object]:
 
 
 def _mapped(
-    reference: Mapping[str, object], name: str, transform: Callable[[float], float]
+    reference: Mapping[str, object], name: str, transform: Callable[[float],
+                                                                    float]
 ) -> dict[str, object]:
     result = _candidate(reference, name)
     for sample in result["samples"]:
@@ -57,11 +61,12 @@ def _mutations(
     if span <= 0:
         raise ValueError("mutation audit requires varying original scores")
     transforms = (
-        ("identity", "pass",
-         lambda score: score), ("offset-plus-three", "pass", lambda score: score + 3),
-        ("positive-scale-quarter", "pass", lambda score: score * .25),
-        ("increasing-cube", "pass", lambda score:
-         (1 + (score - minimum) / span)**3), ("reversed", "fail", lambda score: -score),
+        ("identity", "pass", lambda score: score),
+        ("offset-plus-three", "pass", lambda score: score + 3),
+        ("positive-scale-quarter", "pass", lambda score: score * .25), (
+            "increasing-cube", "pass", lambda score:
+            (1 + (score - minimum) / span)**3
+        ), ("reversed", "fail", lambda score: -score),
         ("constant-collapse", "fail", lambda _: minimum),
     )
     results = [
@@ -71,8 +76,8 @@ def _mutations(
     return [*results, ("rotated-association", "fail", _rotated(reference))]
 
 
-def _summary(name: str, expected: str, evidence: Mapping[str,
-                                                         object]) -> dict[str, object]:
+def _summary(name: str, expected: str,
+             evidence: Mapping[str, object]) -> dict[str, object]:
     ranking = evidence["ranking"]
     numerical = evidence["numerical"]
     return {
@@ -93,29 +98,34 @@ def _summary(name: str, expected: str, evidence: Mapping[str,
 
 def run_audit(reference: Mapping[str, object],
               policy: Mapping[str, object]) -> dict[str, object]:
-    """Check harmless remappings and disruptive associations against one frozen policy.
+    """Check remappings and disrupted associations against a frozen policy.
 
     Numerical gates remain visible but their failure is not presumed: a policy
     may intentionally allow a large numerical range. Ranking behavior determines
     whether this mutation audit passes.
 
     :param reference: Complete canonical original score report.
-    :param policy: Frozen agreement policy, including original input/configuration pins.
+    :param policy: Frozen agreement policy, including original
+        input/configuration pins.
     :returns: Compact gate evidence and every unexpected ranking outcome.
     :raises ValueError: If original evidence, provenance or policy is invalid.
     """
     evaluate_agreement(reference, reference, policy)
     results = [
-        _summary(name, expected, evaluate_agreement(reference, candidate, policy))
-        for name, expected, candidate in _mutations(reference)
+        _summary(
+            name, expected, evaluate_agreement(reference, candidate, policy)
+        ) for name, expected, candidate in _mutations(reference)
     ]
     discrepancies = [
-        f"{row['mutation']}: expected {row['expected_ranking']}, got {row['ranking']}"
-        for row in results if row["ranking"] != row["expected_ranking"]
+        (
+            f"{row['mutation']}: expected {row['expected_ranking']}, got "
+            f"{row['ranking']}"
+        ) for row in results if row["ranking"] != row["expected_ranking"]
     ]
     return {
         "schema_version": 1,
-        "scope": "conceptual recorded-score mutations; no production fault injection",
+        "scope":
+        "conceptual recorded-score mutations; no production fault injection",
         "metric": reference["metric"],
         "reference_revision": reference["revision"],
         "input_manifest_hash": reference["input_manifest_hash"],
@@ -139,26 +149,30 @@ def main(argv: Sequence[str] | None = None) -> int:
     """Run a standalone policy sensitivity audit on checked score evidence.
 
     :param argv: Command-line arguments, or None for sys.argv.
-    :returns: Zero for expected behavior, one for a missed mutation, two for invalid inputs.
+    :returns: Zero for expected behavior, one for a missed mutation, two for
+        invalid inputs.
     """
     args = _arguments(argv)
     try:
         reference = load_report(args.reference)
         policy = json.loads(args.policy.read_text(encoding="utf-8"))
         result = run_audit(reference, policy)
-        result["reference_report_sha256"] = hashlib.sha256(args.reference.read_bytes()
-                                                           ).hexdigest()
+        result["reference_report_sha256"] = hashlib.sha256(
+            args.reference.read_bytes()
+        ).hexdigest()
         result["policy_file_sha256"] = hashlib.sha256(args.policy.read_bytes()
                                                       ).hexdigest()
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(
-            json.dumps(result, indent=2, allow_nan=False) + "\n", encoding="utf-8"
+            json.dumps(result, indent=2, allow_nan=False) + "\n",
+            encoding="utf-8"
         )
     except (OSError, ValueError, TypeError) as error:
         print(f"temporal policy audit: {error}", file=sys.stderr)
         return 2
     print(
-        f"{result['metric']}: temporal policy mutation audit {'PASS' if result['passed'] else 'FAIL'}"
+        f"{result['metric']}: temporal policy mutation audit "
+        f"{'PASS' if result['passed'] else 'FAIL'}"
     )
     for discrepancy in result["discrepancies"]:
         print(discrepancy)

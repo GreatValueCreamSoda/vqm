@@ -12,11 +12,13 @@ import csv
 import math
 import os
 import subprocess
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable
+from collections.abc import Sequence
 from pathlib import Path
 
 import numpy as np
-from numpy.typing import ArrayLike, NDArray
+from numpy.typing import ArrayLike
+from numpy.typing import NDArray
 
 Pair = tuple[str, str]
 ScoreResult = tuple[float | None, str | None]
@@ -104,7 +106,9 @@ def run_score(
     if not any("{original}" in part for part in command):
         argv += [original, distorted]
     try:
-        result = subprocess.run(argv, capture_output=True, text=True, timeout=timeout)
+        result = subprocess.run(
+            argv, capture_output=True, text=True, timeout=timeout
+        )
     except subprocess.TimeoutExpired:
         return None, f"timeout after {timeout}s"
     except OSError as error:
@@ -114,8 +118,10 @@ def run_score(
     try:
         return parse_score(result.stdout, score_line), None
     except ValueError as error:
-        return None, (f"unparsable output: {error}: "
-                      f"{result.stdout.strip()[:200]}")
+        return None, (
+            f"unparsable output: {error}: "
+            f"{result.stdout.strip()[:200]}"
+        )
 
 
 def rankdata(values: ArrayLike) -> NDArray[np.float64]:
@@ -208,4 +214,7 @@ def correlation_triple(scores: ArrayLike,
     :param mcos: Subjective values in matching corpus pair order.
     :returns: Kendall tau-b, Spearman and Pearson correlations.
     """
-    return (kendall_tau_b(scores, mcos), spearman(scores, mcos), pearson(scores, mcos))
+    return (
+        kendall_tau_b(scores, mcos), spearman(scores,
+                                              mcos), pearson(scores, mcos)
+    )

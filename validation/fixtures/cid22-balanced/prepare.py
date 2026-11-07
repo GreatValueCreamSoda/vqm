@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Copyright (c) 2026 VQM contributors. BSD-3-Clause; see LICENSE.
-"""Verify the frozen CID22 ranking subset and create a cache of source symlinks.
+"""Verify the frozen CID22 ranking subset and cache source symlinks.
 
 The original corpus remains untouched. Every selected source must match the
 raw-file fingerprints in the retained independent original reports. No metric
@@ -35,7 +35,8 @@ def _digest_json(value: object) -> str:
 
 def _read_pairs() -> list[tuple[str, str]]:
     """Read the maintained balanced subset and reject unsafe relative paths."""
-    with (FIXTURE / "subset-mcos.csv").open(newline="", encoding="utf-8") as handle:
+    with (FIXTURE / "subset-mcos.csv").open(newline="",
+                                            encoding="utf-8") as handle:
         pairs = [
             (row["reference_img"], row["distorted_img"])
             for row in csv.DictReader(handle)
@@ -50,37 +51,50 @@ def _read_pairs() -> list[tuple[str, str]]:
 
 
 def _check_annotations(data_root: Path) -> dict[str, object]:
-    """Require the exact authoritative annotations and promoted subset membership."""
-    selection = json.loads((FIXTURE / "selection.json").read_text(encoding="utf-8"))
+    """Require exact annotations and promoted subset membership."""
+    selection = json.loads(
+        (FIXTURE / "selection.json").read_text(encoding="utf-8")
+    )
     full = data_root / "CID22_validation_set.csv"
     if _digest_file(full) != selection["mcos_sha256"]:
-        raise ValueError(f"authoritative CID22 annotation SHA-256 mismatch: {full}")
-    if _digest_file(FIXTURE / "subset-mcos.csv") != selection["subset_csv_sha256"]:
-        raise ValueError("maintained subset CSV differs from the frozen selection")
+        raise ValueError(
+            f"authoritative CID22 annotation SHA-256 mismatch: {full}"
+        )
+    if _digest_file(FIXTURE / "subset-mcos.csv"
+                    ) != selection["subset_csv_sha256"]:
+        raise ValueError(
+            "maintained subset CSV differs from the frozen selection"
+        )
     return selection
 
 
 def _check_expected_sample(
     expected: dict[str, object], pair: tuple[str, str], hashes: dict[str, str]
 ) -> None:
-    """Verify both pair membership and raw-file content against an independent report."""
+    """Verify pair membership and bytes against an independent report."""
     original, distorted = pair
     if expected["source_id"] != hashes[original]:
         raise ValueError(f"raw original SHA-256 mismatch: {original}")
-    if expected["input_hash"] != _digest_json([hashes[original], hashes[distorted]]):
+    if expected["input_hash"] != _digest_json([hashes[original],
+                                               hashes[distorted]]):
         raise ValueError(f"raw pair SHA-256 mismatch: {original}, {distorted}")
 
 
 def _check_report(
     metric: str, pairs: list[tuple[str, str]], hashes: dict[str, str]
 ) -> None:
-    """Verify that each retained original arm describes the complete selected corpus."""
+    """Verify original arms cover the complete selected corpus."""
     report = json.loads(
         (FIXTURE / f"{metric}-original.json").read_text(encoding="utf-8")
     )
-    policy = json.loads((FIXTURE / f"{metric}-policy.json").read_text(encoding="utf-8"))
-    if report["metric"] != metric or report["revision"] != policy["reference_revision"]:
-        raise ValueError(f"{metric}: retained original identity or pin mismatch")
+    policy = json.loads(
+        (FIXTURE / f"{metric}-policy.json").read_text(encoding="utf-8")
+    )
+    if report["metric"] != metric or report["revision"] != policy[
+            "reference_revision"]:
+        raise ValueError(
+            f"{metric}: retained original identity or pin mismatch"
+        )
     expected = {sample["sample_id"]: sample for sample in report["samples"]}
     actual = {_digest_json(list(pair)): pair for pair in pairs}
     if expected.keys() != actual.keys():
@@ -90,7 +104,7 @@ def _check_report(
 
 
 def verify_inputs(data_root: Path) -> list[str]:
-    """Verify annotations, fixed source membership and every original/distorted byte.
+    """Verify annotations, source membership and all corpus bytes.
 
     :param data_root: Existing full CID22 validation corpus.
     :returns: Sorted relative paths needed by the frozen source-balanced subset.
@@ -101,7 +115,9 @@ def verify_inputs(data_root: Path) -> list[str]:
     pairs = _read_pairs()
     sources = {Path(original).stem for original, _ in pairs}
     if sources != set(selection["sources"]):
-        raise ValueError("subset original sources differ from the frozen selection")
+        raise ValueError(
+            "subset original sources differ from the frozen selection"
+        )
     paths = sorted({name for pair in pairs for name in pair})
     hashes = {name: _digest_file(data_root / name) for name in paths}
     for metric in ("ssimulacra2", "butteraugli"):
@@ -110,17 +126,19 @@ def verify_inputs(data_root: Path) -> list[str]:
 
 
 def _link_source(original: Path, destination: Path) -> None:
-    """Reuse an existing matching symlink while preserving every conflicting file."""
+    """Reuse matching symlinks and preserve conflicting files."""
     if destination.is_symlink() and destination.resolve() == original.resolve():
         return
     if destination.exists() or destination.is_symlink():
-        raise ValueError(f"preserve existing conflicting subset path: {destination}")
+        raise ValueError(
+            f"preserve existing conflicting subset path: {destination}"
+        )
     destination.parent.mkdir(parents=True, exist_ok=True)
     destination.symlink_to(original.resolve())
 
 
 def _prepare_inputs(args: argparse.Namespace) -> list[str]:
-    """Validate the entire corpus selection before creating any generated links."""
+    """Validate all corpus selections before creating generated links."""
     paths = verify_inputs(args.data_root)
     if args.check:
         return paths
@@ -130,17 +148,20 @@ def _prepare_inputs(args: argparse.Namespace) -> list[str]:
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Prepare the exact measured subset without copying or changing corpus media.
+    """Prepare the measured subset without copying or changing media.
 
     :param argv: Arguments, or None for process arguments.
-    :returns: Zero for verified/prepared inputs, one for an unavailable/mismatched input.
+    :returns: Zero for verified/prepared inputs, one for an
+        unavailable/mismatched input.
     """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--data-root", type=Path, default=ROOT / "validation/data/CID22_validation_set"
+        "--data-root", type=Path,
+        default=ROOT / "validation/data/CID22_validation_set"
     )
     parser.add_argument(
-        "--output-dir", type=Path, default=ROOT / ".cache/validation/cid22-balanced"
+        "--output-dir", type=Path,
+        default=ROOT / ".cache/validation/cid22-balanced"
     )
     parser.add_argument(
         "--check", action="store_true",

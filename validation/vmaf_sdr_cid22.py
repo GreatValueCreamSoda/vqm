@@ -25,13 +25,24 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
+if __package__ in (None, ""):
+    # Keep direct script invocation compatible with package imports.
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 import numpy as np
-import vmaf_cid22
-from common import Pair, correlation_triple, enumerate_pairs, load_mcos
-from numpy.typing import ArrayLike, NDArray
+from numpy.typing import ArrayLike
+from numpy.typing import NDArray
 from PIL import Image
 from PIL import __version__ as pillow_version
-from vmaf_cid22 import ConvertedFrame, CorpusRow, VmafPaths
+
+from validation import vmaf_cid22
+from validation.common import Pair
+from validation.common import correlation_triple
+from validation.common import enumerate_pairs
+from validation.common import load_mcos
+from validation.vmaf_cid22 import ConvertedFrame
+from validation.vmaf_cid22 import CorpusRow
+from validation.vmaf_cid22 import VmafPaths
 
 ROOT = vmaf_cid22.ROOT
 LEGACY_CONVERSION = vmaf_cid22.CONVERSION
@@ -48,11 +59,14 @@ def convert_rgb(rgb: NDArray[np.uint8] | NDArray[np.uint16]) -> bytes:
     :returns: Planar little-endian YUV444P16 bytes.
     :raises ValueError: If the input is not an RGB8 or RGB16 image.
     """
-    if rgb.ndim != 3 or rgb.shape[2] != 3 or rgb.dtype not in (np.uint8, np.uint16):
+    if rgb.ndim != 3 or rgb.shape[2] != 3 or rgb.dtype not in (np.uint8,
+                                                               np.uint16):
         raise ValueError("expected RGB8 or RGB16 image")
     maximum = 255.0 if rgb.dtype == np.uint8 else 65535.0
     srgb = rgb.astype(np.float64) / maximum
-    linear = np.where(srgb <= 0.04045, srgb / 12.92, ((srgb + 0.055) / 1.055)**2.4)
+    linear = np.where(
+        srgb <= 0.04045, srgb / 12.92, ((srgb + 0.055) / 1.055)**2.4
+    )
     encoded = np.maximum(linear, 0.0)**(1.0 / 2.4)
     red, green, blue = (encoded[:, :, i] for i in range(3))
     y = 0.2126 * red + 0.7152 * green + 0.0722 * blue
@@ -83,11 +97,14 @@ def _decode_png16(path: Path, width: int, height: int,
             f"{path}: ffmpeg is required to preserve 16-bit PNG samples"
         ) from error
     if result.returncode:
-        raise RuntimeError(f"{path}: ffmpeg: {result.stderr.decode(errors='replace')}")
+        raise RuntimeError(
+            f"{path}: ffmpeg: {result.stderr.decode(errors='replace')}"
+        )
     channels = 4 if has_alpha else 3
     if len(result.stdout) != width * height * channels * 2:
         raise ValueError(f"{path}: incorrect RGB16 decoded frame length")
-    samples = np.frombuffer(result.stdout, dtype="<u2").reshape(height, width, channels)
+    samples = np.frombuffer(result.stdout,
+                            dtype="<u2").reshape(height, width, channels)
     if has_alpha and np.any(samples[:, :, 3] != 65535):
         raise ValueError(f"{path}: non-opaque alpha is unsupported")
     return samples[:, :, :3]
@@ -104,7 +121,8 @@ def read_source(path: Path) -> NDArray[np.uint8] | NDArray[np.uint16]:
     with path.open("rb") as source:
         header = source.read(29)
     png16 = (
-        len(header) == 29 and header[:8] == b"\x89PNG\r\n\x1a\n" and header[24] == 16
+        len(header) == 29 and header[:8] == b"\x89PNG\r\n\x1a\n"
+        and header[24] == 16
     )
     with Image.open(path) as image:
         width, height = image.size
@@ -140,7 +158,8 @@ def convert_file_16(path: Path, cache: Path) -> ConvertedFrame:
     }
 
 
-def _score_rows(reader: csv.DictReader, path: Path, model: str) -> dict[Pair, float]:
+def _score_rows(reader: csv.DictReader, path: Path,
+                model: str) -> dict[Pair, float]:
     values = {}
     if not {"original", "distorted", model}.issubset(reader.fieldnames or []):
         raise ValueError(f"{path}: missing original, distorted or {model}")
@@ -162,7 +181,8 @@ def read_score_csv(path: Path, model: str, pairs: list[Pair]) -> list[float]:
     :param model: Column containing the requested model's scores.
     :param pairs: Selected pairs in output order.
     :returns: One score per selected pair in that order.
-    :raises ValueError: If a pair is missing, duplicated or has an invalid score.
+    :raises ValueError: If a pair is missing, duplicated or has an invalid
+        score.
     """
     with path.open(newline="") as source:
         values = _score_rows(csv.DictReader(source), path, model)
@@ -172,8 +192,9 @@ def read_score_csv(path: Path, model: str, pairs: list[Pair]) -> list[float]:
     return [values[pair] for pair in pairs]
 
 
-def score_rgb(pairs_path: Path, count: int, metric: str, chroma: str,
-              out_dir: Path) -> list[float]:
+def score_rgb(
+    pairs_path: Path, count: int, metric: str, chroma: str, out_dir: Path
+) -> list[float]:
     """Score the RGB pair list with one VQM model and chroma mode.
 
     :param pairs_path: Tab-separated reference and distortion paths.
@@ -190,7 +211,10 @@ def score_rgb(pairs_path: Path, count: int, metric: str, chroma: str,
         "--score-only", "--pairs-file",
         str(pairs_path), "--iterations", "1", "--warmup", "0"
     ]
-    print(f"VQM {metric} {chroma}: scoring {count} independent still pairs", flush=True)
+    print(
+        f"VQM {metric} {chroma}: scoring {count} independent still pairs",
+        flush=True
+    )
     result = subprocess.run(
         command, text=True, capture_output=True, timeout=120 + 2 * count
     )
@@ -209,8 +233,9 @@ def score_rgb(pairs_path: Path, count: int, metric: str, chroma: str,
     return values
 
 
-def reference_score_16(row: CorpusRow, executable: Path, model0: Path,
-                       model1: Path) -> list[float]:
+def reference_score_16(
+    row: CorpusRow, executable: Path, model0: Path, model1: Path
+) -> list[float]:
     """Score one 16-bit pair with both pinned libvmaf models.
 
     :param row: Prepared pair paths and frame dimensions.
@@ -228,7 +253,9 @@ def reference_score_16(row: CorpusRow, executable: Path, model0: Path,
         str(row["height"]), "16",
         str(model1)
     ]
-    result = subprocess.run(command, text=True, capture_output=True, timeout=120)
+    result = subprocess.run(
+        command, text=True, capture_output=True, timeout=120
+    )
     if result.returncode:
         raise RuntimeError(f"{row['distorted']}: {result.stderr.strip()}")
     values = list(csv.DictReader(result.stdout.splitlines()))
@@ -285,7 +312,8 @@ def _verify_baseline_summary(
         raise ValueError(f"{summary_path}: MCOS file hash differs")
     status["mcos_verified"] = True
     if manifest_path.is_file():
-        if summary.get("input_manifest_sha256") != vmaf_cid22.digest(manifest_path):
+        if summary.get("input_manifest_sha256") != vmaf_cid22.digest(
+                manifest_path):
             raise ValueError(f"{summary_path}: input manifest hash differs")
         status["manifest_verified"] = True
 
@@ -294,7 +322,8 @@ def _index_manifest(reader: csv.DictReader,
                     manifest_path: Path) -> dict[Pair, dict[str, str]]:
     manifest = {}
     required = {
-        "original", "distorted", "original_source_sha256", "distorted_source_sha256"
+        "original", "distorted", "original_source_sha256",
+        "distorted_source_sha256"
     }
     if not required.issubset(reader.fieldnames or []):
         raise ValueError(f"{manifest_path}: missing source hash columns")
@@ -312,11 +341,14 @@ def _record_source_hash(
     if not is_sha256(value):
         raise ValueError(f"{manifest_path}: invalid source hash for {path}")
     if path in expected and expected[path] != value:
-        raise ValueError(f"{manifest_path}: conflicting source hashes for {path}")
+        raise ValueError(
+            f"{manifest_path}: conflicting source hashes for {path}"
+        )
     expected[path] = value
 
 
-def _expected_source_hashes(pairs: list[Pair], manifest_path: Path) -> dict[str, str]:
+def _expected_source_hashes(pairs: list[Pair],
+                            manifest_path: Path) -> dict[str, str]:
     with manifest_path.open(newline="") as source:
         manifest = _index_manifest(csv.DictReader(source), manifest_path)
     expected = {}
@@ -331,7 +363,8 @@ def _expected_source_hashes(pairs: list[Pair], manifest_path: Path) -> dict[str,
 
 
 def validate_baseline(
-    baseline_dir: Path, pairs: list[Pair], data_root: Path, mcos_file: Path, jobs: int
+    baseline_dir: Path, pairs: list[Pair], data_root: Path, mcos_file: Path,
+    jobs: int
 ) -> dict[str, bool | int]:
     """Verify available prior manifest and annotation provenance.
 
@@ -340,7 +373,8 @@ def validate_baseline(
     :param data_root: Current CID22 source directory.
     :param mcos_file: Current annotation CSV.
     :param jobs: Concurrent source hashing workers.
-    :returns: Whether annotation and manifest hashes matched and how many sources were checked.
+    :returns: Whether annotation and manifest hashes matched and how many
+        sources were checked.
     :raises ValueError: If a required source or recorded digest differs.
     """
     status = {
@@ -353,15 +387,17 @@ def validate_baseline(
     _verify_baseline_summary(status, summary_path, manifest_path, mcos_file)
     if not manifest_path.is_file():
         print(
-            f"warning: {manifest_path} missing; baseline source hashes not verified",
-            file=sys.stderr, flush=True
+            (
+                f"warning: {manifest_path} missing; baseline source hashes not "
+                f"verified"
+            ), file=sys.stderr, flush=True
         )
         return status
     expected = _expected_source_hashes(pairs, manifest_path)
     paths = sorted(expected)
     actual = vmaf_cid22.parallel_map(
-        "baseline source hashes", lambda path: vmaf_cid22.digest(data_root / path),
-        paths, jobs
+        "baseline source hashes",
+        lambda path: vmaf_cid22.digest(data_root / path), paths, jobs
     )
     for path, value in zip(paths, actual, strict=True):
         if value != expected[path]:
@@ -412,15 +448,17 @@ def legacy_scores(
     """
     if baseline_dir:
         return {
-            model: read_score_csv(baseline_dir / f"vqm-{model}.csv", model, pairs)
+            model:
+            read_score_csv(baseline_dir / f"vqm-{model}.csv", model, pairs)
             for model in ("v0", "v1")
         }
     cache = ROOT / LEGACY_YUV_CACHE
     cache.mkdir(parents=True, exist_ok=True)
     paths = sorted({path for pair in pairs for path in pair})
     converted = vmaf_cid22.parallel_map(
-        "legacy convert", lambda path: vmaf_cid22.convert_file(data_root / path, cache),
-        paths, jobs
+        "legacy convert",
+        lambda path: vmaf_cid22.convert_file(data_root / path, cache), paths,
+        jobs
     )
     lookup = dict(zip(paths, converted, strict=True))
     rows = []
@@ -454,13 +492,16 @@ def parse_args() -> argparse.Namespace:
     """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--data-root", type=Path, default=ROOT / "validation/data/CID22_validation_set"
+        "--data-root", type=Path,
+        default=ROOT / "validation/data/CID22_validation_set"
     )
     parser.add_argument(
-        "--out-dir", type=Path, default=ROOT / "artifacts/reports/vmaf-sdr-cid22"
+        "--out-dir", type=Path,
+        default=ROOT / "artifacts/reports/vmaf-sdr-cid22"
     )
     parser.add_argument(
-        "--cache", type=Path, default=ROOT / ".cache/validation/vmaf-sdr-cid22-yuv16"
+        "--cache", type=Path,
+        default=ROOT / ".cache/validation/vmaf-sdr-cid22-yuv16"
     )
     parser.add_argument(
         "--baseline-dir", type=Path,
@@ -486,7 +527,8 @@ def parse_args() -> argparse.Namespace:
     args = parser.parse_args()
     if args.limit < 0 or args.reference_count < 2 or args.jobs < 1:
         parser.error(
-            "--limit must be non-negative, --reference-count >= 2, and --jobs positive"
+            "--limit must be non-negative, --reference-count >= 2, and "
+            "--jobs positive"
         )
     if args.verify_baseline_only and not args.baseline_dir:
         parser.error("--verify-baseline-only requires --baseline-dir")
@@ -532,20 +574,24 @@ def _reference_assets() -> tuple[VmafPaths, Path]:
     bench = ROOT / "build/vqm_bench"
     for path in (executable, model0, model1, bench):
         if not path.is_file():
-            raise ValueError(f"missing {path}; build VQM and pinned VMAF references")
+            raise ValueError(
+                f"missing {path}; build VQM and pinned VMAF references"
+            )
 
     return (executable, model0, model1), bench
 
 
 def _reuse_rgb_scores(
-    prior: Path, pairs: list[Pair], mcos_file: Path, pairs_path: Path, bench: Path
+    prior: Path, pairs: list[Pair], mcos_file: Path, pairs_path: Path,
+    bench: Path
 ) -> _ScoreArms:
     previous_summary = json.loads((prior / "summary.json").read_text())
     previous_scores = prior / "scores.csv"
     for key, expected in (("vqm_benchmark_sha256", vmaf_cid22.digest(bench)),
                           ("mcos_sha256", vmaf_cid22.digest(mcos_file)),
                           ("rgb_pairs_sha256", vmaf_cid22.digest(pairs_path)),
-                          ("scores_sha256", vmaf_cid22.digest(previous_scores))):
+                          ("scores_sha256",
+                           vmaf_cid22.digest(previous_scores))):
         if previous_summary.get(key) != expected:
             raise ValueError(f"previous RGB scores do not match: {key}")
     return {
@@ -563,7 +609,9 @@ def _rgb_scores(
         for original, distorted in pairs:
             output.write(f"{data_root / original}\t{data_root / distorted}\n")
     if reuse_dir:
-        return _reuse_rgb_scores(reuse_dir, pairs, inputs.mcos_file, pairs_path, bench)
+        return _reuse_rgb_scores(
+            reuse_dir, pairs, inputs.mcos_file, pairs_path, bench
+        )
     return {
         "v0_444": score_rgb(pairs_path, len(pairs), "v0", "444", out_dir),
         "v1_444": score_rgb(pairs_path, len(pairs), "v1", "444", out_dir),
@@ -576,8 +624,8 @@ def _prepare_reference_rows(
 ) -> list[CorpusRow]:
     paths = sorted({path for pair in reference_pairs for path in pair})
     converted = vmaf_cid22.parallel_map(
-        "CPU SDR conversion", lambda path: convert_file_16(data_root / path, cache),
-        paths, jobs
+        "CPU SDR conversion",
+        lambda path: convert_file_16(data_root / path, cache), paths, jobs
     )
     lookup = dict(zip(paths, converted, strict=True))
     reference_rows = []
@@ -610,9 +658,13 @@ def _reference_scores(
         reference_pairs, inputs.data_root, inputs.cache, jobs
     )
     values = vmaf_cid22.parallel_map(
-        "libvmaf", lambda row: reference_score_16(row, *assets), reference_rows, jobs
+        "libvmaf", lambda row: reference_score_16(row, *assets), reference_rows,
+        jobs
     )
-    reference = {"v0": [row[0] for row in values], "v1": [row[1] for row in values]}
+    reference = {
+        "v0": [row[0] for row in values],
+        "v1": [row[1] for row in values]
+    }
     for row, (v0, v1) in zip(reference_rows, values, strict=True):
         row.update(libvmaf_v0=v0, libvmaf_v1=v1)
     reference_csv = inputs.out_dir / "reference-444.csv"
@@ -633,21 +685,23 @@ def _write_scores(
         writer = csv.writer(output)
         writer.writerow(
             (
-                "original", "distorted", "MCOS", "legacy_v0", "legacy_v1", "vqm_v0_444",
-                "vqm_v1_444", "vqm_v1_420"
+                "original", "distorted", "MCOS", "legacy_v0", "legacy_v1",
+                "vqm_v0_444", "vqm_v1_444", "vqm_v1_420"
             )
         )
         for i, (original, distorted) in enumerate(pairs):
             writer.writerow(
                 (
-                    original, distorted, mcos[i], baseline["v0"][i], baseline["v1"][i],
-                    observed["v0_444"][i], observed["v1_444"][i], observed["v1_420"][i]
+                    original, distorted, mcos[i], baseline["v0"][i],
+                    baseline["v1"][i], observed["v0_444"][i],
+                    observed["v1_444"][i], observed["v1_420"][i]
                 )
             )
 
 
 def _score_statistics(
-    baseline: _ScoreArms, observed: _ScoreArms, reference: _ScoreArms, mcos: list[float]
+    baseline: _ScoreArms, observed: _ScoreArms, reference: _ScoreArms,
+    mcos: list[float]
 ) -> dict[str, object]:
     count = len(reference["v0"])
     full_correlations = {
@@ -663,8 +717,8 @@ def _score_statistics(
     subset_correlations = {}
     subset_parity = {}
     for model in ("v0", "v1"):
-        subset_correlations["libvmaf_" +
-                            model] = correlations(reference[model], mcos[:count])
+        subset_correlations[
+            "libvmaf_" + model] = correlations(reference[model], mcos[:count])
         subset_correlations["vqm_" + model] = correlations(
             observed[model + "_444"][:count], mcos[:count]
         )
@@ -685,38 +739,63 @@ def _score_statistics(
 
 def _summary(
     inputs: _CorpusInputs, baseline_dir: Path | None,
-    baseline_provenance: dict[str, bool | int] | None, assets: VmafPaths, bench: Path,
-    count: int, statistics: dict[str, object]
+    baseline_provenance: dict[str, bool | int] | None, assets: VmafPaths,
+    bench: Path, count: int, statistics: dict[str, object]
 ) -> dict[str, object]:
     executable, model0, model1 = assets
     pairs, mcos_file, out_dir = inputs.pairs, inputs.mcos_file, inputs.out_dir
     pairs_path, reference_csv, score_csv = (
-        out_dir / name for name in ("rgb-pairs.txt", "reference-444.csv", "scores.csv")
+        out_dir / name
+        for name in ("rgb-pairs.txt", "reference-444.csv", "scores.csv")
     )
     info = {
-        "pairs": len(pairs),
-        "reference_pairs": count,
-        "conversion": CONVERSION,
-        "legacy_conversion": LEGACY_CONVERSION,
-        "legacy_source": str(baseline_dir.resolve()) if baseline_dir else "regenerated",
-        "legacy_provenance": baseline_provenance,
-        "legacy_note":
-        "Legacy encoded-sRGB 10-bit conversion is a different input convention and truncates RGB16 PNGs to RGB8; score differences are not same-input implementation parity.",
-        "reference_note":
-        "CPU float64 and GPU FP32 conversion can differ at quantization boundaries; PNG/JPEG decoders may also differ.",
-        "temporal": "independent one-frame sequences; motion=0",
-        "libvmaf_revision": REVISION,
-        "driver_sha256": vmaf_cid22.digest(executable),
-        "v0_model_sha256": vmaf_cid22.digest(model0),
-        "v1_model_sha256": vmaf_cid22.digest(model1),
-        "vqm_benchmark_sha256": vmaf_cid22.digest(bench),
-        "mcos_sha256": vmaf_cid22.digest(mcos_file),
-        "rgb_pairs_sha256": vmaf_cid22.digest(pairs_path),
-        "reference_manifest_sha256": vmaf_cid22.digest(reference_csv),
-        "scores_sha256": vmaf_cid22.digest(score_csv),
-        "numpy": np.__version__,
-        "pillow": pillow_version,
-        "ffmpeg": ffmpeg_version(),
+        "pairs":
+        len(pairs),
+        "reference_pairs":
+        count,
+        "conversion":
+        CONVERSION,
+        "legacy_conversion":
+        LEGACY_CONVERSION,
+        "legacy_source":
+        str(baseline_dir.resolve()) if baseline_dir else "regenerated",
+        "legacy_provenance":
+        baseline_provenance,
+        "legacy_note": (
+            "Legacy encoded-sRGB 10-bit conversion is a different input "
+            "convention and truncates RGB16 PNGs to RGB8; score differences "
+            "are not same-input implementation parity."
+        ),
+        "reference_note": (
+            "CPU float64 and GPU FP32 conversion can differ at quantization "
+            "boundaries; PNG/JPEG decoders may also differ."
+        ),
+        "temporal":
+        "independent one-frame sequences; motion=0",
+        "libvmaf_revision":
+        REVISION,
+        "driver_sha256":
+        vmaf_cid22.digest(executable),
+        "v0_model_sha256":
+        vmaf_cid22.digest(model0),
+        "v1_model_sha256":
+        vmaf_cid22.digest(model1),
+        "vqm_benchmark_sha256":
+        vmaf_cid22.digest(bench),
+        "mcos_sha256":
+        vmaf_cid22.digest(mcos_file),
+        "rgb_pairs_sha256":
+        vmaf_cid22.digest(pairs_path),
+        "reference_manifest_sha256":
+        vmaf_cid22.digest(reference_csv),
+        "scores_sha256":
+        vmaf_cid22.digest(score_csv),
+        "numpy":
+        np.__version__,
+        "pillow":
+        pillow_version,
+        "ffmpeg":
+        ffmpeg_version(),
         **statistics
     }
     if baseline_dir:
@@ -742,23 +821,28 @@ def main() -> None:
         return
     assets, bench = _reference_assets()
     baseline = legacy_scores(
-        inputs.pairs, inputs.data_root, inputs.out_dir, args.jobs, args.baseline_dir
+        inputs.pairs, inputs.data_root, inputs.out_dir, args.jobs,
+        args.baseline_dir
     )
     observed = _rgb_scores(inputs, args.reuse_rgb_dir, bench)
-    reference = _reference_scores(inputs, args.reference_count, args.jobs, assets)
+    reference = _reference_scores(
+        inputs, args.reference_count, args.jobs, assets
+    )
     _write_scores(inputs, baseline, observed)
     statistics = _score_statistics(baseline, observed, reference, inputs.mcos)
     info = _summary(
         inputs, args.baseline_dir, baseline_provenance, assets, bench,
         len(reference["v0"]), statistics
     )
-    (inputs.out_dir / "summary.json").write_text(json.dumps(info, indent=2) + "\n")
+    (inputs.out_dir /
+     "summary.json").write_text(json.dumps(info, indent=2) + "\n")
     print(json.dumps(info, indent=2))
 
 
 if __name__ == "__main__":
     try:
         main()
-    except (OSError, ValueError, RuntimeError, subprocess.TimeoutExpired) as error:
+    except (OSError, ValueError, RuntimeError,
+            subprocess.TimeoutExpired) as error:
         print(f"vmaf-sdr-cid22: {error}", file=sys.stderr)
         sys.exit(1)

@@ -1,0 +1,18 @@
+[style]
+based_on_style = pep8
+column_limit = 80
+indent_width = 4
+continuation_indent_width = 4
+use_tabs = false
+
+# Wrap long signatures/calls inside their parentheses and pack multiple
+# parameters/arguments onto continuation lines whenever they fit.
+dedent_closing_brackets = true
+split_before_first_argument = true
+split_before_named_assigns = false
+split_all_comma_separated_values = false
+split_all_top_level_comma_separated_values = false
+
+# A trailing comma should not force one item per line.
+split_arguments_when_comma_terminated = false
+disable_ending_comma_heuristic = true

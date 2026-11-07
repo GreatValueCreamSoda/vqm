@@ -10,7 +10,8 @@ import io
 import json
 import tempfile
 import unittest
-from contextlib import redirect_stderr, redirect_stdout
+from contextlib import redirect_stderr
+from contextlib import redirect_stdout
 from http.client import IncompleteRead
 from pathlib import Path
 from unittest.mock import patch
@@ -87,7 +88,7 @@ class Response(io.BytesIO):
 
 
 class TemporalFetchTests(unittest.TestCase):
-    """Exercise manifest contracts, atomic publication and offline verification."""
+    """Test manifests, atomic publication and offline verification."""
 
     def setUp(self) -> None:
         """Create an isolated manifest and initially absent cache directory."""
@@ -114,26 +115,29 @@ class TemporalFetchTests(unittest.TestCase):
         self.assertTrue(all(source.frames == 40 for source in sources))
 
     def test_manifest_rejects_invalid_source_fields(self) -> None:
-        """Reject traversal, unpinned content and inconsistent frame metadata."""
+        """Reject traversal, unpinned content and inconsistent metadata."""
         invalid = [
             ("id", "../source"), ("source_id", "source/elsewhere"),
             ("filename", "../source.y4m"), ("filename", "nested\\source.y4m"),
             ("filename", "/source.y4m"), ("url", "http://example.test/a"),
             ("url", "https://user:secret@example.test/a"), ("sha256", "abc"),
-            ("sha256", "g" * 64), ("width", True), ("width", 0), ("height", "2"),
-            ("frames", 3), ("prefix_bytes", len(PAYLOAD) - 1), ("upstream_bytes", 1),
-            ("fps", "0:1"), ("fps", "30:1"), ("header", HEADER + "\n"),
-            ("header", HEADER + " W2"), ("chroma", "420p10")
+            ("sha256", "g" * 64), ("width", True), ("width", 0),
+            ("height", "2"), ("frames", 3), ("prefix_bytes", len(PAYLOAD) - 1),
+            ("upstream_bytes", 1), ("fps", "0:1"), ("fps", "30:1"),
+            ("header", HEADER + "\n"), ("header", HEADER + " W2"),
+            ("chroma", "420p10")
         ]
         for field, value in invalid:
             with self.subTest(field=field, value=value):
                 document = manifest_document()
                 document["sources"][0][field] = value
                 self.write_manifest(document)
-                self.assertRaises(fetch.FetchError, fetch.load_manifest, self.manifest)
+                self.assertRaises(
+                    fetch.FetchError, fetch.load_manifest, self.manifest
+                )
 
     def test_manifest_rejects_duplicate_ids_and_destinations(self) -> None:
-        """Never assign two download workers to the same logical source or file."""
+        """Reject duplicate workers for one source or destination."""
         for field in ("id", "filename"):
             document = manifest_document()
             second = copy.deepcopy(document["sources"][0])
@@ -142,61 +146,75 @@ class TemporalFetchTests(unittest.TestCase):
             document["sources"].append(second)
             self.write_manifest(document)
             with self.subTest(field=field):
-                self.assertRaises(fetch.FetchError, fetch.load_manifest, self.manifest)
+                self.assertRaises(
+                    fetch.FetchError, fetch.load_manifest, self.manifest
+                )
 
     def test_manifest_requires_version_and_source_rows(self) -> None:
-        """Reject unsupported schema versions and missing source descriptions."""
+        """Reject unsupported schemas and missing source descriptions."""
         for document in ({"schema_version": True, "sources":
                           []}, {"schema_version": 2, "sources":
                                 []}, {"schema_version": 1, "sources":
-                                      []}, {"schema_version": 1, "sources": [None]}):
+                                      []}, {"schema_version": 1, "sources":
+                                            [None]}):
             self.write_manifest(document)
-            self.assertRaises(fetch.FetchError, fetch.load_manifest, self.manifest)
+            self.assertRaises(
+                fetch.FetchError, fetch.load_manifest, self.manifest
+            )
 
     def test_selects_known_sources(self) -> None:
-        """Reject accidental empty/unknown selections before any network work."""
+        """Reject empty or unknown selections before network work."""
         self.assertEqual(fetch.select_sources(self.sources, None), self.sources)
-        self.assertEqual(fetch.select_sources(self.sources, " source "), self.sources)
-        self.assertRaises(fetch.FetchError, fetch.select_sources, self.sources, "")
+        self.assertEqual(
+            fetch.select_sources(self.sources, " source "), self.sources
+        )
+        self.assertRaises(
+            fetch.FetchError, fetch.select_sources, self.sources, ""
+        )
         self.assertRaises(
             fetch.FetchError, fetch.select_sources, self.sources, "missing"
         )
 
     def test_downloads_exact_range_then_replays_offline(self) -> None:
-        """Publish the complete verified prefix and reuse it without network calls."""
+        """Publish verified prefixes and reuse them offline."""
         with (patch.object(fetch, "urlopen", return_value=Response()) as
               opened, redirect_stdout(io.StringIO())):
             fetch.fetch_sources(self.sources, self.cache)
         request = opened.call_args.args[0]
         self.assertEqual(request.full_url, SOURCE_URL)
-        self.assertEqual(request.get_header("Range"), f"bytes=0-{len(PAYLOAD) - 1}")
+        self.assertEqual(
+            request.get_header("Range"), f"bytes=0-{len(PAYLOAD) - 1}"
+        )
         self.assertEqual(request.get_header("Accept-encoding"), "identity")
         self.assertEqual(opened.call_args.kwargs["timeout"], 60)
         self.assertEqual((self.cache / "source.y4m").read_bytes(), PAYLOAD)
         self.assertEqual(
             sorted(path.name for path in self.cache.iterdir()), ["source.y4m"]
         )
-        with patch.object(fetch, "urlopen") as opened, redirect_stdout(io.StringIO()):
+        with patch.object(fetch,
+                          "urlopen") as opened, redirect_stdout(io.StringIO()):
             fetch.fetch_sources(self.sources, self.cache)
             fetch.fetch_sources(self.sources, self.cache, check=True)
         opened.assert_not_called()
 
     def test_preserves_corrupt_cache_without_network(self) -> None:
-        """Leave both wrong-sized and same-sized corrupt cache files untouched."""
+        """Preserve wrong-sized and same-sized corrupt cache files."""
         self.cache.mkdir()
         path = self.cache / "source.y4m"
         for contents in (b"incomplete", PAYLOAD[:-1] + b"x"):
             path.write_bytes(contents)
             with patch.object(fetch, "urlopen") as opened:
                 self.assertRaises(
-                    fetch.FetchError, fetch.fetch_sources, self.sources, self.cache
+                    fetch.FetchError, fetch.fetch_sources, self.sources,
+                    self.cache
                 )
             opened.assert_not_called()
             self.assertEqual(path.read_bytes(), contents)
 
     def test_offline_check_never_creates_directory_or_opens_url(self) -> None:
         """Missing inputs in --check fail entirely offline without mutations."""
-        with patch.object(fetch, "urlopen") as opened, redirect_stderr(io.StringIO()):
+        with patch.object(fetch,
+                          "urlopen") as opened, redirect_stderr(io.StringIO()):
             result = fetch.main(
                 [
                     "--manifest",
@@ -209,20 +227,23 @@ class TemporalFetchTests(unittest.TestCase):
         opened.assert_not_called()
 
     def test_rejects_ignored_or_wrong_range_responses(self) -> None:
-        """Check range bounds/total, byte encoding and final HTTPS after redirects."""
+        """Check ranges, encoding and final HTTPS after redirects."""
         responses = [
             Response(status=200),
             Response(headers={"Content-Range": "bytes 1-9/1000"}),
-            Response(headers={"Content-Range": f"bytes 0-{len(PAYLOAD) - 1}/2000"}),
+            Response(
+                headers={"Content-Range": f"bytes 0-{len(PAYLOAD) - 1}/2000"}
+            ),
             Response(headers={"Content-Length": "999"}),
             Response(headers={"Content-Encoding": "gzip"}),
             Response(url="http://example.test/redirected.y4m")
         ]
         for response in responses:
-            with (patch.object(fetch, "urlopen",
-                               return_value=response), redirect_stdout(io.StringIO())):
+            with (patch.object(fetch, "urlopen", return_value=response),
+                  redirect_stdout(io.StringIO())):
                 self.assertRaises(
-                    fetch.FetchError, fetch.fetch_sources, self.sources, self.cache
+                    fetch.FetchError, fetch.fetch_sources, self.sources,
+                    self.cache
                 )
             self.assertEqual(list(self.cache.iterdir()), [])
 
@@ -230,10 +251,11 @@ class TemporalFetchTests(unittest.TestCase):
         """Do not publish partial content or trust the server's claimed size."""
         for payload in (PAYLOAD[:-1], PAYLOAD + b"extra"):
             response = Response(payload)
-            with (patch.object(fetch, "urlopen",
-                               return_value=response), redirect_stdout(io.StringIO())):
+            with (patch.object(fetch, "urlopen", return_value=response),
+                  redirect_stdout(io.StringIO())):
                 self.assertRaises(
-                    fetch.FetchError, fetch.fetch_sources, self.sources, self.cache
+                    fetch.FetchError, fetch.fetch_sources, self.sources,
+                    self.cache
                 )
             self.assertEqual(list(self.cache.iterdir()), [])
 
@@ -248,7 +270,7 @@ class TemporalFetchTests(unittest.TestCase):
         self.assertEqual(list(self.cache.iterdir()), [])
 
     def test_rejects_hash_pinned_invalid_frame_structure(self) -> None:
-        """The manifest hash cannot substitute for complete Y4M frame boundaries."""
+        """Require frame boundaries as well as matching manifest hashes."""
         malformed = PAYLOAD.replace(b"FRAME\n", b"BROKE\n", 1)
         document = manifest_document()
         document["sources"][0]["sha256"] = hashlib.sha256(malformed).hexdigest()
@@ -262,15 +284,15 @@ class TemporalFetchTests(unittest.TestCase):
         self.assertEqual(list(self.cache.iterdir()), [])
 
     def test_accepts_https_redirect_and_preserves_original_aspect(self) -> None:
-        """Keep hosted source bytes intact even when original pixel aspect is non-square."""
+        """Preserve source bytes with non-square pixel aspect ratios."""
         response = Response(url="https://cdn.example.test/redirected.y4m")
-        with (patch.object(fetch, "urlopen",
-                           return_value=response), redirect_stdout(io.StringIO())):
+        with (patch.object(fetch, "urlopen", return_value=response),
+              redirect_stdout(io.StringIO())):
             fetch.fetch_sources(self.sources, self.cache)
         self.assertEqual((self.cache / "source.y4m").read_bytes(), PAYLOAD)
 
     def test_refuses_symlink_cache_destination(self) -> None:
-        """Never follow a cache destination into a maintained or external file."""
+        """Reject cache destinations pointing at other files."""
         target = self.root / "maintained.y4m"
         target.write_bytes(PAYLOAD)
         self.cache.mkdir()
@@ -283,31 +305,34 @@ class TemporalFetchTests(unittest.TestCase):
         self.assertEqual(target.read_bytes(), PAYLOAD)
 
     def test_incomplete_http_stream_is_reported_and_cleaned(self) -> None:
-        """Treat HTTP-level truncation as a named fetch failure without partial files."""
-        with (patch.object(fetch, "urlopen", side_effect=IncompleteRead(b"partial",
-                                                                        99)),
+        """Report HTTP truncation without retaining partial files."""
+        with (patch.object(fetch, "urlopen",
+                           side_effect=IncompleteRead(b"partial", 99)),
               redirect_stdout(io.StringIO())):
             self.assertRaises(
                 fetch.FetchError, fetch.fetch_sources, self.sources, self.cache
             )
         self.assertEqual(list(self.cache.iterdir()), [])
 
-    def test_publication_never_replaces_a_conflicting_concurrent_file(self) -> None:
-        """Atomic publication must preserve an existing destination created during transfer."""
+    def test_publication_never_replaces_a_conflicting_concurrent_file(
+        self
+    ) -> None:
+        """Preserve destinations created during concurrent transfers."""
 
         def conflict(_temporary: Path, destination: Path) -> None:
-            """Simulate another writer creating unique work immediately before publication."""
+            """Simulate a concurrent writer just before publication."""
             destination.write_bytes(b"preserve concurrent file")
             raise FileExistsError(destination)
 
         with (patch.object(fetch, "urlopen", return_value=Response()),
-              patch.object(fetch.os, "link",
-                           side_effect=conflict), redirect_stdout(io.StringIO())):
+              patch.object(fetch.os, "link", side_effect=conflict),
+              redirect_stdout(io.StringIO())):
             self.assertRaises(
                 fetch.FetchError, fetch.fetch_sources, self.sources, self.cache
             )
         self.assertEqual(
-            (self.cache / "source.y4m").read_bytes(), b"preserve concurrent file"
+            (self.cache / "source.y4m").read_bytes(),
+            b"preserve concurrent file"
         )
         self.assertEqual(
             sorted(path.name for path in self.cache.iterdir()), ["source.y4m"]

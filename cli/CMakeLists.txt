@@ -1,4 +1,4 @@
-add_executable(vqm main.cc video.cc)
+add_executable(vqm main.cc options.cc report.cc video.cc)
 set_target_properties(vqm PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}")
 target_include_directories(vqm PRIVATE "${PROJECT_SOURCE_DIR}/src"
   "${PROJECT_SOURCE_DIR}/tools/image_io")

@@ -4,7 +4,8 @@
 
 Run ``python3 -m validation.temporal.fetch`` from the repository root. Existing
 files are verified and preserved; remove an invalid cache file explicitly before
-retrying. ``--check`` is entirely offline and never creates directories or files.
+retrying. ``--check`` is entirely offline and never creates directories or
+files.
 """
 
 from __future__ import annotations
@@ -16,13 +17,17 @@ import os
 import re
 import sys
 import tempfile
-from concurrent.futures import Future, ThreadPoolExecutor, as_completed
+from concurrent.futures import Future
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import as_completed
 from dataclasses import dataclass
-from http.client import HTTPException, HTTPResponse
+from http.client import HTTPException
+from http.client import HTTPResponse
 from pathlib import Path
 from typing import BinaryIO
 from urllib.parse import urlsplit
-from urllib.request import Request, urlopen
+from urllib.request import Request
+from urllib.request import urlopen
 
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_MANIFEST = Path(__file__).with_name("sources.json")
@@ -65,7 +70,9 @@ def _text(row: dict[str, object], name: str) -> str:
     """Require a nonempty string field."""
     value = row.get(name)
     if not isinstance(value, str) or not value or value.strip() != value:
-        raise FetchError(f"{name}: expected a nonempty string without outer whitespace")
+        raise FetchError(
+            f"{name}: expected a nonempty string without outer whitespace"
+        )
     return value
 
 
@@ -83,7 +90,9 @@ def _https_url(value: str) -> None:
     if parts.scheme != "https" or not parts.hostname:
         raise FetchError(f"source URL must use HTTPS: {value}")
     if parts.username or parts.password or parts.fragment:
-        raise FetchError(f"source URL must omit credentials and fragments: {value}")
+        raise FetchError(
+            f"source URL must omit credentials and fragments: {value}"
+        )
 
 
 def _validate_names(source: Source) -> None:
@@ -91,7 +100,8 @@ def _validate_names(source: Source) -> None:
     for name in (source.id, source.source_id):
         if re.fullmatch(r"[a-z0-9][a-z0-9_-]*", name) is None:
             raise FetchError(f"invalid source identity: {name}")
-    if re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*\.y4m", source.filename) is None:
+    if re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*\.y4m",
+                    source.filename) is None:
         raise FetchError(f"invalid Y4M filename: {source.filename}")
     if re.fullmatch(r"[a-fA-F0-9]{64}", source.sha256) is None:
         raise FetchError(
@@ -132,11 +142,13 @@ def frame_bytes(source: Source) -> int:
         return 3 * luma
     if source.chroma == "mono":
         return luma
-    raise FetchError(f"{source.id}: unsupported eight-bit chroma: {source.chroma}")
+    raise FetchError(
+        f"{source.id}: unsupported eight-bit chroma: {source.chroma}"
+    )
 
 
 def _validate_layout(source: Source) -> None:
-    """Match prefix bounds, geometry and timing to the pinned original header."""
+    """Match prefix bounds, geometry and timing to the pinned header."""
     fields = _header_fields(source.header)
     expected = {
         "W": str(source.width),
@@ -145,12 +157,15 @@ def _validate_layout(source: Source) -> None:
         "I": "p"
     }
     if any(fields.get(name) != value for name, value in expected.items()):
-        raise FetchError(f"{source.id}: header geometry, timing or interlace mismatch")
+        raise FetchError(
+            f"{source.id}: header geometry, timing or interlace mismatch"
+        )
     if fields.get("C", "420jpeg") != source.chroma:
         raise FetchError(f"{source.id}: header chroma mismatch")
     if re.fullmatch(r"[1-9][0-9]*:[1-9][0-9]*", source.fps) is None:
         raise FetchError(f"{source.id}: fps must be a positive integer ratio")
-    expected_bytes = len(source.header) + 1 + source.frames * (6 + frame_bytes(source))
+    expected_bytes = len(source.header
+                         ) + 1 + source.frames * (6 + frame_bytes(source))
     if source.prefix_bytes != expected_bytes:
         raise FetchError(
             f"{source.id}: prefix_bytes does not contain exactly frames frames"
@@ -163,14 +178,15 @@ def _source(row: object) -> Source:
     """Parse one source row and validate its complete-frame prefix contract."""
     data = _mapping(row, "source")
     source = Source(
-        id=_text(data, "id"), source_id=_text(data,
-                                              "source_id"), url=_text(data, "url"),
-        filename=_text(data,
-                       "filename"), prefix_bytes=_positive_int(data, "prefix_bytes"),
+        id=_text(data, "id"), source_id=_text(data, "source_id"),
+        url=_text(data, "url"), filename=_text(data, "filename"),
+        prefix_bytes=_positive_int(data, "prefix_bytes"),
         sha256=_text(data, "sha256"), width=_positive_int(data, "width"),
-        height=_positive_int(data, "height"), frames=_positive_int(data, "frames"),
-        fps=_text(data, "fps"), chroma=_text(data,
-                                             "chroma"), header=_text(data, "header"),
+        height=_positive_int(data,
+                             "height"), frames=_positive_int(data, "frames"),
+        fps=_text(data,
+                  "fps"), chroma=_text(data,
+                                       "chroma"), header=_text(data, "header"),
         upstream_bytes=_positive_int(data, "upstream_bytes"),
         catalogue=_text(data, "catalogue")
     )
@@ -180,14 +196,16 @@ def _source(row: object) -> Source:
 
 
 def load_manifest(path: Path = DEFAULT_MANIFEST) -> list[Source]:
-    """Load pinned source descriptions and reject ambiguous cache destinations.
+    """Load pinned sources and reject ambiguous cache destinations.
 
     :param path: JSON manifest to read.
     :returns: Validated sources in manifest order.
     :raises FetchError: If the manifest schema or source metadata is invalid.
     :raises OSError: If the manifest cannot be read.
     """
-    document = _mapping(json.loads(path.read_text(encoding="utf-8")), "manifest")
+    document = _mapping(
+        json.loads(path.read_text(encoding="utf-8")), "manifest"
+    )
     if type(document.get("schema_version")
             ) is not int or document["schema_version"] != 1:
         raise FetchError("manifest schema_version must be 1")
@@ -222,19 +240,25 @@ def select_sources(sources: list[Source], only: str | None) -> list[Source]:
 
 
 def _check_frame_markers(handle: BinaryIO, source: Source) -> None:
-    """Verify raw header and every complete untagged frame in a pinned prefix."""
+    """Verify the header and every untagged frame in a pinned prefix."""
     if handle.readline() != source.header.encode("ascii") + b"\n":
-        raise FetchError("cached original Y4M header does not match the manifest")
+        raise FetchError(
+            "cached original Y4M header does not match the manifest"
+        )
     for _ in range(source.frames):
         if handle.read(6) != b"FRAME\n":
-            raise FetchError("cached source has an invalid or incomplete frame marker")
+            raise FetchError(
+                "cached source has an invalid or incomplete frame marker"
+            )
         handle.seek(frame_bytes(source), os.SEEK_CUR)
 
 
 def _verify_file(path: Path, source: Source) -> None:
-    """Check size, SHA-256 and frame boundaries without rewriting a cache file."""
+    """Check size, SHA-256 and frame bounds without rewriting the cache."""
     if path.is_symlink() or not path.is_file():
-        raise FetchError(f"refusing a symlink or non-regular cache file: {path}")
+        raise FetchError(
+            f"refusing a symlink or non-regular cache file: {path}"
+        )
     if path.stat().st_size != source.prefix_bytes:
         raise FetchError(
             f"cache size mismatch; preserve or remove before retrying: {path}"
@@ -243,7 +267,8 @@ def _verify_file(path: Path, source: Source) -> None:
         digest = hashlib.file_digest(handle, "sha256").hexdigest()
         if digest != source.sha256.lower():
             raise FetchError(
-                f"cache SHA-256 mismatch; preserve or remove before retrying: {path}"
+                f"cache SHA-256 mismatch; preserve or remove before "
+                f"retrying: {path}"
             )
         handle.seek(0)
         _check_frame_markers(handle, source)
@@ -261,9 +286,14 @@ def _validate_response(response: HTTPResponse, source: Source) -> None:
         raise FetchError(f"server Content-Range must be {expected}")
     length = response.headers.get("Content-Length")
     if length is not None and length != str(source.prefix_bytes):
-        raise FetchError("server Content-Length does not match the pinned prefix")
-    if response.headers.get("Content-Encoding", "identity").lower() != "identity":
-        raise FetchError("server encoded the byte range; original bytes are required")
+        raise FetchError(
+            "server Content-Length does not match the pinned prefix"
+        )
+    if response.headers.get("Content-Encoding",
+                            "identity").lower() != "identity":
+        raise FetchError(
+            "server encoded the byte range; original bytes are required"
+        )
 
 
 def _copy_response(
@@ -291,7 +321,7 @@ def _publish_file(temporary: Path, destination: Path, source: Source) -> None:
 
 
 def _download(source: Source, destination: Path) -> None:
-    """Fetch one pinned range into a temporary file before no-clobber publication."""
+    """Fetch a pinned range before publishing without overwriting files."""
     request = Request(
         source.url, headers={
             "Range": f"bytes=0-{source.prefix_bytes - 1}",
@@ -300,10 +330,12 @@ def _download(source: Source, destination: Path) -> None:
         }
     )
     with tempfile.NamedTemporaryFile(prefix=f".{source.id}.", suffix=".part",
-                                     dir=destination.parent, delete=False) as handle:
+                                     dir=destination.parent,
+                                     delete=False) as handle:
         temporary = Path(handle.name)
     try:
-        with urlopen(request, timeout=60) as response, temporary.open("wb") as handle:
+        with urlopen(request,
+                     timeout=60) as response, temporary.open("wb") as handle:
             _validate_response(response, source)
             _copy_response(response, handle, source.prefix_bytes)
             handle.flush()
@@ -319,7 +351,10 @@ def _fetch_one(source: Source, output_dir: Path, check: bool) -> None:
     destination = output_dir / source.filename
     if destination.exists() or destination.is_symlink():
         _verify_file(destination, source)
-        print(f"{source.id}: verified {source.prefix_bytes} cached bytes", flush=True)
+        print(
+            f"{source.id}: verified {source.prefix_bytes} cached bytes",
+            flush=True
+        )
         return
     if check:
         raise FetchError(f"missing cache: {destination}")
@@ -340,11 +375,12 @@ def _result_error(future: Future[None], source_id: str) -> str:
 def fetch_sources(
     sources: list[Source], output_dir: Path, jobs: int = 4, check: bool = False
 ) -> None:
-    """Verify selected sources and download only missing complete-frame prefixes.
+    """Verify sources and fetch only missing complete-frame prefixes.
 
     :param sources: Validated source descriptions.
     :param output_dir: Cache destination; existing invalid files are preserved.
-    :param jobs: Maximum simultaneous verification/download workers, 1 through 32.
+    :param jobs: Maximum simultaneous verification/download workers, 1 through
+        32.
     :param check: Verify entirely offline without creating directories or files.
     :raises FetchError: If a selected source cannot be verified or downloaded.
     :raises OSError: If the cache directory cannot be created.
@@ -359,7 +395,8 @@ def fetch_sources(
             for source in sources
         }
         failures = [
-            _result_error(future, pending[future]) for future in as_completed(pending)
+            _result_error(future, pending[future])
+            for future in as_completed(pending)
         ]
     failures = [failure for failure in failures if failure]
     if failures:
@@ -374,7 +411,9 @@ def main(argv: list[str] | None = None) -> int:
     """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--only", help="comma-separated source IDs")
-    parser.add_argument("--check", action="store_true", help="verify offline only")
+    parser.add_argument(
+        "--check", action="store_true", help="verify offline only"
+    )
     parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT)
     parser.add_argument("--jobs", type=int, default=4)

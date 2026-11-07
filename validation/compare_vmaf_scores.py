@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compare matched score CSVs with optional provenance-bound ranking acceptance."""
+"""Compare matched CSVs with optional provenance-bound ranking gates."""
 
 import argparse
 import csv
@@ -8,11 +8,16 @@ import json
 import math
 import re
 import sys
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping
+from collections.abc import Sequence
 from pathlib import Path
 
-from agreement_policy import ScoreSample
-from common import correlation_triple
+if __package__ in (None, ""):
+    # Keep direct script invocation compatible with package imports.
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from validation.agreement_policy import ScoreSample
+from validation.common import correlation_triple
 
 PairKey = tuple[str, str]
 ScoreMap = dict[PairKey, float]
@@ -29,13 +34,13 @@ def pair_sample_id(pair: PairKey) -> str:
 
 
 def pair_input_hash(hashes: tuple[str, str]) -> str:
-    """Fingerprint the ordered decoded input hashes without changing the inputs.
+    """Fingerprint ordered decoded hashes without changing inputs.
 
     :param hashes: Original and distorted YUV SHA-256 strings.
     :returns: A SHA-256 for the ordered pair of decoded inputs.
     """
-    return hashlib.sha256(json.dumps(hashes,
-                                     separators=(",", ":")).encode()).hexdigest()
+    return hashlib.sha256(json.dumps(hashes, separators=(",", ":")).encode()
+                          ).hexdigest()
 
 
 def _score_row(path: Path, row: Mapping[str, str],
@@ -54,7 +59,9 @@ def _score_row(path: Path, row: Mapping[str, str],
 
 def _hash_columns(path: Path, fields: Sequence[str], column: str) -> bool:
     if not {"original", "distorted", column}.issubset(fields):
-        raise ValueError(f"{path}: expected original, distorted and {column} columns")
+        raise ValueError(
+            f"{path}: expected original, distorted and {column} columns"
+        )
     hash_fields = {"original_yuv_sha256", "distorted_yuv_sha256"}
     present = hash_fields.intersection(fields)
     if present and present != hash_fields:
@@ -63,7 +70,7 @@ def _hash_columns(path: Path, fields: Sequence[str], column: str) -> bool:
 
 
 def load_scores(path: Path, column: str) -> tuple[ScoreMap, HashMap | None]:
-    """Load finite scores and optional decoded-input provenance by exact pair.
+    """Load finite scores and optional provenance by exact pair.
 
     :param path: Score CSV to read.
     :param column: Numerical score column.
@@ -82,7 +89,8 @@ def load_scores(path: Path, column: str) -> tuple[ScoreMap, HashMap | None]:
             raise ValueError(f"{path}: duplicate pair {pair}")
         scores[pair] = score
         if present:
-            hashes[pair] = row["original_yuv_sha256"], row["distorted_yuv_sha256"]
+            hashes[pair] = row["original_yuv_sha256"], row[
+                "distorted_yuv_sha256"]
     if not scores or any(not all(value) for value in hashes.values()):
         raise ValueError(f"{path}: no scores or missing YUV input hash")
     return scores, hashes if present else None
@@ -90,7 +98,7 @@ def load_scores(path: Path, column: str) -> tuple[ScoreMap, HashMap | None]:
 
 def direct_correlations(reference: Sequence[float],
                         candidate: Sequence[float]) -> dict[str, object]:
-    """Report direct score agreement without treating diagnostics as acceptance.
+    """Report direct agreement as diagnostics rather than acceptance.
 
     :param reference: Reference scores in matched sample order.
     :param candidate: Candidate scores in the same order.
@@ -99,16 +107,18 @@ def direct_correlations(reference: Sequence[float],
     values = correlation_triple(reference, candidate)
     coefficients = {
         name: value if math.isfinite(value) else None
-        for name, value in zip(("tau_b", "srcc", "pearson"), values, strict=True)
+        for name, value in
+        zip(("tau_b", "srcc", "pearson"), values, strict=True)
     }
     return {"status": "diagnostic_only", **coefficients}
 
 
 def compare(
-    baseline: ScoreMap, candidate: ScoreMap, baseline_hashes: HashMap | None = None,
+    baseline: ScoreMap, candidate: ScoreMap,
+    baseline_hashes: HashMap | None = None,
     candidate_hashes: HashMap | None = None
 ) -> dict[str, object]:
-    """Compare exact matched pairs, keeping ranking and numerical evidence separate.
+    """Compare exact pairs with separate ranking and numerical evidence.
 
     :param baseline: Original implementation's scores.
     :param candidate: Candidate implementation's scores.
@@ -119,13 +129,16 @@ def compare(
     """
     if set(baseline) != set(candidate):
         raise ValueError(
-            f"pair mismatch: {len(set(baseline) - set(candidate))} missing from "
+            f"pair mismatch: {len(set(baseline) - set(candidate))} "
+            "missing from "
             f"candidate, {len(set(candidate) - set(baseline))} extra"
         )
     verified = baseline_hashes is not None and candidate_hashes is not None
     if verified and baseline_hashes != candidate_hashes:
         raise ValueError("YUV input hashes differ between runs")
-    errors = [(abs(candidate[pair] - value), pair) for pair, value in baseline.items()]
+    errors = [
+        (abs(candidate[pair] - value), pair) for pair, value in baseline.items()
+    ]
     ordered = sorted(error for error, _ in errors)
     position = 0.99 * (len(ordered) - 1)
     lower = int(position)
@@ -163,14 +176,16 @@ def _check_bound_sample(
     if sample.score != score or sample.source_id != pair[0]:
         raise ValueError("agreement report score or source does not match CSV")
     if any(re.fullmatch(r"[0-9a-fA-F]{64}", value) is None for value in hashes):
-        raise ValueError("ranking acceptance requires SHA-256 decoded-input hashes")
+        raise ValueError(
+            "ranking acceptance requires SHA-256 decoded-input hashes"
+        )
     if sample.input_hash != pair_input_hash(hashes):
         raise ValueError("agreement report input hash does not match CSV")
 
 
 def _bound_report(path: Path, scores: ScoreMap,
                   hashes: HashMap | None) -> dict[str, object]:
-    from agreement_policy import ScoreReport
+    from validation.agreement_policy import ScoreReport
 
     if hashes is None:
         raise ValueError(
@@ -186,7 +201,9 @@ def _bound_report(path: Path, scores: ScoreMap,
     if set(samples) != {pair_sample_id(pair) for pair in scores}:
         raise ValueError("agreement report sample IDs do not match CSV pairs")
     for pair, score in scores.items():
-        _check_bound_sample(pair, score, hashes[pair], samples[pair_sample_id(pair)])
+        _check_bound_sample(
+            pair, score, hashes[pair], samples[pair_sample_id(pair)]
+        )
     return raw
 
 
@@ -194,7 +211,7 @@ def _policy_agreement(
     args: argparse.Namespace, baseline: ScoreMap, candidate: ScoreMap,
     baseline_hashes: HashMap | None, candidate_hashes: HashMap | None
 ) -> dict[str, object]:
-    from agreement import evaluate_agreement
+    from validation.agreement import evaluate_agreement
 
     reference = _bound_report(args.reference_report, baseline, baseline_hashes)
     proposed = _bound_report(args.candidate_report, candidate, candidate_hashes)
@@ -215,7 +232,8 @@ def _arguments() -> argparse.Namespace:
         "--candidate-column", help="override --column for the candidate CSV"
     )
     parser.add_argument(
-        "--max-absolute", type=float, help="optional maximum permitted absolute drift"
+        "--max-absolute", type=float,
+        help="optional maximum permitted absolute drift"
     )
     parser.add_argument(
         "--mean-absolute", type=float,
@@ -229,12 +247,16 @@ def _arguments() -> argparse.Namespace:
     parser.add_argument("--candidate-report", type=Path)
     args = parser.parse_args()
     for threshold in (args.max_absolute, args.mean_absolute):
-        if threshold is not None and (not math.isfinite(threshold) or threshold < 0):
+        if threshold is not None and (not math.isfinite(threshold)
+                                      or threshold < 0):
             parser.error("drift thresholds must be finite and non-negative")
-    reports = args.reference_report is not None and args.candidate_report is not None
+    reports = (
+        args.reference_report is not None and args.candidate_report is not None
+    )
     if args.agreement_policy is not None and not reports:
         parser.error(
-            "--agreement-policy requires --reference-report and --candidate-report"
+            "--agreement-policy requires --reference-report and "
+            "--candidate-report"
         )
     return args
 
@@ -242,7 +264,8 @@ def _arguments() -> argparse.Namespace:
 def main() -> int:
     """Run the CSV comparison and any explicitly requested acceptance policy.
 
-    :returns: Zero for requested checks passing, one for failure, two for bad inputs.
+    :returns: Zero for requested checks passing, one for failure, two for bad
+        inputs.
     """
     args = _arguments()
     try:
@@ -261,15 +284,20 @@ def main() -> int:
         print(f"score comparison: {exc}", file=sys.stderr)
         return 2
     passed = (
-        (args.max_absolute is None or result["max_absolute"] <= args.max_absolute) and
-        (args.mean_absolute is None or result["mean_absolute"] <= args.mean_absolute)
+        (
+            args.max_absolute is None
+            or result["max_absolute"] <= args.max_absolute
+        ) and (
+            args.mean_absolute is None
+            or result["mean_absolute"] <= args.mean_absolute
+        )
     )
     result["within_thresholds"] = (
-        passed
-        if args.max_absolute is not None or args.mean_absolute is not None else None
+        passed if args.max_absolute is not None
+        or args.mean_absolute is not None else None
     )
-    ranking_passed = not args.agreement_policy or result["agreement"]["proposed_status"
-                                                                      ] == "pass"
+    ranking_passed = not args.agreement_policy or result["agreement"][
+        "proposed_status"] == "pass"
     print(json.dumps(result, indent=2, allow_nan=False))
     return 0 if passed and ranking_passed else 1
 

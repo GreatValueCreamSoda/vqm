@@ -1,7 +1,8 @@
 """Illustrate motion quantization; not a GPU oracle or performance benchmark.
 
 Promoted from the FP16 research report's ``motion/cpu_precision_examples.py``.
-The explicit casts and operation order retain the original diagnostic arithmetic.
+The explicit casts and operation order retain the original diagnostic
+arithmetic.
 """
 
 import argparse
@@ -12,9 +13,12 @@ import numpy as np
 from numpy.typing import NDArray
 
 ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_OUTPUT = ROOT / "artifacts/reports/precision-examples/vmaf-motion-precision.json"
+DEFAULT_OUTPUT = ROOT / (
+    "artifacts/reports/precision-examples/vmaf-motion-precision.json"
+)
 WEIGHTS = np.array(
-    [0.054488685, 0.244201342, 0.402619947, 0.244201342, 0.054488685], np.float32
+    [0.054488685, 0.244201342, 0.402619947, 0.244201342, 0.054488685],
+    np.float32
 )
 
 
@@ -25,7 +29,8 @@ def blur(source: NDArray[np.float32], kind: str) -> NDArray[np.float32]:
     :param kind: Precision mode or pattern label.
     :returns: Filtered image plane widened to binary32.
     """
-    data = source if kind == "fp32" else source.astype(np.float16).astype(np.float32)
+    data = source if kind == "fp32" else source.astype(np.float16
+                                                       ).astype(np.float32)
     height, width = data.shape
     accumulator = np.float16 if kind == "half_alu" else np.float32
     vertical_source = np.pad(data, ((2, 2), (0, 0)), mode="reflect")
@@ -34,11 +39,14 @@ def blur(source: NDArray[np.float32], kind: str) -> NDArray[np.float32]:
         sample = vertical_source[tap:tap + height]
         if kind in ("half_alu", "half_products"):
             product = np.multiply(
-                np.float16(WEIGHTS[tap]), sample.astype(np.float16), dtype=np.float16
+                np.float16(WEIGHTS[tap]), sample.astype(np.float16),
+                dtype=np.float16
             )
         else:
             product = np.multiply(WEIGHTS[tap], sample, dtype=np.float32)
-        vertical = np.add(vertical, product.astype(accumulator), dtype=accumulator)
+        vertical = np.add(
+            vertical, product.astype(accumulator), dtype=accumulator
+        )
     if kind in ("half_shared", "half_alu", "half_products"):
         vertical = vertical.astype(np.float16).astype(np.float32)
 
@@ -48,7 +56,8 @@ def blur(source: NDArray[np.float32], kind: str) -> NDArray[np.float32]:
         sample = horizontal_source[:, tap:tap + width]
         if kind in ("half_alu", "half_products"):
             product = np.multiply(
-                np.float16(WEIGHTS[tap]), sample.astype(np.float16), dtype=np.float16
+                np.float16(WEIGHTS[tap]), sample.astype(np.float16),
+                dtype=np.float16
             )
         else:
             product = np.multiply(WEIGHTS[tap], sample, dtype=np.float32)
@@ -71,7 +80,9 @@ def _compare_blurs(
     :returns: Reference transition and error summaries for each precision mode.
     """
     reference = [blur(image, "fp32") for image in (original, changed)]
-    expected = float(np.mean(np.abs(reference[1] - reference[0]), dtype=np.float64))
+    expected = float(
+        np.mean(np.abs(reference[1] - reference[0]), dtype=np.float64)
+    )
     row = {
         "depth": depth,
         "content": content,
@@ -82,7 +93,9 @@ def _compare_blurs(
         row.update(first_luma=start, second_luma=start + scale)
     for kind in ("half_input", "half_shared", "half_alu", "half_products"):
         candidate = [blur(image, kind) for image in (original, changed)]
-        value = float(np.mean(np.abs(candidate[1] - candidate[0]), dtype=np.float64))
+        value = float(
+            np.mean(np.abs(candidate[1] - candidate[0]), dtype=np.float64)
+        )
         row["variants"][kind] = {
             "transition":
             value,
@@ -122,14 +135,21 @@ def generate_examples() -> dict[str, object]:
                 _compare_blurs(depth, content, original, changed, start, scale)
             )
     return {
-        "note":
-        "CPU illustrative sequential FP32/FP16 simulation; not a GPU oracle or performance result. GPU FMA contraction can change values.",
-        "numpy_version": np.__version__,
-        "weights_fp32": WEIGHTS.astype(float).tolist(),
-        "weights_fp16": WEIGHTS.astype(np.float16).astype(float).tolist(),
+        "note": (
+            "CPU illustrative sequential FP32/FP16 simulation; not a GPU "
+            "oracle or performance result. GPU FMA contraction can change "
+            "values."
+        ),
+        "numpy_version":
+        np.__version__,
+        "weights_fp32":
+        WEIGHTS.astype(float).tolist(),
+        "weights_fp16":
+        WEIGHTS.astype(np.float16).astype(float).tolist(),
         "weights_fp16_sum_fp64":
         float(np.sum(WEIGHTS.astype(np.float16), dtype=np.float64)),
-        "results": results,
+        "results":
+        results,
     }
 
 

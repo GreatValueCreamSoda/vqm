@@ -8,7 +8,10 @@ import json
 import math
 import os
 import statistics
-from typing import Any, NotRequired, TextIO, TypedDict
+from typing import Any
+from typing import NotRequired
+from typing import TextIO
+from typing import TypedDict
 
 Pair = tuple[str, str]
 ArmKey = tuple[str, str]
@@ -142,7 +145,8 @@ def _group_pair_medians(
 
 
 def _summarize_group(
-    metric: str, entry_name: str, size: tuple[int, int], values: list[_PairMedian],
+    metric: str, entry_name: str, size: tuple[int,
+                                              int], values: list[_PairMedian],
     rounds: list[list[RoundRow]], ours: dict[Pair, float] | None
 ) -> LatencyRow:
     medians = [value[1] for value in values]
@@ -238,7 +242,8 @@ def json_safe(value: object) -> object:
 
 
 _LATENCY_HEADER = (
-    "| implementation | metric | size | pairs | median ms/pair | round range ms | "
+    "| implementation | metric | size | pairs | median ms/pair | round range "
+    "ms | "
     "FPS | median score | max absolute score difference vs ours |"
 )
 _LATENCY_DIVIDER = "| --- | --- | --- | --- | --- | --- | --- | --- | --- |"
@@ -256,8 +261,8 @@ def _latency_line(row: LatencyRow) -> str:
 
 
 def write_summary(
-    path: str, args: argparse.Namespace, pair_count: int, rows: list[LatencyRow],
-    environment: JsonObject | None = None
+    path: str, args: argparse.Namespace, pair_count: int,
+    rows: list[LatencyRow], environment: JsonObject | None = None
 ) -> None:
     """Write the Markdown latency report.
 
@@ -270,8 +275,10 @@ def write_summary(
     """
     with open(path, "w") as f:
         f.write("# In-memory benchmark\n\n")
-        f.write(f"generated: "
-                f"{datetime.datetime.now(datetime.UTC).isoformat()}\n")
+        f.write(
+            f"generated: "
+            f"{datetime.datetime.now(datetime.UTC).isoformat()}\n"
+        )
         f.write(f"pairs: {args.pairs_file} ({pair_count} pairs)\n")
         f.write(
             f"protocol: decode once per pair; median of {args.iterations} "
@@ -321,22 +328,25 @@ def ceiling_text(
 
 def _throughput_line(row: ThroughputRow, sizes: list[str]) -> str:
     entries = [row["sizes"].get(size, {}) for size in sizes]
-    cells = ["n/a" if "error" in entry else f"{entry['fps']:.0f}" for entry in entries]
+    cells = [
+        "n/a" if "error" in entry else f"{entry['fps']:.0f}"
+        for entry in entries
+    ]
     cells.extend(
-        "n/a" if "error" in entry else f"{entry['fps_one']:.0f}" for entry in entries
+        "n/a" if "error" in entry else f"{entry['fps_one']:.0f}"
+        for entry in entries
     )
     cells.extend(
         "n/a" if "error" in entry else ceiling_text(
-            row["implementation"], entry.
-            get("threads", row["threads"]), entry["fps_one"], entry["ceiling_fps"]
+            row["implementation"], entry.get("threads", row["threads"]),
+            entry["fps_one"], entry["ceiling_fps"]
         ) for entry in entries
     )
     threads_text = "/".join(
         str(entry.get("threads", row["threads"])) for entry in entries
     )
-    return f"| {row['implementation']} | {row['metric']} | {threads_text} | " + " | ".join(
-        cells
-    ) + " |\n"
+    return (f"| {row['implementation']} | {row['metric']} | {threads_text} | "
+            ) + " | ".join(cells) + " |\n"
 
 
 def _write_throughput_table(
@@ -350,8 +360,8 @@ def _write_throughput_table(
     )
     f.write(header)
     f.write(
-        "| --- | --- | --- | " + " | ".join("---"
-                                            for _ in range(3 * len(sizes))) + " |\n"
+        "| --- | --- | --- | " +
+        " | ".join("---" for _ in range(3 * len(sizes))) + " |\n"
     )
     f.writelines(_throughput_line(row, sizes) for row in rows)
     f.write(
@@ -393,13 +403,16 @@ def _write_call_durations(
         ) + " |\n"
     )
     f.write(
-        "| --- | --- | " + " | ".join("---" for _ in range(3 * len(sizes))) + " |\n"
+        "| --- | --- | " + " | ".join("---"
+                                      for _ in range(3 * len(sizes))) + " |\n"
     )
     for row in rows:
-        cells = [cell for size in sizes for cell in _call_duration_cells(row, size)]
+        cells = [
+            cell for size in sizes for cell in _call_duration_cells(row, size)
+        ]
         f.write(
-            f"| {row['implementation']} | {row['metric']} | " + " | ".join(cells) +
-            " |\n"
+            f"| {row['implementation']} | {row['metric']} | " +
+            " | ".join(cells) + " |\n"
         )
 
 
@@ -412,9 +425,12 @@ def _throughput_fps(row: ThroughputRow | None, size: str) -> float | None:
 
 def _vship_cells(rows: dict[str, ThroughputRow], size: str) -> list[str]:
     names = ("ours-resident", "vship-cuda", "vship-vulkan", "vship-fast-vulkan")
-    ours, cuda, vulkan, fast = [_throughput_fps(rows.get(name), size) for name in names]
+    ours, cuda, vulkan, fast = [
+        _throughput_fps(rows.get(name), size) for name in names
+    ]
     cells = [
-        "n/a" if fps is None else f"{fps:.0f}" for fps in (ours, cuda, vulkan, fast)
+        "n/a" if fps is None else f"{fps:.0f}"
+        for fps in (ours, cuda, vulkan, fast)
     ]
     cells.extend(
         "n/a" if ours is None or not fps else f"{ours / fps:.2f}x"
@@ -442,14 +458,16 @@ def _write_vship_comparisons(
         }
         for size in sizes:
             f.write(
-                f"| {size} | " + " | ".join(_vship_cells(metric_rows, size)) + " |\n"
+                f"| {size} | " + " | ".join(_vship_cells(metric_rows, size)) +
+                " |\n"
             )
 
 
 def write_throughput_report(
-    path: str, args: argparse.Namespace, sizes: list[str], rows: list[ThroughputRow]
+    path: str, args: argparse.Namespace, sizes: list[str],
+    rows: list[ThroughputRow]
 ) -> None:
-    """Write the fixed-window throughput, call-rate and peer comparison tables.
+    """Write throughput, call-rate and peer comparison tables.
 
     :param path: Output report path.
     :param args: Measurement protocol settings.
@@ -459,8 +477,10 @@ def write_throughput_report(
     """
     with open(path, "w") as f:
         f.write("# Exploratory fixed-window throughput (FPS)\n\n")
-        f.write(f"generated: "
-                f"{datetime.datetime.now(datetime.UTC).isoformat()}\n")
+        f.write(
+            f"generated: "
+            f"{datetime.datetime.now(datetime.UTC).isoformat()}\n"
+        )
         f.write(
             f"protocol: --throughput-seconds {args.throughput_seconds:g}, "
             f"median of {args.throughput_runs} runs; implementations "
@@ -506,7 +526,8 @@ def write_latency_results(
             json_safe(
                 {
                     "schema_version": 2,
-                    "generated": datetime.datetime.now(datetime.UTC).isoformat(),
+                    "generated":
+                    datetime.datetime.now(datetime.UTC).isoformat(),
                     "pairs": args.pairs_file,
                     "pair_count": pair_count,
                     "rows": rows,
@@ -544,7 +565,7 @@ def write_throughput_results(
     args: argparse.Namespace, sizes: list[str], rows: list[ThroughputRow],
     environment: JsonObject, protocol: JsonObject
 ) -> None:
-    """Publish the exploratory throughput report and its reproducibility data.
+    """Publish exploratory throughput and reproducibility data.
 
     :param args: Measurement protocol and output directory settings.
     :param sizes: Measured geometries in display order.
@@ -561,7 +582,8 @@ def write_throughput_results(
             json_safe(
                 {
                     "schema_version": 2,
-                    "generated": datetime.datetime.now(datetime.UTC).isoformat(),
+                    "generated":
+                    datetime.datetime.now(datetime.UTC).isoformat(),
                     "sizes": sizes,
                     "throughput_seconds": args.throughput_seconds,
                     "throughput_runs": args.throughput_runs,

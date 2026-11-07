@@ -8,10 +8,7 @@ from collections.abc import Mapping
 from dataclasses import asdict
 from pathlib import Path
 
-try:
-    from . import agreement_policy as schema
-except ImportError:
-    import agreement_policy as schema
+from validation import agreement_policy as schema
 
 REGISTRY = Path(__file__).with_name("qualified_domains.json")
 
@@ -66,8 +63,10 @@ def default_gate_mode(
     """
     identity = _identity(reference, policy)
     registry = json.loads(REGISTRY.read_text(encoding="utf-8"))
-    if registry.get("schema_version") != 1 or not isinstance(registry.get("domains"),
-                                                             list):
+    if registry.get("schema_version") != 1 or not isinstance(
+            registry.get("domains"), list):
         raise ValueError("qualified-domain registry must have schema version 1")
-    approved = any(entry["identity"] == identity for entry in registry["domains"])
+    approved = any(
+        entry["identity"] == identity for entry in registry["domains"]
+    )
     return "ranking" if approved else "both"

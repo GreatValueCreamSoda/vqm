@@ -4,8 +4,10 @@
 """Write one compile_commands.json for clangd, covering every C++ file.
 
 CMake's own database (build/compile_commands.json) describes the library, the
-CLI, the tests and every source under bench/driver/. It cannot describe the reference harnesses:
-they are compiled inside each reference's CMake project, and bench/vship_bench.cc
+CLI, the tests and every source under bench/driver/. It cannot describe the
+reference harnesses:
+they are compiled inside each reference's CMake project, and
+bench/vship_bench.cc
 and bench/inmemory/fssimu2_bench.cc are compiled by hand. clangd then guesses a
 command from a sibling file, which is wrong enough to paint the editor red.
 
@@ -16,18 +18,21 @@ compile_commands.json at the repository root, where clangd looks. Re-run it
 after configure or after building references; tools/build_references.py does.
 """
 
+import argparse
 import json
 import os
 import sys
-from typing import NotRequired, TypedDict
+from pathlib import Path
+from typing import NotRequired
+from typing import TypedDict
+
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from tools.build_paths import build_directory
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUTPUT = os.path.join(REPO_ROOT, "compile_commands.json")
-MAIN_DATABASE = os.path.join(REPO_ROOT, "build", "compile_commands.json")
-REFERENCE_DATABASES = (
-    os.path.join(REPO_ROOT, "build", "reference-build", "compile_commands.json"),
-    os.path.join(REPO_ROOT, "build", "libjxl-build", "compile_commands.json"),
-)
 CXX = os.environ.get("CXX", "g++")
 
 
@@ -67,10 +72,12 @@ def entry(file: str, arguments: list[str]) -> CompileEntry:
     }
 
 
-def synthesized() -> list[CompileEntry]:
+def synthesized(build_dir: Path) -> list[CompileEntry]:
     """Describe the hand-compiled drivers with the flags that build them.
 
-    :returns: The fssimu2 entry and the Vship entry when its sources are available.
+    :param build_dir: Selected candidate and reference build directory.
+    :returns: The fssimu2 entry and the Vship entry when its sources are
+        available.
     """
     entries = [
         entry(
@@ -83,14 +90,15 @@ def synthesized() -> list[CompileEntry]:
         )
     ]
     for backend in ("Vulkan", "Cuda"):
-        source = os.path.join(REPO_ROOT, "build", f"Vship-src-{backend}", "src")
+        source = str(build_dir / f"Vship-src-{backend}" / "src")
         if os.path.isdir(source):
             entries.append(
                 entry(
                     "bench/vship_bench.cc", [
-                        CXX, "-std=c++20", "-O2", "-Wall", "-Wextra", "-Wpedantic",
-                        f"-I{source}", f"-I{REPO_ROOT}/src",
-                        f"-I{REPO_ROOT}/tools/image_io", f"-I{REPO_ROOT}/include", "-c",
+                        CXX, "-std=c++20", "-O2", "-Wall", "-Wextra",
+                        "-Wpedantic", f"-I{source}", f"-I{REPO_ROOT}/src",
+                        f"-I{REPO_ROOT}/tools/image_io",
+                        f"-I{REPO_ROOT}/include", "-c",
                     ]
                 )
             )
@@ -98,23 +106,28 @@ def synthesized() -> list[CompileEntry]:
     return entries
 
 
-def merge() -> int:
+def merge(directory: str | Path = "build") -> int:
     """Merge project and reference entries into the root clangd database.
 
+    :param directory: Selected candidate and reference build directory.
     :returns: Zero after writing the database.
     :raises OSError: If a database cannot be read or written.
     :raises json.JSONDecodeError: If an input database is malformed.
     """
+    build_dir = build_directory(directory)
     entries = []
-    if os.path.isfile(MAIN_DATABASE):
-        entries.extend(load(MAIN_DATABASE))
-    for path in REFERENCE_DATABASES:
+    main_database = build_dir / "compile_commands.json"
+    if main_database.is_file():
+        entries.extend(load(str(main_database)))
+    for reference in ("reference-build", "libjxl-build"):
+        path = str(build_dir / reference / "compile_commands.json")
         if not os.path.isfile(path):
             continue
         entries.extend(
-            item for item in load(path) if "/bench/inmemory/" in item.get("file", "")
+            item for item in load(path)
+            if "/bench/inmemory/" in item.get("file", "")
         )
-    entries.extend(synthesized())
+    entries.extend(synthesized(build_dir))
 
     deduplicated = {}
     for item in entries:
@@ -127,4 +140,6 @@ def merge() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(merge())
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--build-dir", type=Path, default=Path("build"))
+    sys.exit(merge(parser.parse_args().build_dir))

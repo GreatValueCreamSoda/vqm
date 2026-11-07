@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Copyright (c) 2026 VQM contributors. BSD-3-Clause; see LICENSE.
-"""Exercise the public CLI's ordered video, batch and machine-output contracts."""
+"""Test ordered video, batch and machine-output CLI contracts."""
 
 import json
 import math
@@ -27,7 +27,8 @@ def _require_gpu() -> None:
     if not path:
         raise unittest.SkipTest("GPU test binary not configured")
     probe = subprocess.run(
-        [path, "--probe-gpu"], capture_output=True, text=True, timeout=120, check=False
+        [path, "--probe-gpu"], capture_output=True, text=True, timeout=120,
+        check=False
     )
     if probe.returncode == 0:
         return
@@ -38,8 +39,8 @@ def _require_gpu() -> None:
 
 def _run(*args: str | Path) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
-        [_binary(), *(str(arg) for arg in args)], capture_output=True, text=True,
-        timeout=120, check=False
+        [_binary(), *(str(arg) for arg in args)], capture_output=True,
+        text=True, timeout=120, check=False
     )
 
 
@@ -47,7 +48,9 @@ def _write_y4m(
     path: Path, *, frames: int = 3, distorted: bool = False, width: int = 32,
     height: int = 32, fps: str = "30:1", distorted_frame: int | None = None
 ) -> None:
-    pixels = bytearray(f"YUV4MPEG2 W{width} H{height} F{fps} Ip C444\n".encode())
+    pixels = bytearray(
+        f"YUV4MPEG2 W{width} H{height} F{fps} Ip C444\n".encode()
+    )
     offsets = (0, 7, 5, 17)
     if distorted and distorted_frame is None:
         distorted_frame = frames - 1
@@ -56,13 +59,16 @@ def _write_y4m(
         for plane in range(3):
             pixels.extend(
                 _plane(
-                    width, height, offsets[frame % 4], plane, frame == distorted_frame
+                    width, height, offsets[frame % 4], plane,
+                    frame == distorted_frame
                 )
             )
     path.write_bytes(pixels)
 
 
-def _plane(width: int, height: int, offset: int, plane: int, distorted: bool) -> bytes:
+def _plane(
+    width: int, height: int, offset: int, plane: int, distorted: bool
+) -> bytes:
     values = bytearray()
     for y in range(height):
         for x in range(width):
@@ -78,8 +84,8 @@ class VideoCliArguments(unittest.TestCase):
     def test_rejects_invalid_frame_range_options(self) -> None:
         """Validate frame range arguments before opening inputs."""
         cases = (
-            ("--start-frame", "-1"), ("--frame-count", "0"), ("--start-frame", "1.5"),
-            ("--frame-count", "9223372036854775808")
+            ("--start-frame", "-1"), ("--frame-count", "0"),
+            ("--start-frame", "1.5"), ("--frame-count", "9223372036854775808")
         )
         for flags in cases:
             with self.subTest(flags=flags):
@@ -91,8 +97,9 @@ class VideoCliArguments(unittest.TestCase):
         """Keep iteration counts unsigned and output modes unambiguous."""
         cases = (
             ("--iterations", "0"), ("--iterations", "-1"), ("--warmup", "-1"),
-            ("--iterations", "1x"), ("--iterations", "4294967296"), ("--json", "--raw"),
-            ("--metric", "all", "--raw"), ("--verbose", "--raw")
+            ("--iterations", "1x"), ("--iterations", "4294967296"),
+            ("--json", "--raw"), ("--metric", "all",
+                                  "--raw"), ("--verbose", "--raw")
         )
         for flags in cases:
             with self.subTest(flags=flags):
@@ -110,7 +117,8 @@ class VideoCliArguments(unittest.TestCase):
 
     def test_rejects_empty_or_unknown_metric_list_items(self) -> None:
         """Validate every list item, including items after the all alias."""
-        for value in ("", ",cvvdp", "cvvdp,", "cvvdp,,butteraugli", "all,unknown"):
+        for value in ("", ",cvvdp", "cvvdp,", "cvvdp,,butteraugli",
+                      "all,unknown"):
             with self.subTest(value=value):
                 result = _run("--metric", value, "a", "b")
                 self.assertEqual(result.returncode, 2, result.stderr)
@@ -129,14 +137,17 @@ class VideoCliArguments(unittest.TestCase):
     def test_rejects_vmaf_v1_model_with_wrong_metric_or_name(self) -> None:
         """Require a VMAF v1 selection and a supported preset."""
         for metric, model in (("vmaf-v0", "4k-3h"), ("vmaf-v1", "unknown")):
-            result = _run("--metric", metric, "--vmaf-v1-model", model, "a", "b")
+            result = _run(
+                "--metric", metric, "--vmaf-v1-model", model, "a", "b"
+            )
             self.assertEqual(result.returncode, 2, result.stderr)
             self.assertIn("--vmaf-v1-model", result.stderr)
 
     def test_rejects_invalid_vmaf_v0_options(self) -> None:
         """Require VMAF v0 and a known predictor for v0 options."""
         cases = (
-            ("vmaf-v0", "--vmaf-model", "unknown"), ("vmaf-v1", "--vmaf-model", "1080"),
+            ("vmaf-v0", "--vmaf-model",
+             "unknown"), ("vmaf-v1", "--vmaf-model", "1080"),
             ("vmaf-v1", "--vmaf-neg"), ("cvvdp", "--vmaf-transform"),
         )
         for metric, flag, *values in cases:
@@ -146,9 +157,10 @@ class VideoCliArguments(unittest.TestCase):
 
     def test_vmaf_v1_temporal_and_hdr_option_validation(self) -> None:
         """Require VMAF v1 and let its HDR model control geometry."""
-        for flags, flag in ((("--metric", "vmaf-v0", "--vmaf-v1-hfr"), "--vmaf-v1-hfr"),
-                            (("--metric", "vmaf-v1", "--vmaf-v1-model", "hdr-4k-1.5h",
-                              "--vmaf-pad"), "--vmaf-pad")):
+        for flags, flag in ((("--metric", "vmaf-v0", "--vmaf-v1-hfr"),
+                             "--vmaf-v1-hfr"),
+                            (("--metric", "vmaf-v1", "--vmaf-v1-model",
+                              "hdr-4k-1.5h", "--vmaf-pad"), "--vmaf-pad")):
             result = _run(*flags, "a", "b")
             self.assertEqual(result.returncode, 2, result.stderr)
             self.assertIn(flag, result.stderr)
@@ -170,7 +182,8 @@ class VideoCliArguments(unittest.TestCase):
     def test_video_timing_and_geometry_must_match(self) -> None:
         """Reject incompatible video headers before constructing a pipeline."""
         with tempfile.TemporaryDirectory() as temporary:
-            original, distorted = Path(temporary) / "a.y4m", Path(temporary) / "b.y4m"
+            original, distorted = Path(temporary
+                                       ) / "a.y4m", Path(temporary) / "b.y4m"
             _write_y4m(original)
             _write_y4m(distorted, fps="30000:1001")
             result = _run("--json", "--metric", "vmaf-v0", original, distorted)
@@ -188,16 +201,19 @@ class VideoCliGpu(unittest.TestCase):
     """Check complete ordered clips through the shipped executable."""
 
     def test_all_qualified_metrics_emit_complete_clip_results(self) -> None:
-        """Expose ordered frame results or a whole-clip JOD for qualification."""
+        """Expose frame results or whole-clip JOD for qualification."""
         _require_gpu()
         metrics = ("ssimulacra2", "butteraugli", "vmaf-v0", "vmaf-v1", "cvvdp")
         temporary = self.enterContext(tempfile.TemporaryDirectory())
-        original, distorted = Path(temporary) / "a.y4m", Path(temporary) / "b.y4m"
+        original, distorted = Path(temporary
+                                   ) / "a.y4m", Path(temporary) / "b.y4m"
         for metric in metrics:
             with self.subTest(metric=metric):
                 width, height = (216, 80) if metric == "vmaf-v1" else (32, 32)
                 _write_y4m(original, width=width, height=height)
-                _write_y4m(distorted, width=width, height=height, distorted=True)
+                _write_y4m(
+                    distorted, width=width, height=height, distorted=True
+                )
                 result = _run("--json", "--metric", metric, original, distorted)
                 self.assertEqual(result.returncode, 0, result.stderr)
                 report = json.loads(result.stdout)
@@ -212,17 +228,24 @@ class VideoCliGpu(unittest.TestCase):
         """Score all six metrics on one complete clip in canonical order."""
         _require_gpu()
         metrics = (
-            "ssimulacra2", "butteraugli", "vmaf-v0", "vmaf-v1", "cvvdp", "psnr-hvs"
+            "ssimulacra2", "butteraugli", "vmaf-v0", "vmaf-v1", "cvvdp",
+            "psnr-hvs"
         )
         temporary = self.enterContext(tempfile.TemporaryDirectory())
-        original, distorted = Path(temporary) / "a.y4m", Path(temporary) / "b.y4m"
+        original, distorted = Path(temporary
+                                   ) / "a.y4m", Path(temporary) / "b.y4m"
         _write_y4m(original, width=216, height=80)
         _write_y4m(distorted, width=216, height=80, distorted=True)
         combined = _run("--json", "--metric", "all", original, distorted)
         self.assertEqual(combined.returncode, 0, combined.stderr)
         reports = [json.loads(line) for line in combined.stdout.splitlines()]
-        self.assertEqual([report["metric"] for report in reports], list(metrics))
-        self.assertEqual(len({report["decode_seconds"] for report in reports}), 1)
+        self.assertEqual(
+            [report["metric"] for report in reports], list(metrics)
+        )
+        self.assertEqual(
+            len({report["decode_seconds"]
+                 for report in reports}), 1
+        )
         for report in reports:
             with self.subTest(metric=report["metric"]):
                 independent = _run(
@@ -232,10 +255,12 @@ class VideoCliGpu(unittest.TestCase):
                 expected = json.loads(independent.stdout)
                 self.assertEqual(report["frames"], expected["frames"])
                 self.assertEqual(report["score"], expected["score"])
-                self.assertEqual(report["frame_results"], expected["frame_results"])
+                self.assertEqual(
+                    report["frame_results"], expected["frame_results"]
+                )
 
     def test_vmaf_pools_the_final_distorted_frame(self) -> None:
-        """The final frame changes the pooled score without changing the first frame."""
+        """Let the last frame change the pool without changing the first."""
         _require_gpu()
         root = Path(self.enterContext(tempfile.TemporaryDirectory()))
         original, distorted = root / "original.y4m", root / "distorted.y4m"
@@ -243,19 +268,22 @@ class VideoCliGpu(unittest.TestCase):
         _write_y4m(distorted, width=216, height=160, distorted=True)
         pairs = root / "pairs.tsv"
         pairs.write_text(
-            f"identity\t{original}\t{original}\nlate\t{original}\t{distorted}\n",
-            encoding="utf-8",
+            (
+                f"identity\t{original}\t{original}\nlate\t{original}\t"
+                f"{distorted}\n"
+            ), encoding="utf-8",
         )
         for metric in ("vmaf-v0", "vmaf-v1"):
             with self.subTest(metric=metric):
                 result = _run(
-                    "--json", "--metric", metric, "--pairs-file", pairs, "--iterations",
-                    "2", "--warmup", "1",
+                    "--json", "--metric", metric, "--pairs-file", pairs,
+                    "--iterations", "2", "--warmup", "1",
                 )
                 self.assertEqual(result.returncode, 0, result.stderr)
                 identity, late = map(json.loads, result.stdout.splitlines())
                 self._check_frames(late, metric)
-                expected, actual = identity["frame_results"], late["frame_results"]
+                expected, actual = identity["frame_results"], late[
+                    "frame_results"]
                 self.assertEqual(actual[0]["score"], expected[0]["score"])
                 self.assertNotAlmostEqual(
                     actual[-1]["score"], expected[-1]["score"], places=3
@@ -272,19 +300,25 @@ class VideoCliGpu(unittest.TestCase):
         metrics = ("vmaf-v0", "vmaf-v1")
         features = {metric: set() for metric in metrics}
         modes = (
-            (), ("--vmaf-scale", ), ("--vmaf-pad", ), ("--vmaf-scale", "--vmaf-pad")
+            (), ("--vmaf-scale", ), ("--vmaf-pad", ),
+            ("--vmaf-scale", "--vmaf-pad")
         )
         for flags in modes:
             result = _run(
-                "--json", "--metric", ",".join(metrics), *flags, original, distorted
+                "--json", "--metric", ",".join(metrics), *flags, original,
+                distorted
             )
             self.assertEqual(result.returncode, 0, result.stderr)
             reports = [json.loads(line) for line in result.stdout.splitlines()]
-            self.assertEqual([report["metric"] for report in reports], list(metrics))
+            self.assertEqual(
+                [report["metric"] for report in reports], list(metrics)
+            )
             for report in reports:
                 self.assertTrue(math.isfinite(report["score"]))
                 frames = report["frame_results"]
-                self.assertEqual([frame["index"] for frame in frames], [0, 1, 2])
+                self.assertEqual(
+                    [frame["index"] for frame in frames], [0, 1, 2]
+                )
                 features[report["metric"]].add(
                     tuple(tuple(frame["features"]) for frame in frames)
                 )
@@ -299,7 +333,9 @@ class VideoCliGpu(unittest.TestCase):
         original = root / "hfr-original.y4m"
         distorted = root / "hfr-distorted.y4m"
         _write_y4m(original, width=216, height=80, fps="60000:1001")
-        _write_y4m(distorted, width=216, height=80, fps="60000:1001", distorted=True)
+        _write_y4m(
+            distorted, width=216, height=80, fps="60000:1001", distorted=True
+        )
         result = _run(
             "--json", "--metric", "vmaf-v0,vmaf-v1", "--vmaf-v1-hfr", original,
             distorted
@@ -323,10 +359,12 @@ class VideoCliGpu(unittest.TestCase):
         baseline = _run(*command)
         self.assertEqual(baseline.returncode, 0, baseline.stderr)
         base_v0, base_v1 = map(json.loads, baseline.stdout.splitlines())
-        base_features = [frame["features"] for frame in base_v0["frame_results"]]
+        base_features = [
+            frame["features"] for frame in base_v0["frame_results"]
+        ]
         cases = (
-            (("--vmaf-model", "4k"), False), (("--vmaf-neg", ),
-                                              True), (("--vmaf-transform", ), False),
+            (("--vmaf-model", "4k"),
+             False), (("--vmaf-neg", ), True), (("--vmaf-transform", ), False),
             (("--vmaf-model", "4k", "--vmaf-neg", "--vmaf-transform"), True),
         )
         for flags, changes_features in cases:
@@ -346,18 +384,20 @@ class VideoCliGpu(unittest.TestCase):
         original = root / "clip.y4m"
         _write_y4m(original, width=320, height=240)
         result = _run(
-            "--json", "--verbose", "--metric", "vmaf-v1", "--vmaf-v1-model", "4k-3h",
-            original, original
+            "--json", "--verbose", "--metric", "vmaf-v1", "--vmaf-v1-model",
+            "4k-3h", original, original
         )
         self.assertEqual(result.returncode, 0, result.stderr)
         report = json.loads(result.stdout)
         self.assertGreater(report["score"], 100)
         self.assertLessEqual(report["score"], 110)
         scores = [frame["score"] for frame in report["frame_results"]]
-        self.assertEqual(report["frame_stats"]["perfect_frames"], scores.count(110))
+        self.assertEqual(
+            report["frame_stats"]["perfect_frames"], scores.count(110)
+        )
 
     def test_psnr_hvs_pools_frame_errors_before_db_conversion(self) -> None:
-        """Zero-error frames contribute to the clip mean without dominating it."""
+        """Include zero-error frames without dominating the clip mean."""
         _require_gpu()
         temporary = Path(self.enterContext(tempfile.TemporaryDirectory()))
         original, distorted = temporary / "a.y4m", temporary / "b.y4m"
@@ -368,9 +408,13 @@ class VideoCliGpu(unittest.TestCase):
         report = json.loads(result.stdout)
         frames = report["frame_results"]
         self.assertEqual([frame["index"] for frame in frames], [0, 1, 2])
-        self.assertEqual([frame["score"] for frame in frames[:2]], ["inf", "inf"])
+        self.assertEqual(
+            [frame["score"] for frame in frames[:2]], ["inf", "inf"]
+        )
         errors = [frame["normalized_error"] for frame in frames]
-        weighted_errors = [0.8 * y + 0.1 * cb + 0.1 * cr for y, cb, cr in errors]
+        weighted_errors = [
+            0.8 * y + 0.1 * cb + 0.1 * cr for y, cb, cr in errors
+        ]
         mean_error = sum(weighted_errors) / len(frames)
         self.assertIsInstance(report["score"], float)
         self.assertAlmostEqual(
@@ -381,16 +425,22 @@ class VideoCliGpu(unittest.TestCase):
         self.assertEqual(identity.returncode, 0, identity.stderr)
         self.assertEqual(json.loads(identity.stdout)["score"], "inf")
 
-    def test_verbose_json_reports_temporal_scores_and_infinite_frames(self) -> None:
-        """Expose filtered frame JOD and summarize finite scores in batch records."""
+    def test_verbose_json_reports_temporal_scores_and_infinite_frames(
+        self
+    ) -> None:
+        """Expose filtered frame JOD and finite batch summaries."""
         _require_gpu()
         root = Path(self.enterContext(tempfile.TemporaryDirectory()))
-        original, distorted, single = root / "a.y4m", root / "b.y4m", root / "c.y4m"
+        original, distorted, single = (
+            root / "a.y4m", root / "b.y4m", root / "c.y4m"
+        )
         _write_y4m(original)
         _write_y4m(distorted, distorted_frame=0)
         _write_y4m(single, frames=1)
         pairs = root / "pairs.tsv"
-        pairs.write_text(f"clip\t{original}\t{distorted}\nsingle\t{single}\t{single}\n")
+        pairs.write_text(
+            f"clip\t{original}\t{distorted}\nsingle\t{single}\t{single}\n"
+        )
         flags = ("--json", "--metric", "cvvdp,psnr-hvs", "--pairs-file", pairs)
         ordinary = _run(*flags)
         verbose = _run("--verbose", *flags)
@@ -415,10 +465,18 @@ class VideoCliGpu(unittest.TestCase):
         self.assertLess(reports[0]["frame_results"][1]["score"], 10)
         self.assertGreater(reports[0]["frame_stats"]["finite_stddev"], 0)
         self.assertEqual(
-            [f["score"] for f in reports[1]["frame_results"][1:]], ["inf", "inf"]
+            [f["score"] for f in reports[1]["frame_results"][1:]],
+            ["inf", "inf"]
         )
-        self.assertEqual(reports[1]["frame_results"], baseline[1]["frame_results"])
-        self.assertEqual(reports[2]["frame_results"], [{"index": 0, "score": 10}])
+        self.assertEqual(
+            reports[1]["frame_results"], baseline[1]["frame_results"]
+        )
+        self.assertEqual(
+            reports[2]["frame_results"], [{
+                "index": 0,
+                "score": 10
+            }]
+        )
         self.assertEqual(reports[3]["frame_stats"]["infinite_frames"], 1)
 
     def _check_scoring_fps(self, reports: list[dict[str, object]]) -> None:
@@ -456,7 +514,9 @@ class VideoCliGpu(unittest.TestCase):
             self.assertIsNone(stats["finite_stddev"])
             return
         self.assertAlmostEqual(stats["finite_mean"], statistics.mean(finite))
-        self.assertAlmostEqual(stats["finite_stddev"], statistics.pstdev(finite))
+        self.assertAlmostEqual(
+            stats["finite_stddev"], statistics.pstdev(finite)
+        )
 
     def test_verbose_text_aligns_selected_metrics(self) -> None:
         """Align each metric's pooled score in selection order."""
@@ -466,7 +526,8 @@ class VideoCliGpu(unittest.TestCase):
         _write_y4m(original, width=216, height=80)
         _write_y4m(distorted, width=216, height=80, distorted=True)
         metrics = (
-            "psnr-hvs", "butteraugli", "cvvdp", "ssimulacra2", "vmaf-v1", "vmaf-v0"
+            "psnr-hvs", "butteraugli", "cvvdp", "ssimulacra2", "vmaf-v1",
+            "vmaf-v0"
         )
         flags = ("-v", "--metric", ",".join(metrics), original, distorted)
         result = _run(*flags)
@@ -488,7 +549,9 @@ class VideoCliGpu(unittest.TestCase):
         )
         verbose_json = _run("--json", *flags)
         self.assertEqual(verbose_json.returncode, 0, verbose_json.stderr)
-        reports = [json.loads(line) for line in verbose_json.stdout.splitlines()]
+        reports = [
+            json.loads(line) for line in verbose_json.stdout.splitlines()
+        ]
         self._check_scoring_fps(reports)
         for row, report in zip(rows, reports, strict=True):
             self.assertEqual(row[0].group(), report["metric"])
@@ -518,7 +581,9 @@ class VideoCliGpu(unittest.TestCase):
         )
         if metric.startswith("vmaf"):
             count = 6 if metric == "vmaf-v0" else 4
-            self.assertEqual([len(frame["features"]) for frame in frames], [count] * 3)
+            self.assertEqual(
+                [len(frame["features"]) for frame in frames], [count] * 3
+            )
             self.assertTrue(
                 all(
                     math.isfinite(value) for frame in frames
@@ -536,7 +601,8 @@ class VideoCliGpu(unittest.TestCase):
         """A distortion confined to the last frame affects the ordinary CLI."""
         _require_gpu()
         temporary = self.enterContext(tempfile.TemporaryDirectory())
-        original, distorted = Path(temporary) / "a.y4m", Path(temporary) / "b.y4m"
+        original, distorted = Path(temporary
+                                   ) / "a.y4m", Path(temporary) / "b.y4m"
         _write_y4m(original)
         _write_y4m(distorted, distorted=True)
         metrics = ("butteraugli", "ssimulacra2")
@@ -544,7 +610,9 @@ class VideoCliGpu(unittest.TestCase):
         for metric in metrics:
             with self.subTest(metric=metric):
                 plain = _run("--metric", metric, original, distorted)
-                machine = _run("--json", "--metric", metric, original, distorted)
+                machine = _run(
+                    "--json", "--metric", metric, original, distorted
+                )
                 self.assertEqual(plain.returncode, 0, plain.stderr)
                 self.assertEqual(machine.returncode, 0, machine.stderr)
                 self.assertAlmostEqual(
@@ -557,11 +625,13 @@ class VideoCliGpu(unittest.TestCase):
         self.assertEqual(combined.stdout.splitlines(), expected)
 
     def test_batch_and_repeated_clips_reset_pending_history(self) -> None:
-        """Keep metric order, escaped IDs, and isolated sequence tails in a batch."""
+        """Preserve metric order, escaped IDs and isolated batch tails."""
         _require_gpu()
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            original, distorted, still = root / "a.y4m", root / "b.y4m", root / "c.y4m"
+            original, distorted, still = (
+                root / "a.y4m", root / "b.y4m", root / "c.y4m"
+            )
             _write_y4m(original)
             _write_y4m(distorted, distorted=True)
             _write_y4m(still, frames=1)
@@ -574,8 +644,9 @@ class VideoCliGpu(unittest.TestCase):
                 f"last\t{still}\t{still}\nimage\t{png}\t{png}\n"
             )
             batch = _run(
-                "--json", "--metric", "vmaf-v0", "--metric", "butteraugli,vmaf-v0",
-                "--pairs-file", pairs, "--iterations", "2", "--warmup", "1"
+                "--json", "--metric", "vmaf-v0", "--metric",
+                "butteraugli,vmaf-v0", "--pairs-file", pairs, "--iterations",
+                "2", "--warmup", "1"
             )
             self.assertEqual(batch.returncode, 0, batch.stderr)
             reports = [json.loads(line) for line in batch.stdout.splitlines()]
@@ -584,7 +655,8 @@ class VideoCliGpu(unittest.TestCase):
                 [sample_id, sample_id, "last", "last", "image", "image"]
             )
             self.assertEqual(
-                [report["metric"] for report in reports], ["vmaf-v0", "butteraugli"] * 3
+                [report["metric"] for report in reports],
+                ["vmaf-v0", "butteraugli"] * 3
             )
             self.assertEqual(
                 [report["frames"] for report in reports], [3, 3, 1, 1, 1, 1]
@@ -597,11 +669,14 @@ class VideoCliGpu(unittest.TestCase):
             )
             self.assertEqual(reports[2]["frame_results"][0]["features"][1], 0)
 
-    def test_late_malformed_or_unequal_frames_emit_no_partial_result(self) -> None:
+    def test_late_malformed_or_unequal_frames_emit_no_partial_result(
+        self
+    ) -> None:
         """A successful prefix must never become a complete clip result."""
         _require_gpu()
         with tempfile.TemporaryDirectory() as temporary:
-            original, distorted = Path(temporary) / "a.y4m", Path(temporary) / "b.y4m"
+            original, distorted = Path(temporary
+                                       ) / "a.y4m", Path(temporary) / "b.y4m"
             _write_y4m(original)
             _write_y4m(distorted, frames=2)
             result = _run("--json", original, distorted)
@@ -611,7 +686,8 @@ class VideoCliGpu(unittest.TestCase):
             _write_y4m(distorted)
             distorted.write_bytes(distorted.read_bytes()[:-1])
             result = _run(
-                "--json", "--metric", "ssimulacra2,butteraugli", original, distorted
+                "--json", "--metric", "ssimulacra2,butteraugli", original,
+                distorted
             )
             self.assertEqual(result.returncode, 1)
             self.assertIn("truncated y4m frame", result.stderr)

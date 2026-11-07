@@ -51,39 +51,45 @@ def _cases() -> list[tuple[str, dict[str, object], dict[str, object]]]:
 
 
 class QualifiedDefaultTests(unittest.TestCase):
-    """Resolve complete frozen domains without depending on their filesystem paths."""
+    """Resolve frozen domains independently of filesystem paths."""
 
     def test_all_twelve_qualified_profiles_default_to_ranking(self) -> None:
-        """Both hosted profiles and both balanced still policies are promoted."""
+        """Promote both hosted profiles and balanced still policies."""
         cases = _cases()
         self.assertEqual(len(cases), 12)
         for name, reference, policy in cases:
             with self.subTest(domain=name):
-                self.assertEqual(default_gate_mode(reference, policy), "ranking")
+                self.assertEqual(
+                    default_gate_mode(reference, policy), "ranking"
+                )
 
     def test_implicit_policy_defaults_cannot_change_under_an_approved_policy(
         self
     ) -> None:
-        """A schema default change requires qualification even when JSON stays the same."""
+        """Require qualification after schema default changes."""
         _, reference, policy = _cases()[0]
         settings = AgreementPolicy.parse(policy)
-        changed = replace(settings, limits=replace(settings.limits, srcc_min=.9))
+        changed = replace(
+            settings, limits=replace(settings.limits, srcc_min=.9)
+        )
         with mock.patch.object(AgreementPolicy, "parse", return_value=changed):
             self.assertEqual(default_gate_mode(reference, policy), "both")
 
     def test_key_order_and_reference_sample_order_do_not_change_qualification(
         self
     ) -> None:
-        """Canonical identity survives JSON presentation and whole-report sorting."""
+        """Preserve identity across JSON formatting and report sorting."""
         for name, reference, policy in _cases():
             with self.subTest(domain=name):
                 reordered = dict(reversed(tuple(reference.items())))
                 reordered["samples"] = list(reversed(reference["samples"]))
                 settings = dict(reversed(tuple(policy.items())))
-                self.assertEqual(default_gate_mode(reordered, settings), "ranking")
+                self.assertEqual(
+                    default_gate_mode(reordered, settings), "ranking"
+                )
 
     def test_policy_changes_do_not_inherit_the_qualified_default(self) -> None:
-        """New margins, provenance, thresholds and subjective rules need new evidence."""
+        """Require new evidence for changed frozen policy contracts."""
         for name, reference, policy in _cases():
             self._check_policy_changes(name, reference, policy)
 
@@ -110,15 +116,17 @@ class QualifiedDefaultTests(unittest.TestCase):
                 changed = dict(policy, **{field: value})
                 self.assertEqual(default_gate_mode(reference, changed), "both")
 
-    def test_reference_provenance_cannot_reuse_a_registered_policy(self) -> None:
-        """Copying an approved policy cannot qualify a different metric or input manifest."""
+    def test_reference_provenance_cannot_reuse_a_registered_policy(
+        self
+    ) -> None:
+        """Reject copied policies for different metrics or manifests."""
         changes = {
             "metric": "unqualified-metric",
             "revision": "unqualified-original",
             "input_manifest_hash": _digest("different-samples")
         }
-        for (name, reference, policy), (field, value) in product(_cases(),
-                                                                 changes.items()):
+        for (name, reference,
+             policy), (field, value) in product(_cases(), changes.items()):
             with self.subTest(domain=name, field=field):
                 changed = dict(reference, **{field: value})
                 self.assertEqual(default_gate_mode(changed, policy), "both")
@@ -126,7 +134,7 @@ class QualifiedDefaultTests(unittest.TestCase):
     def test_original_scores_cannot_be_replaced_under_the_same_declared_hash(
         self
     ) -> None:
-        """Claiming the old manifest does not approve a different original score vector."""
+        """Bind original scores independently of claimed manifests."""
         for name, reference, policy in _cases():
             with self.subTest(domain=name):
                 changed = copy.deepcopy(reference)
@@ -136,7 +144,7 @@ class QualifiedDefaultTests(unittest.TestCase):
     def test_sample_metadata_cannot_be_replaced_under_the_same_declared_hash(
         self
     ) -> None:
-        """Input IDs, domains, families and per-sample hashes remain independently bound."""
+        """Bind input IDs, domains, families and hashes independently."""
         fields = {
             "sample_id": "different-sample",
             "source_id": "different-source",
@@ -149,8 +157,8 @@ class QualifiedDefaultTests(unittest.TestCase):
             self._check_sample_changes(name, reference, policy, fields)
 
     def _check_sample_changes(
-        self, name: str, reference: dict[str, object], policy: dict[str, object],
-        changes: dict[str, str]
+        self, name: str, reference: dict[str, object],
+        policy: dict[str, object], changes: dict[str, str]
     ) -> None:
         for field, value in changes.items():
             with self.subTest(domain=name, field=field):
@@ -159,7 +167,7 @@ class QualifiedDefaultTests(unittest.TestCase):
                 self.assertEqual(default_gate_mode(changed, policy), "both")
 
     def test_missing_or_additional_samples_need_new_qualification(self) -> None:
-        """A partial or enlarged corpus cannot inherit the complete frozen-domain default."""
+        """Reject frozen defaults for partial or enlarged corpora."""
         for name, reference, policy in _cases():
             with self.subTest(domain=name):
                 changed = copy.deepcopy(reference)
@@ -173,17 +181,19 @@ class QualifiedDefaultTests(unittest.TestCase):
     def test_cid22_configuration_fingerprint_may_change_with_a_binary_rebuild(
         self
     ) -> None:
-        """Balanced still policies bind logical settings and inputs rather than one executable."""
+        """Bind balanced policies to logical settings and inputs."""
         for name, reference, policy in _cases():
             if not name.startswith("cid22/"):
                 continue
             with self.subTest(domain=name):
                 self.assertNotIn("configuration_hash", policy)
-                changed = dict(reference, configuration_hash=_digest("rebuilt-binary"))
+                changed = dict(
+                    reference, configuration_hash=_digest("rebuilt-binary")
+                )
                 self.assertEqual(default_gate_mode(changed, policy), "ranking")
 
     def test_temporal_configuration_fingerprint_cannot_change(self) -> None:
-        """The hosted qualification binds exact conversion, pooling, model and timing settings."""
+        """Bind hosted policies to exact scoring and input settings."""
         for name, reference, policy in _cases():
             if name.startswith("cid22/"):
                 continue
@@ -193,8 +203,10 @@ class QualifiedDefaultTests(unittest.TestCase):
                 )
                 self.assertEqual(default_gate_mode(changed, policy), "both")
 
-    def test_changed_still_mos_labels_cannot_reuse_the_qualified_default(self) -> None:
-        """The approved human-label noninferiority contract keeps its original annotations."""
+    def test_changed_still_mos_labels_cannot_reuse_the_qualified_default(
+        self
+    ) -> None:
+        """Retain frozen human-label noninferiority annotations."""
         for name, reference, policy in _cases():
             if not name.startswith("cid22/"):
                 continue
@@ -203,21 +215,25 @@ class QualifiedDefaultTests(unittest.TestCase):
                 changed["samples"][0]["mos"] += 1
                 self.assertEqual(default_gate_mode(changed, policy), "both")
 
-    def test_unknown_policy_stays_on_both_even_with_a_known_metric(self) -> None:
-        """Metric names alone never qualify alternate models, displays or content."""
+    def test_unknown_policy_stays_on_both_even_with_a_known_metric(
+        self
+    ) -> None:
+        """Require qualification beyond matching metric names."""
         _, reference, policy = _cases()[0]
         changed = dict(policy, input_manifest_hash=_digest("new-domain"))
-        observed = dict(reference, input_manifest_hash=changed["input_manifest_hash"])
+        observed = dict(
+            reference, input_manifest_hash=changed["input_manifest_hash"]
+        )
         self.assertEqual(default_gate_mode(observed, changed), "both")
 
     def test_default_qualified_cli_accepts_offset_and_keeps_numerical_failure(
         self
     ) -> None:
-        """A real command defaults to ranking while explicit numerical requirements still fail."""
+        """Use ranking defaults and preserve explicit numerical failures."""
         with tempfile.TemporaryDirectory() as temporary:
             command, output = _qualified_command(Path(temporary))
-            for mode, expected in ((None, 0), ("ranking", 0), ("both", 1), ("numerical",
-                                                                            1)):
+            for mode, expected in ((None, 0), ("ranking", 0), ("both", 1),
+                                   ("numerical", 1)):
                 self._check_cli_result(command, output, mode, expected)
 
     def _check_cli_result(
@@ -249,10 +265,14 @@ class QualifiedDefaultTests(unittest.TestCase):
             self.assertEqual(evidence["ranking"]["status"], "fail")
             self.assertEqual(evidence["numerical"]["status"], "fail")
 
-    def test_default_unqualified_cli_keeps_the_numerical_conjunction(self) -> None:
-        """An altered policy does not inherit ranking acceptance from a metric name."""
+    def test_default_unqualified_cli_keeps_the_numerical_conjunction(
+        self
+    ) -> None:
+        """Reject ranking defaults for altered policies."""
         with tempfile.TemporaryDirectory() as temporary:
-            command, output = _qualified_command(Path(temporary), unqualified=True)
+            command, output = _qualified_command(
+                Path(temporary), unqualified=True
+            )
             result = subprocess.run(
                 command, capture_output=True, text=True, check=False
             )
@@ -270,15 +290,17 @@ def _qualified_command(
     if unqualified:
         policy["numerical_max"] *= 2
     candidate = copy.deepcopy(reference)
-    candidate.update(implementation="offset-test-candidate", revision="test-build")
+    candidate.update(
+        implementation="offset-test-candidate", revision="test-build"
+    )
     for sample in candidate["samples"]:
         sample["score"] = -sample["score"] if reverse else sample["score"] + 3
     paths = {
         name: directory / f"{name}.json"
         for name in ("reference", "candidate", "policy", "result")
     }
-    for name, value in (("reference", reference), ("candidate", candidate), ("policy",
-                                                                             policy)):
+    for name, value in (("reference", reference), ("candidate", candidate),
+                        ("policy", policy)):
         paths[name].write_text(json.dumps(value))
     return [
         sys.executable, "-m", "validation.agreement",

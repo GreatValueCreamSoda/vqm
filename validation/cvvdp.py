@@ -21,7 +21,8 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Any, TextIO
+from typing import Any
+from typing import TextIO
 
 os.environ["PYTHONDONTWRITEBYTECODE"] = "1"
 sys.dont_write_bytecode = True
@@ -32,17 +33,24 @@ DISPLAY_PPD = {
     "standard_4k": "75.402449345163049",
     "standard_fhd": "37.842503853602885",
 }
+if __package__ in (None, ""):
+    # Keep direct script invocation compatible with package imports.
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(ROOT / ".reference/ColorVideoVDP"))
 
 import numpy as np  # noqa: E402
 import pycvvdp  # noqa: E402
 import torch  # noqa: E402
-from agreement import default_gate_mode, evaluate_agreement, report_from_rows  # noqa: E402
-from agreement_policy import AgreementPolicy  # noqa: E402
-from common import enumerate_pairs, load_mcos  # noqa: E402
 from PIL import Image  # noqa: E402
 from PIL import __version__ as pillow_version  # noqa: E402
 from pycvvdp.display_model import vvdp_display_photo_eotf  # noqa: E402
+
+from validation.agreement import default_gate_mode  # noqa: E402
+from validation.agreement import evaluate_agreement  # noqa: E402
+from validation.agreement import report_from_rows  # noqa: E402
+from validation.agreement_policy import AgreementPolicy  # noqa: E402
+from validation.common import enumerate_pairs  # noqa: E402
+from validation.common import load_mcos  # noqa: E402
 
 
 @dataclasses.dataclass(frozen=True)
@@ -79,27 +87,31 @@ def canonical_source(path: Path, cache: Path) -> Source:
     :raises ValueError: For nonopaque alpha or an unsupported sample mode.
     """
     with Image.open(path) as image:
-        if image.mode in ("RGBA", "LA") and image.getchannel("A").getextrema() != (255,
-                                                                                   255):
+        if image.mode in ("RGBA",
+                          "LA") and image.getchannel("A").getextrema() != (255,
+                                                                           255):
             raise ValueError(f"{path}: nonopaque alpha is unsupported")
         if image.mode not in ("RGB", "L", "RGBA", "LA"):
             raise ValueError(f"{path}: expected RGB8/grey8, found {image.mode}")
         rgb = image.convert("RGB")
     width, height = rgb.size
     pixels = rgb.tobytes()
-    rgb_hash = hashlib.sha256(f"RGB8:{width}x{height}:".encode() + pixels).hexdigest()
+    rgb_hash = hashlib.sha256(f"RGB8:{width}x{height}:".encode() +
+                              pixels).hexdigest()
     target = cache / f"{rgb_hash}.png"
     if target.exists():
         with Image.open(target) as existing:
-            valid = existing.mode == "RGB" and existing.size == rgb.size and existing.tobytes(
-            ) == pixels
+            valid = (
+                existing.mode == "RGB" and existing.size == rgb.size
+                and existing.tobytes() == pixels
+            )
         if not valid:
             raise ValueError(f"{target}: decoded cache was modified")
     else:
         rgb.save(target, format="PNG")
     return Source(
-        str(path.resolve()), digest(path), str(target.resolve()), rgb_hash, width,
-        height
+        str(path.resolve()), digest(path), str(target.resolve()), rgb_hash,
+        width, height
     )
 
 
@@ -138,7 +150,9 @@ def read_pair_list(path: Path) -> list[tuple[Path, Path]]:
             continue
         fields = line.split("\t")
         if len(fields) != 2:
-            raise ValueError(f"{path}:{number}: expected original<TAB>distorted")
+            raise ValueError(
+                f"{path}:{number}: expected original<TAB>distorted"
+            )
         pairs.append((Path(fields[0]), Path(fields[1])))
     return pairs
 
@@ -173,11 +187,12 @@ def metric_for(display: str) -> pycvvdp.cvvdp:
     resolved = pycvvdp.vvdp_display_photometry.load(display, [])
     photometry = vvdp_display_photo_eotf(
         resolved.Y_peak, contrast=resolved.contrast, source_colorspace="sRGB",
-        E_ambient=resolved.E_ambient, k_refl=resolved.k_refl, exposure=resolved.exposure
+        E_ambient=resolved.E_ambient, k_refl=resolved.k_refl,
+        exposure=resolved.exposure
     )
     return pycvvdp.cvvdp(
-        display_name=display, display_photometry=photometry, device=torch.device("cpu"),
-        quiet=True
+        display_name=display, display_photometry=photometry,
+        device=torch.device("cpu"), quiet=True
     )
 
 
@@ -189,8 +204,9 @@ def raw_tensor(path: str) -> torch.Tensor:
     """
     with Image.open(path) as image:
         rgb = np.asarray(image).copy()
-    return torch.from_numpy(rgb).permute(2, 0,
-                                         1).unsqueeze(0).unsqueeze(2).float() / 255.0
+    return torch.from_numpy(rgb).permute(
+        2, 0, 1
+    ).unsqueeze(0).unsqueeze(2).float() / 255.0
 
 
 def cache_key(a: Source, b: Source, display: str) -> str:
@@ -202,14 +218,14 @@ def cache_key(a: Source, b: Source, display: str) -> str:
     :returns: Cache key including implementation, precision and runtime version.
     """
     settings = [
-        PIN, torch.__version__, "cpu-fp32-highest-threads1", display, a.rgb_sha256,
-        b.rgb_sha256
+        PIN, torch.__version__, "cpu-fp32-highest-threads1", display,
+        a.rgb_sha256, b.rgb_sha256
     ]
     return hashlib.sha256(json.dumps(settings).encode()).hexdigest()
 
 
 def load_score_cache(path: Path) -> dict[str, dict[str, Any]]:
-    """Load append-only original score evidence without trusting stale settings.
+    """Load original scores while rejecting stale settings.
 
     :param path: JSONL cache path.
     :returns: Records indexed by their complete numerical-input key.
@@ -222,8 +238,9 @@ def load_score_cache(path: Path) -> dict[str, dict[str, Any]]:
     }
 
 
-def original_scores(rows: list[tuple[Source, Source]],
-                    args: argparse.Namespace) -> list[dict[str, Any]]:
+def original_scores(
+    rows: list[tuple[Source, Source]], args: argparse.Namespace
+) -> list[dict[str, Any]]:
     """Evaluate original scores, reusing only fully identified cached inputs.
 
     :param rows: Canonical paired sources.
@@ -275,8 +292,10 @@ def print_progress(count: int, total: int, started: float) -> None:
     """
     if count % 20 == 0 or count == total:
         print(
-            f"original {count}/{total}, {time.monotonic() - started:.1f}s elapsed",
-            flush=True
+            (
+                f"original {count}/{total}, {time.monotonic() - started:.1f}s "
+                f"elapsed"
+            ), flush=True
         )
 
 
@@ -301,8 +320,9 @@ def evaluate_original(metric: pycvvdp.cvvdp, a: Source, b: Source,
     return {"key": key, "score": value, "seconds": time.monotonic() - start}
 
 
-def candidate_scores(rows: list[tuple[Source, Source]],
-                     args: argparse.Namespace) -> list[float]:
+def candidate_scores(
+    rows: list[tuple[Source, Source]], args: argparse.Namespace
+) -> list[float]:
     """Run one VQM process over the same decoded samples.
 
     :param rows: Ordered canonical pair records.
@@ -311,19 +331,21 @@ def candidate_scores(rows: list[tuple[Source, Source]],
     :raises ValueError: For process failures, missing or malformed scores.
     """
     pairs_file = args.out_dir / "candidate-pairs.txt"
-    pairs_file.write_text("".join(f"{a.decoded}\t{b.decoded}\n" for a, b in rows))
+    pairs_file.write_text(
+        "".join(f"{a.decoded}\t{b.decoded}\n" for a, b in rows)
+    )
     snapshot = args.out_dir / "candidate-binary"
     shutil.copyfile(args.binary, snapshot)
     snapshot.chmod(args.binary.stat().st_mode)
     device = subprocess.run(
-        [str(snapshot.resolve()), "--device-info"], text=True, capture_output=True,
-        check=True, timeout=60
+        [str(snapshot.resolve()), "--device-info"], text=True,
+        capture_output=True, check=True, timeout=60
     )
     json.loads(device.stdout)  # Reject malformed provenance before scoring.
     (args.out_dir / "device.json").write_text(device.stdout)
     command = [
-        str(snapshot.resolve()), "--metric", "cvvdp", "--score-only", "--cvvdp-ppd",
-        DISPLAY_PPD[args.display], "--pairs-file",
+        str(snapshot.resolve()), "--metric", "cvvdp", "--score-only",
+        "--cvvdp-ppd", DISPLAY_PPD[args.display], "--pairs-file",
         str(pairs_file.resolve())
     ]
     result = subprocess.run(
@@ -335,7 +357,8 @@ def candidate_scores(rows: list[tuple[Source, Source]],
     values = result.stdout.splitlines()
     if result.returncode or len(values) != len(rows):
         raise ValueError(
-            f"candidate exit {result.returncode}, {len(values)}/{len(rows)} scores; see candidate.log"
+            f"candidate exit {result.returncode}, {len(values)}/{len(rows)}"
+            f" scores; see candidate.log"
         )
     scores = [float(line) for line in values]
     if not all(map(math.isfinite, scores)):
@@ -356,9 +379,12 @@ def write_report(
     :returns: Whether every candidate score satisfies the requested gate.
     """
     values = comparison_rows(rows, original, candidate)
-    errors = [row["absolute_error"] for row in values if "absolute_error" in row]
+    errors = [
+        row["absolute_error"] for row in values if "absolute_error" in row
+    ]
     passed = bool(errors) and max(errors) <= args.tolerance
-    metadata = candidate_provenance(args.out_dir) if candidate is not None else {}
+    metadata = candidate_provenance(args.out_dir
+                                    ) if candidate is not None else {}
     report = {
         "upstream_commit": PIN,
         "torch": torch.__version__,
@@ -375,17 +401,25 @@ def write_report(
         "results": values,
         **metadata
     }
-    print(f'{len(values)} pairs, max absolute JOD error {report["max_absolute_error"]}')
+    print(
+        f'{len(values)} pairs, max absolute JOD error '
+        f'{report["max_absolute_error"]}'
+    )
     selected_passed = passed
     if getattr(args, "agreement_policy", None) is not None:
         agreement = write_agreement(rows, original, candidate, args, passed)
         selected_passed = agreement["selected_gate_passed"]
         report.update(
-            gate_mode=agreement["gate_mode"], selected_gate_passed=selected_passed
+            gate_mode=agreement["gate_mode"],
+            selected_gate_passed=selected_passed
         )
     else:
-        print("REFERENCE ONLY" if candidate is None else "PASS" if passed else "FAIL")
-    (args.out_dir / "results.json").write_text(json.dumps(report, indent=2) + "\n")
+        print(
+            "REFERENCE ONLY" if candidate is
+            None else "PASS" if passed else "FAIL"
+        )
+    (args.out_dir /
+     "results.json").write_text(json.dumps(report, indent=2) + "\n")
     return selected_passed
 
 
@@ -396,7 +430,7 @@ def _json_digest(value: object) -> str:
 
 
 def _agreement_configuration(args: argparse.Namespace) -> dict[str, object]:
-    """Identify the physical display, source interpretation and pinned model data."""
+    """Identify the display, source interpretation and pinned model data."""
     data = ROOT / ".reference/ColorVideoVDP/pycvvdp/vvdp_data"
     return {
         "metric": "cvvdp",
@@ -413,8 +447,9 @@ def _agreement_configuration(args: argparse.Namespace) -> dict[str, object]:
     }
 
 
-def _agreement_sample(index: int, a: Source, b: Source, score: float,
-                      display: str) -> dict[str, object]:
+def _agreement_sample(
+    index: int, a: Source, b: Source, score: float, display: str
+) -> dict[str, object]:
     """Describe one pair using the decoded samples consumed by both arms."""
     parts = Path(b.source).parts
     family = parts[parts.index("compressed") +
@@ -434,10 +469,11 @@ def _agreement_reports(
     rows: list[tuple[Source, Source]], original: list[dict[str, Any]],
     candidate: list[float], args: argparse.Namespace
 ) -> tuple[dict[str, object], dict[str, object]]:
-    """Build canonical arms with a common real configuration and decoded-input manifest."""
+    """Build canonical arms with shared settings and decoded-input hashes."""
     reference_rows = [
         _agreement_sample(index, a, b, float(score["score"]), args.display)
-        for index, ((a, b), score) in enumerate(zip(rows, original, strict=True))
+        for index, ((a, b),
+                    score) in enumerate(zip(rows, original, strict=True))
     ]
     _attach_mos(reference_rows, rows, args)
     candidate_rows = [
@@ -466,13 +502,14 @@ def _agreement_reports(
     )
     observed = report_from_rows(
         candidate_rows, implementation="vqm",
-        revision=f"sha256:{digest(args.out_dir / 'candidate-binary')}", **metadata
+        revision=f"sha256:{digest(args.out_dir / 'candidate-binary')}",
+        **metadata
     )
     return reference, observed
 
 
 def _relative_pair(a: Source, b: Source, root: Path) -> tuple[str, str] | None:
-    """Identify CID22 annotation keys only for sources inside the selected corpus."""
+    """Identify CID22 annotation keys within the selected corpus."""
     original, distorted = Path(a.source), Path(b.source)
     if not original.is_relative_to(root) or not distorted.is_relative_to(root):
         return None
@@ -483,7 +520,7 @@ def _attach_mos(
     samples: list[dict[str, object]], rows: list[tuple[Source, Source]],
     args: argparse.Namespace
 ) -> None:
-    """Retain available authoritative CID22 labels for explicitly requested bootstrap gates."""
+    """Retain CID22 labels for explicitly requested bootstrap gates."""
     corpus = getattr(args, "corpus", None)
     if corpus is None:
         return
@@ -500,9 +537,10 @@ def _attach_mos(
 
 def write_agreement(
     rows: list[tuple[Source, Source]], original: list[dict[str, Any]],
-    candidate: list[float] | None, args: argparse.Namespace, numerical_passed: bool
+    candidate: list[float] | None, args: argparse.Namespace,
+    numerical_passed: bool
 ) -> dict[str, object]:
-    """Write independent ranking evidence and resolve the requested gate selection.
+    """Write ranking evidence and resolve the requested gate selection.
 
     :param rows: Canonical paired decoded inputs.
     :param original: Complete pinned-original score records.
@@ -522,18 +560,21 @@ def write_agreement(
     reference, observed = _agreement_reports(rows, original, candidate, args)
     result = evaluate_agreement(reference, observed, policy)
     ranking_passed = result["proposed_status"] == "pass"
-    numerical_gate = numerical_passed and result["numerical"]["status"] != "fail"
-    mode = getattr(args, "gate_mode", None) or default_gate_mode(reference, policy)
+    numerical_gate = (
+        numerical_passed and result["numerical"]["status"] != "fail"
+    )
+    mode = getattr(args, "gate_mode",
+                   None) or default_gate_mode(reference, policy)
     passed = (
-        ranking_passed if mode == "ranking" else
-        numerical_gate if mode == "numerical" else ranking_passed and numerical_gate
+        ranking_passed if mode == "ranking" else numerical_gate
+        if mode == "numerical" else ranking_passed and numerical_gate
     )
     result.update(
         gate_mode=mode, legacy_numerical_passed=numerical_passed,
         numerical_gate_passed=numerical_gate, selected_gate_passed=passed
     )
-    for name, value in (("original", reference), ("candidate", observed), ("agreement",
-                                                                           result)):
+    for name, value in (("original", reference), ("candidate", observed),
+                        ("agreement", result)):
         (args.out_dir / f"{name}.json"
          ).write_text(json.dumps(value, indent=2, allow_nan=False) + "\n")
     print(f"ranking agreement: {result['proposed_status'].upper()}")
@@ -568,7 +609,8 @@ def comparison_rows(
     :returns: Serializable pair comparisons.
     """
     values = []
-    for index, ((a, b), reference) in enumerate(zip(rows, original, strict=True)):
+    for index, ((a, b), reference) in enumerate(zip(rows, original,
+                                                    strict=True)):
         row = {
             "original": dataclasses.asdict(a),
             "distorted": dataclasses.asdict(b),
@@ -586,19 +628,25 @@ def comparison_rows(
 def _agreement_options(
     args: argparse.Namespace, parser: argparse.ArgumentParser
 ) -> None:
-    """Reject inadmissible qualification options before loading or scoring inputs."""
+    """Reject invalid options before loading or scoring inputs."""
     if args.gate_mode and args.agreement_policy is None:
         parser.error("--gate-mode requires --agreement-policy")
     if args.agreement_policy is None:
         return
     if args.reference_only:
-        parser.error("--agreement-policy requires both original and candidate arms")
+        parser.error(
+            "--agreement-policy requires both original and candidate arms"
+        )
     try:
-        settings = AgreementPolicy.parse(json.loads(args.agreement_policy.read_text()))
+        settings = AgreementPolicy.parse(
+            json.loads(args.agreement_policy.read_text())
+        )
     except (OSError, ValueError) as error:
         parser.error(f"invalid agreement policy: {error}")
     if settings.metric != "cvvdp" or settings.reference_revision != PIN:
-        parser.error("agreement policy metric or original pin does not match CVVDP")
+        parser.error(
+            "agreement policy metric or original pin does not match CVVDP"
+        )
 
 
 def arguments() -> argparse.Namespace:
@@ -608,14 +656,17 @@ def arguments() -> argparse.Namespace:
     """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--corpus", type=Path, default=ROOT / "validation/data/CID22_validation_set"
+        "--corpus", type=Path,
+        default=ROOT / "validation/data/CID22_validation_set"
     )
     parser.add_argument("--pairs-file", type=Path)
     parser.add_argument(
         "--limit", type=int, default=300,
         help="uniform subset size; 0 selects all pairs"
     )
-    parser.add_argument("--display", choices=tuple(DISPLAY_PPD), default="standard_4k")
+    parser.add_argument(
+        "--display", choices=tuple(DISPLAY_PPD), default="standard_4k"
+    )
     parser.add_argument("--tolerance", type=float, default=1e-3)
     parser.add_argument("--binary", type=Path, default=ROOT / "build/vqm_bench")
     parser.add_argument(
@@ -634,12 +685,17 @@ def arguments() -> argparse.Namespace:
         help="explicit frozen policy for canonical ranking qualification"
     )
     parser.add_argument(
-        "--gate-mode", choices=("both", "ranking", "numerical"), help=
-        "requested agreement gates (default: ranking for qualified domains; both otherwise)"
+        "--gate-mode", choices=("both", "ranking", "numerical"), help=(
+            "requested agreement gates (default: ranking for qualified "
+            "domains; both otherwise)"
+        )
     )
     args = parser.parse_args()
-    if args.limit < 0 or not math.isfinite(args.tolerance) or args.tolerance <= 0:
-        parser.error("limit must be nonnegative and tolerance finite and positive")
+    if args.limit < 0 or not math.isfinite(args.tolerance
+                                           ) or args.tolerance <= 0:
+        parser.error(
+            "limit must be nonnegative and tolerance finite and positive"
+        )
     _agreement_options(args, parser)
     return args
 

@@ -29,7 +29,9 @@ def run(arguments: list[str]) -> subprocess.CompletedProcess[str]:
     :param arguments: Executable and its arguments.
     :returns: Captured process output and status.
     """
-    return subprocess.run(arguments, capture_output=True, text=True, timeout=120)
+    return subprocess.run(
+        arguments, capture_output=True, text=True, timeout=120
+    )
 
 
 def write_y4m(path: Path, fps: str = "30:1", frames: int = 3) -> None:
@@ -56,7 +58,9 @@ def write_late_distortion(
     :param width: Frame width in pixels.
     :param height: Frame height in pixels.
     """
-    contents = bytearray(f"YUV4MPEG2 W{width} H{height} F30:1 Ip Cmono\n".encode())
+    contents = bytearray(
+        f"YUV4MPEG2 W{width} H{height} F30:1 Ip Cmono\n".encode()
+    )
     for frame in range(4):
         values = [
             32 + (5 * x + 3 * y + 19 * frame) % 192 for y in range(height)
@@ -86,12 +90,13 @@ class CvvdpToolTests(unittest.TestCase):
     """Exercise physical settings, timing validation and clip reporting."""
 
     def test_comparison_runner_lists_cvvdp_latency_arms(self) -> None:
-        """Expose CVVDP explicitly without changing the default metric matrix."""
+        """Expose CVVDP without changing the default metric matrix."""
         root = Path(__file__).resolve().parent.parent
         result = run(
             [
                 sys.executable,
-                str(root / "bench/run_inmemory.py"), "--metric", "cvvdp", "--list"
+                str(root / "bench/run_inmemory.py"), "--metric", "cvvdp",
+                "--list"
             ]
         )
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -106,12 +111,12 @@ class CvvdpToolTests(unittest.TestCase):
         commands = (
             [
                 sys.executable,
-                str(root / "bench/run_inmemory.py"), "--metric", "cvvdp", "--mode",
-                "throughput"
+                str(root / "bench/run_inmemory.py"), "--metric", "cvvdp",
+                "--mode", "throughput"
             ], [
                 sys.executable,
-                str(root / "bench/benchmark.py"), "--suite", "images", "--metric",
-                "cvvdp", "--references", "libjxl"
+                str(root / "bench/benchmark.py"), "--suite", "images",
+                "--metric", "cvvdp", "--references", "libjxl"
             ]
         )
         for command in commands:
@@ -123,14 +128,17 @@ class CvvdpToolTests(unittest.TestCase):
         """Reject invalid display values before opening input files."""
         cli = binary("VQM_CLI_BINARY")
         cases = (
-            ("--cvvdp-peak", "nan"), ("--cvvdp-ppd", "0"), ("--cvvdp-contrast", "-1"),
-            ("--cvvdp-ambient", "-1"), ("--cvvdp-display", "automatic"),
-            ("--cvvdp-display", "standard-4k"), ("--cvvdp-display", "standard-fhd"),
-            ("--cvvdp-display", "standard-sdr"), ("--cvvdp-display", "compact-sdr"),
+            ("--cvvdp-peak", "nan"), ("--cvvdp-ppd",
+                                      "0"), ("--cvvdp-contrast",
+                                             "-1"), ("--cvvdp-ambient", "-1"),
+            ("--cvvdp-display",
+             "automatic"), ("--cvvdp-display",
+                            "standard-4k"), ("--cvvdp-display", "standard-fhd"),
+            ("--cvvdp-display",
+             "standard-sdr"), ("--cvvdp-display", "compact-sdr"),
             ("--cvvdp-display", "standard-hdr"), ("--cvvdp-aspect", "16"),
-            ("--cvvdp-aspect", "16:0"), ("--cvvdp-aspect",
-                                         "16:9:1"), ("--cvvdp-diagonal",
-                                                     "inf"), ("--cvvdp-distance", "0"),
+            ("--cvvdp-aspect", "16:0"), ("--cvvdp-aspect", "16:9:1"),
+            ("--cvvdp-diagonal", "inf"), ("--cvvdp-distance", "0"),
         )
         for flag, value in cases:
             result = run([cli, "--metric", "cvvdp", flag, value, "a", "b"])
@@ -140,13 +148,14 @@ class CvvdpToolTests(unittest.TestCase):
     def test_rejects_conflicting_display_geometry(self) -> None:
         """Reject a geometry override combined with explicit PPD."""
         cli = binary("VQM_CLI_BINARY")
-        for flag, value in (("--cvvdp-aspect", "16:9"), ("--cvvdp-diagonal", "27"),
-                            ("--cvvdp-distance", "0.7")):
+        for flag, value in (("--cvvdp-aspect", "16:9"),
+                            ("--cvvdp-diagonal", "27"), ("--cvvdp-distance",
+                                                         "0.7")):
             with self.subTest(flag=flag):
                 result = run(
                     [
-                        cli, "--metric", "cvvdp", "--cvvdp-ppd", "30", flag, value, "a",
-                        "b"
+                        cli, "--metric", "cvvdp", "--cvvdp-ppd", "30", flag,
+                        value, "a", "b"
                     ]
                 )
                 self.assertEqual(result.returncode, 2, result.stderr)
@@ -154,13 +163,18 @@ class CvvdpToolTests(unittest.TestCase):
                 self.assertEqual(result.stdout, "")
 
     def test_display_geometry_scores_with_aspect_fitted_ppd(self) -> None:
-        """Match explicit PPD for full-screen, letterboxed and pillarboxed content."""
+        """Match PPD for full-screen, letterbox and pillarbox content."""
         require_gpu()
         cli = binary("VQM_CLI_BINARY")
         with tempfile.TemporaryDirectory() as directory:
-            original, distorted = Path(directory) / "a.y4m", Path(directory) / "b.y4m"
-            write_late_distortion(original, distorted=False, width=320, height=180)
-            write_late_distortion(distorted, distorted=True, width=320, height=180)
+            original, distorted = Path(directory
+                                       ) / "a.y4m", Path(directory) / "b.y4m"
+            write_late_distortion(
+                original, distorted=False, width=320, height=180
+            )
+            write_late_distortion(
+                distorted, distorted=True, width=320, height=180
+            )
             # Values from the central-pixel formula for an 8-inch panel at
             # 0.7 m, using its width for 4:3 and height for 21:9.
             cases = (
@@ -173,8 +187,8 @@ class CvvdpToolTests(unittest.TestCase):
                 command = [cli, "--metric", "cvvdp", "--raw"]
                 result = run(
                     [
-                        *command, "--cvvdp-aspect", aspect, "--cvvdp-diagonal", "8",
-                        "--cvvdp-distance", "0.7", *inputs
+                        *command, "--cvvdp-aspect", aspect, "--cvvdp-diagonal",
+                        "8", "--cvvdp-distance", "0.7", *inputs
                     ]
                 )
                 explicit = run([*command, "--cvvdp-ppd", ppd, *inputs])
@@ -206,10 +220,15 @@ class CvvdpToolTests(unittest.TestCase):
         """Reject input frame-rate mismatches before metric construction."""
         cli = binary("VQM_CLI_BINARY")
         with tempfile.TemporaryDirectory() as directory:
-            original, distorted = Path(directory) / "a.y4m", Path(directory) / "b.y4m"
+            original, distorted = Path(directory
+                                       ) / "a.y4m", Path(directory) / "b.y4m"
             write_y4m(original, "30000:1001")
             write_y4m(distorted, "30:1")
-            result = run([cli, "--metric", "cvvdp", str(original), str(distorted)])
+            result = run(
+                [cli, "--metric", "cvvdp",
+                 str(original),
+                 str(distorted)]
+            )
             self.assertEqual(result.returncode, 1, result.stderr)
             self.assertIn("unequal frame rates", result.stderr)
             self.assertEqual(result.stdout, "")
@@ -221,9 +240,15 @@ class CvvdpToolTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "video.y4m"
             write_y4m(path)
-            result = run([cli, "--metric", "cvvdp", "--raw", str(path), str(path)])
+            result = run(
+                [cli, "--metric", "cvvdp", "--raw",
+                 str(path),
+                 str(path)]
+            )
             self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertEqual(result.stdout.splitlines(), ["frames 3", "10.00000000"])
+            self.assertEqual(
+                result.stdout.splitlines(), ["frames 3", "10.00000000"]
+            )
             path.write_bytes(path.read_bytes()[:-1])
             truncated = run([cli, "--metric", "cvvdp", str(path), str(path)])
             self.assertEqual(truncated.returncode, 1, truncated.stderr)
@@ -241,8 +266,8 @@ class CvvdpToolTests(unittest.TestCase):
                 [
                     bench, "--metric", "cvvdp", "--cvvdp-video", "--pair",
                     str(path),
-                    str(path), "--iterations", "2", "--warmup", "1", "--cvvdp-diagonal",
-                    "8"
+                    str(path), "--iterations", "2", "--warmup", "1",
+                    "--cvvdp-diagonal", "8"
                 ]
             )
             self.assertEqual(result.returncode, 0, result.stderr)
@@ -264,15 +289,18 @@ class CvvdpToolTests(unittest.TestCase):
             # Standard and compact are both 16:9, at 30 in and 0.7472 m or
             # 24 in and 0.6 m respectively.
             cases = (
-                (320, 180, (), "6.28354146",
-                 200), (640, 360, ("--cvvdp-display", "standard"), "12.5670769", 200),
+                (320, 180, (), "6.28354146", 200),
+                (640, 360, ("--cvvdp-display", "standard"), "12.5670769", 200),
                 (320, 180, ("--cvvdp-display", "compact"), "6.30708789", 200), (
-                    640, 360, ("--cvvdp-peak", "1500", "--cvvdp-display", "compact"),
-                    "12.6141697", 1500
+                    640, 360,
+                    ("--cvvdp-peak", "1500", "--cvvdp-display",
+                     "compact"), "12.6141697", 1500
                 ),
             )
             for width, height, flags, ppd, peak in cases:
-                write_late_distortion(path, distorted=False, width=width, height=height)
+                write_late_distortion(
+                    path, distorted=False, width=width, height=height
+                )
                 result = run(
                     [
                         bench, "--metric", "cvvdp", "--cvvdp-video", "--pair",
@@ -282,8 +310,10 @@ class CvvdpToolTests(unittest.TestCase):
                 )
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertIn(
-                    f"ppd {ppd}, peak {peak} nit, contrast 1000, ambient 250 lux",
-                    result.stdout
+                    (
+                        f"ppd {ppd}, peak {peak} nit, contrast 1000, ambient "
+                        f"250 lux"
+                    ), result.stdout
                 )
 
     def test_cli_scores_nonidentical_final_frame(self) -> None:
@@ -291,21 +321,28 @@ class CvvdpToolTests(unittest.TestCase):
         require_gpu()
         cli = binary("VQM_CLI_BINARY")
         with tempfile.TemporaryDirectory() as directory:
-            original, distorted = Path(directory) / "a.y4m", Path(directory) / "b.y4m"
+            original, distorted = Path(directory
+                                       ) / "a.y4m", Path(directory) / "b.y4m"
             write_late_distortion(original, distorted=False)
             write_late_distortion(distorted, distorted=True)
             identity = run(
-                [cli, "--metric", "cvvdp", "--raw",
-                 str(original),
-                 str(original)]
+                [
+                    cli, "--metric", "cvvdp", "--raw",
+                    str(original),
+                    str(original)
+                ]
             )
             result = run(
-                [cli, "--metric", "cvvdp", "--raw",
-                 str(original),
-                 str(distorted)]
+                [
+                    cli, "--metric", "cvvdp", "--raw",
+                    str(original),
+                    str(distorted)
+                ]
             )
             self.assertEqual(identity.returncode, 0, identity.stderr)
-            self.assertEqual(identity.stdout.splitlines(), ["frames 4", "10.00000000"])
+            self.assertEqual(
+                identity.stdout.splitlines(), ["frames 4", "10.00000000"]
+            )
             self.assertEqual(result.returncode, 0, result.stderr)
             lines = result.stdout.splitlines()
             self.assertEqual(len(lines), 2, result.stdout)

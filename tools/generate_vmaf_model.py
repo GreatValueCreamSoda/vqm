@@ -3,7 +3,8 @@
 # BSD-2-Clause-Patent; see licenses/NETFLIX-VMAF-LICENSE.
 """Generate the VMAF v0.6.1 float predictor tables from the pinned models.
 
-The models are from Netflix/vmaf commit 4611e47a7330cd342498dcc130e1008efbeab6e4.
+The models are from Netflix/vmaf commit
+4611e47a7330cd342498dcc130e1008efbeab6e4.
 The checked-in output is buildable without an upstream checkout. To verify it:
 
     python3 tools/generate_vmaf_model.py --check
@@ -94,9 +95,8 @@ def _load_metadata(
     if len(clip) != 2:
         raise ValueError(f"{spec.path}: unexpected score clip")
     transform = model.get("score_transform")
-    if spec.transform != (transform
-                          is not None) or (transform is not None
-                                           and transform.get("out_gte_in") != "true"):
+    if spec.transform != (transform is not None) or (
+            transform is not None and transform.get("out_gte_in") != "true"):
         raise ValueError(f"{spec.path}: unexpected score transform")
     return slopes, intercepts, transform, clip, model["model"]
 
@@ -120,11 +120,13 @@ def _vector_row(line: str, spec: ModelSpec) -> str:
 
 def load_model(
     spec: ModelSpec,
-) -> tuple[list[float], list[float], dict[str, float] | None, list[float], list[str]]:
+) -> tuple[list[float], list[float], dict[str, float] | None, list[float],
+           list[str]]:
     """Load and validate the constants of a pinned v0 model.
 
     :param spec: Expected model configuration and digest.
-    :returns: Slopes, intercepts, score transform, clip bounds and C++ vector rows.
+    :returns: Slopes, intercepts, score transform, clip bounds and C++ vector
+        rows.
     :raises OSError: If the source model is unavailable.
     :raises ValueError: If the model differs from its pinned configuration.
     :raises KeyError: If a required model field is missing.
@@ -176,7 +178,8 @@ def emit_model(
     if transform is not None:
         out.append(
             f"inline constexpr std::array<double, 3> kTransform{suffix} = {{" +
-            ", ".join(number(transform[name]) for name in ("p0", "p1", "p2")) + "};"
+            ", ".join(number(transform[name])
+                      for name in ("p0", "p1", "p2")) + "};"
         )
     out.append(
         f"inline constexpr std::array<SupportVector, {spec.total_sv}> "

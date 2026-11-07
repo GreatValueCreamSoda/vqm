@@ -1,6 +1,7 @@
 """Illustrate SpEED Gram precision; not a GPU oracle or timing benchmark.
 
-The crop, 5x5 patch order, means and 64-lane reduction tree follow the maintained
+The crop, 5x5 patch order, means and 64-lane reduction tree follow the
+maintained
 SpEED covariance shader. Products use binary64 temporaries before binary32
 accumulation to model full products of binary16 inputs, rather than products
 rounded to binary16. Matrix hardware may choose a different addition order or
@@ -20,7 +21,9 @@ from numpy.typing import NDArray
 
 ROOT = Path(__file__).resolve().parents[3]
 SHADERS = ROOT / "src/metrics/vmaf/speed/shaders"
-DEFAULT_OUTPUT = ROOT / "artifacts/reports/vmaf-cooperative-matrix/numerics/speed.json"
+DEFAULT_OUTPUT = ROOT / (
+    "artifacts/reports/vmaf-cooperative-matrix/numerics/speed.json"
+)
 RESIDUAL_SCALE = np.float32(2048)
 SINGULAR_THRESHOLD = 1e-6
 
@@ -31,7 +34,8 @@ def coefficients(name: str, count: int) -> NDArray[np.float32]:
     :param name: Name of the coefficient array, stage or case.
     :param count: Expected number of coefficients or samples.
     :returns: Coefficient array in binary32 tap order.
-    :raises ValueError: If the named shader array is missing or its count differs.
+    :raises ValueError: If the named shader array is missing or its count
+        differs.
     """
     source = (SHADERS / "vmaf_speed_filter_common.glsl").read_text()
     match = re.search(rf"{name}\[{count}\].*?\((.*?)\);", source, re.S)
@@ -66,7 +70,8 @@ def filter_plane(source: NDArray[np.float32]) -> NDArray[np.float32]:
     height, width = source.shape
     down_height, down_width = height // 16, width // 16
     x = mirror(
-        16 * (np.arange(9 * down_width) // 9) + np.arange(9 * down_width) % 9 - 4, width
+        16 * (np.arange(9 * down_width) // 9) + np.arange(9 * down_width) % 9 -
+        4, width
     )
     vertical = np.zeros((down_height, 9 * down_width), dtype=np.float32)
     for tap, weight in enumerate(antialias):
@@ -93,7 +98,9 @@ def lane_sum(values: NDArray[np.float32]) -> NDArray[np.float32] | np.float32:
     :returns: Binary32 mean reduced across the sample axis.
     """
     samples = len(values)
-    padded = np.zeros(((samples + 63) // 64 * 64, *values.shape[1:]), dtype=np.float32)
+    padded = np.zeros(
+        ((samples + 63) // 64 * 64, *values.shape[1:]), dtype=np.float32
+    )
     padded[:samples] = values
     lanes = np.zeros((64, *values.shape[1:]), dtype=np.float32)
     for batch in padded.reshape((-1, *lanes.shape)):
@@ -202,7 +209,8 @@ def encoding_bound(
     original_norm = np.linalg.norm(approximation)
     difference_norm = np.linalg.norm(difference)
     return float(
-        (2 * original_norm * difference_norm + difference_norm**2) / len(original)
+        (2 * original_norm * difference_norm + difference_norm**2) /
+        len(original)
     )
 
 
@@ -221,7 +229,9 @@ def candidates(
     high_gram, cross = gram(high), gram(high, low)
     cross_term = np.float32(np.float32(cross + cross.T) / RESIDUAL_SCALE)
     split_two = np.float32(high_gram + cross_term)
-    split_three = np.float32(split_two + np.float32(gram(low) / RESIDUAL_SCALE**2))
+    split_three = np.float32(
+        split_two + np.float32(gram(low) / RESIDUAL_SCALE**2)
+    )
     squared_scale = np.float32(scale * scale)
     plain = half_round(values)
     reconstructed = np.float32(high + np.float32(low / RESIDUAL_SCALE))
@@ -249,16 +259,22 @@ def candidates(
         "value_count":
         int(values.size),
         "scaled_low_nonzero_subnormals":
-        int(np.count_nonzero((low != 0) & (np.abs(low) < np.finfo(np.float16).tiny))),
+        int(
+            np.count_nonzero(
+                (low != 0) & (np.abs(low) < np.finfo(np.float16).tiny)
+            )
+        ),
         "operand_only_spectral_error_bounds": {
-            "half_inputs_wide": encoding_bound(values, plain.astype(np.float64)),
+            "half_inputs_wide":
+            encoding_bound(values, plain.astype(np.float64)),
             "half_inputs_wide_power_scaled": encoding_bound(values, exact_high),
             "split_two_gram_products": reconstruction_bound + omitted_bound,
             "split_three_gram_products": reconstruction_bound,
         },
         "bounds_scope":
         "Exact real-arithmetic Gram bounds for operand rounding; "
-        "exclude FP32 accumulation, reduction, rescaling and addition rounding.",
+        "exclude FP32 accumulation, reduction, rescaling and addition "
+        "rounding.",
     }
 
 
@@ -278,7 +294,8 @@ def covariance_diagnostics(
     error = candidate64 - reference64
     reference_norm = float(np.linalg.norm(reference64, 2))
     error_norm = float(np.linalg.norm(error, 2))
-    reference_min, candidate_min = float(reference_eigen[0]), float(candidate_eigen[0])
+    reference_min, candidate_min = float(reference_eigen[0]
+                                         ), float(candidate_eigen[0])
     return {
         "max_absolute_entry_error":
         float(np.max(np.abs(error))),
@@ -294,8 +311,10 @@ def covariance_diagnostics(
         reference_min < SINGULAR_THRESHOLD,
         "candidate_singular":
         candidate_min < SINGULAR_THRESHOLD,
-        "singular_classification_changed":
-        ((reference_min < SINGULAR_THRESHOLD) != (candidate_min < SINGULAR_THRESHOLD)),
+        "singular_classification_changed": (
+            (reference_min < SINGULAR_THRESHOLD)
+            != (candidate_min < SINGULAR_THRESHOLD)
+        ),
         "nonpositive_eigenvalue_count":
         int(np.count_nonzero(candidate_eigen <= 0)),
         "relative_minimum_eigenvalue_error":
@@ -314,7 +333,9 @@ def plane_cases() -> Iterator[tuple[str, NDArray[np.float32]]]:
     """
     for height, width in ((320, 320), (465, 593), (81, 81)):
         y, x = np.indices((height, width), dtype=np.int64)
-        val = 16 + ((x * 7 + y * 13 + (x // 7) * 23 + (y // 11) * 31 + 19) % 220)
+        val = 16 + (
+            (x * 7 + y * 13 + (x // 7) * 23 + (y // 11) * 31 + 19) % 220
+        )
         yield f"filtered-test-pattern-{width}x{height}", filter_plane(
             np.float32(val - 128)
         )
@@ -324,7 +345,8 @@ def plane_cases() -> Iterator[tuple[str, NDArray[np.float32]]]:
         "flat-coded": np.full((height, width), 36.25, dtype=np.float32),
         "lowbit-ripple": np.float32(127 + ((x + y) % 4) / 256),
         "smooth-chroma": np.float32(80 * np.sin(x / 33) + 35 * np.cos(y / 19)),
-        "highcontrast-stripes": np.float32(((x // 17 + y // 29) % 2) * 255 - 128),
+        "highcontrast-stripes":
+        np.float32(((x // 17 + y // 29) % 2) * 255 - 128),
     }
     for name, plane in cases.items():
         yield "filtered-" + name, filter_plane(plane)
@@ -338,7 +360,7 @@ def plane_cases() -> Iterator[tuple[str, NDArray[np.float32]]]:
 
 
 def synthetic_matrix_cases() -> Iterator[tuple[str, NDArray[np.float32]]]:
-    """Direct matrix stress cases; not asserted to be realizable image patches.
+    """Generate matrix stress cases that may not represent image patches.
 
     :returns: Case labels and operand matrices with prescribed spectra.
     """
@@ -349,7 +371,9 @@ def synthetic_matrix_cases() -> Iterator[tuple[str, NDArray[np.float32]]]:
     for relative in (.95, .999, 1.001, 1.05, 4, 100):
         spectrum = np.linspace(1, 8, 25)
         spectrum[0] = SINGULAR_THRESHOLD * relative
-        values = np.float32((orthogonal * np.sqrt(samples * spectrum)) @ rotation)
+        values = np.float32(
+            (orthogonal * np.sqrt(samples * spectrum)) @ rotation
+        )
         yield f"direct-matrix-min-eigen-{relative:g}e-6", values
 
 
@@ -359,7 +383,9 @@ def scaled_patch_cases() -> Iterator[tuple[str, NDArray[np.float32]]]:
     :returns: Case labels and scaled source planes.
     """
     y, x = np.indices((29, 37), dtype=np.int64)
-    plane = np.float32(((x * 7 + y * 13 + x // 7 * 23 + y // 11 * 31) % 220) - 110)
+    plane = np.float32(
+        ((x * 7 + y * 13 + x // 7 * 23 + y // 11 * 31) % 220) - 110
+    )
     values, _ = centered_samples(plane)
     minimum = float(np.linalg.eigvalsh(gram(values).astype(np.float64))[0])
     for ratio in (.999, 1.001, 1.05):
@@ -370,7 +396,8 @@ def scaled_patch_cases() -> Iterator[tuple[str, NDArray[np.float32]]]:
 
 
 def analyze(
-    name: str, values: NDArray[np.float32], geometry: tuple[int, ...] | None = None,
+    name: str, values: NDArray[np.float32],
+    geometry: tuple[int, ...] | None = None,
     means: NDArray[np.float32] | None = None
 ) -> dict[str, object]:
     """Measure the covariance precision of one input case.
@@ -438,7 +465,8 @@ def main() -> None:
         }
     output = {
         "schema_version": 1,
-        "scope": "CPU numerical diagnostic, not GPU oracle or performance evidence",
+        "scope":
+        "CPU numerical diagnostic, not GPU oracle or performance evidence",
         "numpy": np.__version__,
         "seed": 85917,
         "source_hashes": {

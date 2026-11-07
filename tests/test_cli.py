@@ -40,12 +40,14 @@ class CliTests(unittest.TestCase):
                 f"YUV4MPEG2 W{max_size} H2 C444\nFRAME\n".encode(),
                 "image layout exceeds size_t"
             ),
-            "truncated-y4m": (b"YUV4MPEG2 W8 H8 C444\nFRAME\n", "truncated y4m frame"),
+            "truncated-y4m":
+            (b"YUV4MPEG2 W8 H8 C444\nFRAME\n", "truncated y4m frame"),
             "invalid-frame": (
                 b"YUV4MPEG2 W8 H8 C444\nFRAMEoops\n" + bytes(192),
                 "y4m file has no frame"
             ),
-            "truncated-png": (b"\x89PNG\r\n\x1a\n", "Could not load original image"),
+            "truncated-png":
+            (b"\x89PNG\r\n\x1a\n", "Could not load original image"),
             "truncated-jpeg": (b"\xff\xd8", "Could not load original image"),
         }
         directory = Path(self.enterContext(tempfile.TemporaryDirectory()))
@@ -54,15 +56,15 @@ class CliTests(unittest.TestCase):
                 image = directory / name
                 image.write_bytes(content)
                 result = subprocess.run(
-                    [str(self.cli), str(image), str(image)], capture_output=True,
-                    text=True, timeout=5,
+                    [str(self.cli), str(image),
+                     str(image)], capture_output=True, text=True, timeout=5,
                 )
                 self.assertEqual(result.returncode, 1, result.stderr)
                 self.assertEqual(result.stdout, "")
                 self.assertIn(expected, result.stderr)
 
     def test_jpeg_scan_truncation_is_rejected_before_gpu_creation(self) -> None:
-        """Reject truncated JPEG entropy scans while accepting complete image data."""
+        """Reject truncated JPEG scans and accept complete image data."""
         directory = Path(self.enterContext(tempfile.TemporaryDirectory()))
         env = os.environ.copy()
         # Accepted controls stop at device creation without using a GPU.
@@ -117,8 +119,8 @@ class CliTests(unittest.TestCase):
         :param accepted: Whether decoding should succeed.
         """
         result = subprocess.run(
-            [str(self.cli), str(image), str(image)], env=env, capture_output=True,
-            text=True, timeout=10,
+            [str(self.cli), str(image), str(image)], env=env,
+            capture_output=True, text=True, timeout=10,
         )
         self.assertEqual(result.returncode, 1, result.stderr)
         self.assertEqual(result.stdout, "")
@@ -152,23 +154,29 @@ class CliTests(unittest.TestCase):
         devices = listing.stdout.splitlines()
         for index, device in enumerate(devices):
             self.assertTrue(device.startswith(f"{index}  "), device)
-            self.assertRegex(device, r"  [\da-f]{8}(?:-[\da-f]{4}){3}-[\da-f]{12}$")
+            self.assertRegex(
+                device, r"  [\da-f]{8}(?:-[\da-f]{4}){3}-[\da-f]{12}$"
+            )
         directory = Path(self.enterContext(tempfile.TemporaryDirectory()))
         image = directory / "identity.png"
         make_goldens.write_png(image, 32, 32, 3, [[128] * 96] * 32)
         result = subprocess.run(
-            [str(self.cli), "--device",
-             str(len(devices) - 1),
-             str(image),
-             str(image)], check=True, capture_output=True, text=True, timeout=120,
+            [
+                str(self.cli), "--device",
+                str(len(devices) - 1),
+                str(image),
+                str(image)
+            ], check=True, capture_output=True, text=True, timeout=120,
         )
         self.assertAlmostEqual(float(result.stdout), 100.0, delta=0.5)
 
     def test_unavailable_device_index_fails_before_scoring(self) -> None:
         """Report an unavailable index without reading either input."""
         result = subprocess.run(
-            [str(self.cli), "--device", "999999", "original.png", "distorted.png"],
-            capture_output=True, text=True, timeout=30,
+            [
+                str(self.cli), "--device", "999999", "original.png",
+                "distorted.png"
+            ], capture_output=True, text=True, timeout=30,
         )
         self.assertEqual(result.returncode, 1, result.stderr)
         self.assertIn("--device 999999 is unavailable", result.stderr)
@@ -180,7 +188,8 @@ class CliTests(unittest.TestCase):
         if not test_binary:
             self.skipTest("GPU test binary not configured")
         probe = subprocess.run(
-            [test_binary, "--probe-gpu"], capture_output=True, text=True, timeout=120
+            [test_binary, "--probe-gpu"], capture_output=True, text=True,
+            timeout=120
         )
         if probe.returncode:
             if "GPU required, but no usable Vulkan device" in probe.stderr:
@@ -190,21 +199,22 @@ class CliTests(unittest.TestCase):
         opaque = directory / "opaque.png"
         transparent = directory / "transparent.png"
         make_goldens.write_png(opaque, 32, 32, 3, [[128, 128, 128] * 32] * 32)
-        make_goldens.write_png(transparent, 32, 32, 4, [[128, 128, 128, 0] * 32] * 32)
+        make_goldens.write_png(
+            transparent, 32, 32, 4, [[128, 128, 128, 0] * 32] * 32
+        )
         thresholds = (
             ("ssimulacra2", self.assertLess, 90.0),
             ("butteraugli", self.assertGreater, 0.0)
         )
-        for (metric, check, threshold), (original,
-                                         distorted) in product(thresholds,
-                                                               ((opaque, transparent),
-                                                                (transparent, opaque))):
+        for (metric, check, threshold), (original, distorted) in product(
+                thresholds, ((opaque, transparent), (transparent, opaque))):
             with self.subTest(metric=metric, original=original.name):
                 result = subprocess.run(
-                    [str(self.cli), "--metric", metric,
-                     str(original),
-                     str(distorted)], check=True, capture_output=True, text=True,
-                    timeout=120,
+                    [
+                        str(self.cli), "--metric", metric,
+                        str(original),
+                        str(distorted)
+                    ], check=True, capture_output=True, text=True, timeout=120,
                 )
                 check(float(result.stdout.strip()), threshold)
 

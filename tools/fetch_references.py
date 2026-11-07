@@ -111,8 +111,8 @@ def checkout_dirty(directory: str) -> bool:
     commands = [
         ["git", "-C", directory, *status_args],
         [
-            "git", "-C", directory, "submodule", "foreach", "--quiet", "--recursive",
-            "git", *status_args
+            "git", "-C", directory, "submodule", "foreach", "--quiet",
+            "--recursive", "git", *status_args
         ]
     ]
     for command in commands:
@@ -159,9 +159,14 @@ def missing_submodules(directory: str) -> list[str]:
     :returns: Uninitialized submodule paths.
     """
     output = capture(
-        ["git", "-C", directory, "submodule", "status", "--", *LIBJXL_SUBMODULES]
+        [
+            "git", "-C", directory, "submodule", "status", "--",
+            *LIBJXL_SUBMODULES
+        ]
     )
-    return [line.split()[1] for line in output.splitlines() if line.startswith("-")]
+    return [
+        line.split()[1] for line in output.splitlines() if line.startswith("-")
+    ]
 
 
 def init_submodules(directory: str) -> None:
@@ -172,8 +177,8 @@ def init_submodules(directory: str) -> None:
     """
     run(
         [
-            "git", "-C", directory, "submodule", "update", "--init", "--depth", "1",
-            "--", *LIBJXL_SUBMODULES
+            "git", "-C", directory, "submodule", "update", "--init", "--depth",
+            "1", "--", *LIBJXL_SUBMODULES
         ]
     )
 
@@ -189,7 +194,10 @@ def _check_libjxl(directory: str, check: bool) -> bool:
     if not uninitialized:
         return True
     if check:
-        print(f"libjxl: uninitialized submodules: {' '.join(uninitialized)}; run again")
+        print(
+            f"libjxl: uninitialized submodules: {' '.join(uninitialized)}; "
+            f"run again"
+        )
         return False
     init_submodules(directory)
     print("libjxl: initialized submodules")
@@ -238,7 +246,12 @@ def _checkout(
         return False
     os.makedirs(REFERENCE_DIR, exist_ok=True)
     if name == "libjxl":
-        run(["git", "clone", "--filter=blob:none", "--no-checkout", url, directory])
+        run(
+            [
+                "git", "clone", "--filter=blob:none", "--no-checkout", url,
+                directory
+            ]
+        )
         run(["git", "-C", directory, "sparse-checkout", "set", *LIBJXL_SPARSE])
         run(["git", "-C", directory, "checkout", pin])
         init_submodules(directory)
@@ -288,7 +301,8 @@ def _parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
 
 
 def _select(
-    parser: argparse.ArgumentParser, only: str | None, rows: list[tuple[str, str, str]]
+    parser: argparse.ArgumentParser, only: str | None,
+    rows: list[tuple[str, str, str]]
 ) -> tuple[list[tuple[str, str, str]], bool]:
     if only is None:
         return rows, True
@@ -303,7 +317,10 @@ def _select(
 
 
 def _check_cid22(check: bool, status: set[str], mismatches: list[str]) -> None:
-    command = [sys.executable, os.path.join(REPO_ROOT, "validation", "fetch_cid22.py")]
+    command = [
+        sys.executable,
+        os.path.join(REPO_ROOT, "validation", "fetch_cid22.py")
+    ]
     if check:
         command.append("--check")
     try:
@@ -317,7 +334,8 @@ def main() -> int:
     """Verify or fetch the selected reference inputs.
 
     :returns: One if any selected input fails verification, otherwise zero.
-    :raises SystemExit: If the lock file or required Git commands are unavailable.
+    :raises SystemExit: If the lock file or required Git commands are
+        unavailable.
     """
     parser, args = _parse_args()
     if not os.path.isfile(LOCK):
@@ -328,8 +346,8 @@ def main() -> int:
     mismatches = []
     for name, url, pin in rows:
         check_state(
-            name, url, os.path.join(REFERENCE_DIR, name), pin, args.check, args.force,
-            status, mismatches
+            name, url, os.path.join(REFERENCE_DIR, name), pin, args.check,
+            args.force, status, mismatches
         )
     if include_cid22:
         _check_cid22(args.check, status, mismatches)
@@ -337,7 +355,8 @@ def main() -> int:
         print(f"reference mismatch: {' '.join(mismatches)}", file=sys.stderr)
         return 1
     print(
-        "all selected references and CID22 ok" if include_cid22 else "all references ok"
+        "all selected references and CID22 ok"
+        if include_cid22 else "all references ok"
     )
     return 0
 

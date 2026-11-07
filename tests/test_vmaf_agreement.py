@@ -4,7 +4,6 @@
 
 import contextlib
 import csv
-import importlib
 import io
 import json
 import sys
@@ -13,11 +12,10 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT / "validation"))
+from validation import compare_vmaf_scores as comparison
+from validation import vmaf_cid22 as cid
 
-comparison = importlib.import_module("compare_vmaf_scores")
-cid = importlib.import_module("vmaf_cid22")
+ROOT = Path(__file__).resolve().parent.parent
 
 
 def _rows(candidate: list[float] | None = None) -> list[dict[str, object]]:
@@ -25,7 +23,8 @@ def _rows(candidate: list[float] | None = None) -> list[dict[str, object]]:
     return [
         {
             "original": f"original/source{index // 2}.png",
-            "distorted": f"compressed/source{index // 2}/codec/level{index % 2}.png",
+            "distorted":
+            f"compressed/source{index // 2}/codec/level{index % 2}.png",
             "original_yuv_sha256": f"{index // 2 + 16:064x}",
             "distorted_yuv_sha256": f"{index + 1:064x}",
             "libvmaf_v0": float(10 * (index + 1)),
@@ -53,7 +52,8 @@ def _policy() -> dict[str, object]:
     }
 
 
-def _fixture(directory: Path, candidate: list[float] | None = None) -> list[str]:
+def _fixture(directory: Path,
+             candidate: list[float] | None = None) -> list[str]:
     rows = _rows(candidate)
     target = directory / "scores.csv"
     with target.open("w", newline="") as output:
@@ -63,14 +63,14 @@ def _fixture(directory: Path, candidate: list[float] | None = None) -> list[str]
     reference, proposed = cid.build_agreement_reports(
         rows, "v0", "a" * 64, "b" * 64, "candidate-revision"
     )
-    for name, value in (("reference", reference), ("candidate", proposed), ("policy",
-                                                                            _policy())):
+    for name, value in (("reference", reference), ("candidate", proposed),
+                        ("policy", _policy())):
         (directory / f"{name}.json").write_text(json.dumps(value))
     return [
         "compare_vmaf_scores.py",
         str(target),
-        str(target), "--reference-column", "libvmaf_v0", "--candidate-column", "vqm_v0",
-        "--agreement-policy",
+        str(target), "--reference-column", "libvmaf_v0", "--candidate-column",
+        "vqm_v0", "--agreement-policy",
         str(directory / "policy.json"), "--reference-report",
         str(directory / "reference.json"), "--candidate-report",
         str(directory / "candidate.json")
@@ -79,8 +79,9 @@ def _fixture(directory: Path, candidate: list[float] | None = None) -> list[str]
 
 def _run(argv: list[str]) -> tuple[int, dict[str, object], str]:
     output, error = io.StringIO(), io.StringIO()
-    with mock.patch.object(sys, "argv", argv), contextlib.redirect_stdout(output), \
-         contextlib.redirect_stderr(error):
+    with (mock.patch.object(sys, "argv",
+                            argv), contextlib.redirect_stdout(output),
+          contextlib.redirect_stderr(error)):
         status = comparison.main()
     report = json.loads(output.getvalue()) if output.getvalue() else {}
     return status, report, error.getvalue()
@@ -92,7 +93,7 @@ class VmafAgreementTests(unittest.TestCase):
     def test_uniform_offset_preserves_ranking_but_old_absolute_gate_remains(
         self
     ) -> None:
-        """Accept a uniform offset unless explicit numerical bounds reject it."""
+        """Accept offsets unless explicit numerical bounds reject them."""
         with tempfile.TemporaryDirectory() as temporary:
             argv = _fixture(Path(temporary))
             status, report, _ = _run(argv)
@@ -108,12 +109,14 @@ class VmafAgreementTests(unittest.TestCase):
     def test_reordered_quality_fails_required_ranking(self) -> None:
         """Reject score order changes even with a small complete score table."""
         with tempfile.TemporaryDirectory() as temporary:
-            status, report, _ = _run(_fixture(Path(temporary), [10, 30, 20, 40]))
+            status, report, _ = _run(
+                _fixture(Path(temporary), [10, 30, 20, 40])
+            )
             self.assertEqual(status, 1)
             self.assertEqual(report["agreement"]["ranking"]["status"], "fail")
 
     def test_canonical_sidecar_is_bound_to_csv_score_and_source(self) -> None:
-        """Reject a valid-schema sidecar that describes other scores or sources."""
+        """Reject sidecars describing different scores or sources."""
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             argv = _fixture(root)
@@ -138,8 +141,10 @@ class VmafAgreementTests(unittest.TestCase):
             self.assertEqual(status, 2)
             self.assertIn("input hash does not match CSV", error)
 
-    def test_diagnostic_sidecar_without_revision_cannot_qualify_later(self) -> None:
-        """Require implementation provenance when reusing diagnostic sidecars."""
+    def test_diagnostic_sidecar_without_revision_cannot_qualify_later(
+        self
+    ) -> None:
+        """Require provenance when reusing diagnostic sidecars."""
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             argv = _fixture(root)
@@ -160,20 +165,23 @@ class VmafAgreementTests(unittest.TestCase):
         json.dumps(result, allow_nan=False)
 
     def test_policy_requires_both_score_sidecars(self) -> None:
-        """Reject a required policy before silently skipping absent provenance."""
+        """Reject required policies with missing provenance."""
         argv = [
             "compare_vmaf_scores.py", "a.csv", "b.csv", "--agreement-policy",
             "policy.json"
         ]
-        with mock.patch.object(sys, "argv", argv), contextlib.redirect_stderr(io.StringIO()), \
-             self.assertRaises(SystemExit):
+        with (mock.patch.object(sys, "argv", argv),
+              contextlib.redirect_stderr(io.StringIO()
+                                         ), self.assertRaises(SystemExit)):
             comparison.main()
 
 
 class Cid22AgreementTests(unittest.TestCase):
     """Check canonical CID22 reports without a corpus or GPU dependency."""
 
-    def test_report_preserves_model_input_hashes_and_source_groups(self) -> None:
+    def test_report_preserves_model_input_hashes_and_source_groups(
+        self
+    ) -> None:
         """Keep each derivative with its original source and decoded inputs."""
         rows = _rows()
         reference, candidate = cid.build_agreement_reports(
@@ -185,24 +193,33 @@ class Cid22AgreementTests(unittest.TestCase):
         )
         self.assertEqual(reference["input_manifest_hash"], "b" * 64)
         self.assertEqual(candidate["revision"], "revision")
-        self.assertEqual(reference["samples"][0]["source_id"], "original/source0.png")
-        self.assertEqual(reference["samples"][1]["source_id"], "original/source0.png")
+        self.assertEqual(
+            reference["samples"][0]["source_id"], "original/source0.png"
+        )
+        self.assertEqual(
+            reference["samples"][1]["source_id"], "original/source0.png"
+        )
         self.assertEqual(reference["samples"][0]["distortion_family"], "codec")
         self.assertEqual(reference["samples"][0]["score"], 10)
         self.assertEqual(candidate["samples"][0]["score"], 13)
 
-    def test_supplied_acceptance_requires_matching_decoded_input_hashes(self) -> None:
-        """Refuse score imports that cannot establish the prepared input pair."""
+    def test_supplied_acceptance_requires_matching_decoded_input_hashes(
+        self
+    ) -> None:
+        """Reject score imports without prepared input identity."""
         with tempfile.TemporaryDirectory() as temporary:
             target = Path(temporary) / "scores.csv"
             target.write_text("original,distorted,v0\na,b,10\n")
             with self.assertRaisesRegex(ValueError, "decoded-input hashes"):
                 cid._supplied_rows(target, True)
             target.write_text(
-                "original,distorted,v0,original_yuv_sha256,distorted_yuv_sha256\n"
+                "original,distorted,v0,original_yuv_sha256,"
+                "distorted_yuv_sha256\n"
                 f"a,b,10,{'a' * 64},{'b' * 64}\n"
             )
-            args = mock.Mock(vqm_scores=target, agreement_policy=Path("policy.json"))
+            args = mock.Mock(
+                vqm_scores=target, agreement_policy=Path("policy.json")
+            )
             rows = [
                 {
                     "original": "a",
@@ -215,59 +232,76 @@ class Cid22AgreementTests(unittest.TestCase):
                 cid._apply_supplied(args, rows, [("a", "b")])
 
     def test_policy_model_must_be_scored(self) -> None:
-        """Fail the requested policy when only a different model was measured."""
+        """Reject policy checks for unmeasured models."""
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             policy = root / "policy.json"
             policy.write_text(json.dumps(_policy()))
             args = mock.Mock(agreement_policy=policy)
-            with self.assertRaisesRegex(ValueError, "matching selected VQM model"):
+            with self.assertRaisesRegex(ValueError,
+                                        "matching selected VQM model"):
                 cid._record_agreement(args, _rows(), ["v1"], {})
 
-    def test_recorded_cid22_policy_controls_status_and_writes_sidecars(self) -> None:
-        """Accept offsets and reject reordered quality through CID22's gate path."""
+    def test_recorded_cid22_policy_controls_status_and_writes_sidecars(
+        self
+    ) -> None:
+        """Accept offsets and reject reordered quality in CID22 gates."""
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             policy = root / "policy.json"
             policy.write_text(json.dumps(_policy()))
             args = mock.Mock(
-                agreement_policy=policy, candidate_revision="candidate-revision",
+                agreement_policy=policy,
+                candidate_revision="candidate-revision",
                 vqm_scores=Path("supplied.csv"), vqm_v0=False, vqm_v1=False,
                 out_dir=root
             )
-            info = {"v0_model_sha256": "a" * 64, "input_manifest_sha256": "b" * 64}
+            info = {
+                "v0_model_sha256": "a" * 64,
+                "input_manifest_sha256": "b" * 64
+            }
             self.assertTrue(cid._record_agreement(args, _rows(), ["v0"], info))
-            self.assertEqual(info["agreement"]["v0"]["ranking"]["status"], "pass")
+            self.assertEqual(
+                info["agreement"]["v0"]["ranking"]["status"], "pass"
+            )
             self.assertTrue((root / "v0-reference-agreement.json").is_file())
             self.assertEqual(
                 json.loads((root / "v0-candidate-agreement.json").read_text()
                            )["revision"], "candidate-revision"
             )
             self.assertFalse(
-                cid._record_agreement(args, _rows([10, 30, 20, 40]), ["v0"], info)
+                cid._record_agreement(
+                    args, _rows([10, 30, 20, 40]), ["v0"], info
+                )
             )
-            self.assertEqual(info["agreement"]["v0"]["ranking"]["status"], "fail")
+            self.assertEqual(
+                info["agreement"]["v0"]["ranking"]["status"], "fail"
+            )
 
     def test_no_policy_records_diagnostics_without_qualifying(self) -> None:
-        """Avoid labeling ordinary CID22 reports as a ranking acceptance pass."""
+        """Keep ordinary CID22 reports distinct from ranking acceptance."""
         with tempfile.TemporaryDirectory() as temporary:
             args = mock.Mock(
                 agreement_policy=None, candidate_revision=None,
                 vqm_scores=Path("supplied.csv"), vqm_v0=False, vqm_v1=False,
                 out_dir=Path(temporary)
             )
-            info = {"v0_model_sha256": "a" * 64, "input_manifest_sha256": "b" * 64}
+            info = {
+                "v0_model_sha256": "a" * 64,
+                "input_manifest_sha256": "b" * 64
+            }
             self.assertTrue(cid._record_agreement(args, _rows(), ["v0"], info))
             self.assertEqual(info["agreement"], {"status": "not_requested"})
 
     def test_cid22_policy_rejects_unidentified_supplied_revision(self) -> None:
-        """Require a declared implementation revision for external score imports."""
+        """Require declared revisions for external score imports."""
         argv = [
-            "vmaf_cid22.py", "--agreement-policy", "policy.json", "--vqm-scores",
-            "scores.csv"
+            "vmaf_cid22.py", "--agreement-policy", "policy.json",
+            "--vqm-scores", "scores.csv"
         ]
-        with mock.patch.object(sys, "argv", argv), contextlib.redirect_stderr(io.StringIO()), \
-             self.assertRaises(SystemExit):
+        with (mock.patch.object(sys, "argv", argv),
+              contextlib.redirect_stderr(io.StringIO()
+                                         ), self.assertRaises(SystemExit)):
             cid.parse_args()
 
 

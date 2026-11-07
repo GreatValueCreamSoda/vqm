@@ -3,17 +3,19 @@
 """Compute direct ranking, meaningful-order and paired subjective evidence."""
 
 import math
-from collections import Counter, defaultdict
+from collections import Counter
+from collections import defaultdict
 from collections.abc import Sequence
 
 import numpy as np
 
-try:
-    from .agreement_policy import AgreementPolicy, ScoreSample, SubjectivePolicy
-    from .common import kendall_tau_b, pearson, rankdata, spearman
-except ImportError:
-    from agreement_policy import AgreementPolicy, ScoreSample, SubjectivePolicy
-    from common import kendall_tau_b, pearson, rankdata, spearman
+from validation.agreement_policy import AgreementPolicy
+from validation.agreement_policy import ScoreSample
+from validation.agreement_policy import SubjectivePolicy
+from validation.common import kendall_tau_b
+from validation.common import pearson
+from validation.common import rankdata
+from validation.common import spearman
 
 Aligned = Sequence[tuple[ScoreSample, ScoreSample]]
 
@@ -49,7 +51,9 @@ def rank_statistics(aligned: Aligned) -> dict[str, object]:
     signed = None if tau is None else tau * math.sqrt(
         (total - reference_ties) * (total - candidate_ties)
     )
-    reversed_pairs = None if signed is None else round((comparable - signed) / 2)
+    reversed_pairs = None if signed is None else round(
+        (comparable - signed) / 2
+    )
     return {
         "samples": len(aligned),
         "srcc": finite_or_none(spearman(reference, candidate)),
@@ -65,20 +69,25 @@ def rank_statistics(aligned: Aligned) -> dict[str, object]:
 
 
 def numerical_diagnostics(aligned: Aligned) -> dict[str, object]:
-    """Report raw errors and affine calibration without correcting any scores.
+    """Report raw errors and affine calibration without correcting scores.
 
     :param aligned: Original/candidate sample pairs.
     :returns: Maximum/mean/RMS errors, signed offset and affine diagnostics.
     """
-    reference = np.array([first.score for first, _ in aligned], dtype=np.longdouble)
-    candidate = np.array([second.score for _, second in aligned], dtype=np.longdouble)
+    reference = np.array(
+        [first.score for first, _ in aligned], dtype=np.longdouble
+    )
+    candidate = np.array(
+        [second.score for _, second in aligned], dtype=np.longdouble
+    )
     error = candidate - reference
     centered = reference - reference.mean()
     variance = np.dot(centered, centered)
     slope = None if variance == 0 else np.dot(
         centered, candidate - candidate.mean()
     ) / variance
-    intercept = None if slope is None else candidate.mean() - slope * reference.mean()
+    intercept = None if slope is None else candidate.mean(
+    ) - slope * reference.mean()
     scale_x = max(float(np.max(np.abs(reference))), 1)
     scale_y = max(float(np.max(np.abs(candidate))), 1)
     pcc = pearson(
@@ -91,7 +100,8 @@ def numerical_diagnostics(aligned: Aligned) -> dict[str, object]:
         "rmse": finite_or_none(np.sqrt(np.mean(error * error))),
         "mean_offset": finite_or_none(error.mean()),
         "affine_slope": None if slope is None else finite_or_none(slope),
-        "affine_intercept": None if intercept is None else finite_or_none(intercept),
+        "affine_intercept":
+        None if intercept is None else finite_or_none(intercept),
         "pearson": finite_or_none(pcc)
     }
 
@@ -116,17 +126,21 @@ def _pair_counts(aligned: Aligned, margin: float) -> dict[str, int]:
     }
 
 
-def _source_counts(aligned: Aligned, margins: dict[str, float]) -> dict[str, int]:
-    configurations: dict[str, list[tuple[ScoreSample, ScoreSample]]] = defaultdict(list)
+def _source_counts(aligned: Aligned, margins: dict[str,
+                                                   float]) -> dict[str, int]:
+    configurations: dict[str, list[tuple[ScoreSample,
+                                         ScoreSample]]] = defaultdict(list)
     for pair in aligned:
         configurations[pair[0].configuration_id].append(pair)
     counts = [
-        _pair_counts(pairs, margins[name]) for name, pairs in configurations.items()
+        _pair_counts(pairs, margins[name])
+        for name, pairs in configurations.items()
     ]
     return {key: sum(count[key] for count in counts) for key in counts[0]}
 
 
-def order_statistics(aligned: Aligned, margins: dict[str, float]) -> dict[str, object]:
+def order_statistics(aligned: Aligned,
+                     margins: dict[str, float]) -> dict[str, object]:
     """Count meaningful failures with equal weight per informative source.
 
     Comparisons never cross original sources or qualification configurations.
@@ -136,7 +150,8 @@ def order_statistics(aligned: Aligned, margins: dict[str, float]) -> dict[str, o
     :param margins: Frozen original-score margin for every configuration.
     :returns: Aggregate counts, source rates, exclusions and worst-source rate.
     """
-    sources: dict[str, list[tuple[ScoreSample, ScoreSample]]] = defaultdict(list)
+    sources: dict[str, list[tuple[ScoreSample,
+                                  ScoreSample]]] = defaultdict(list)
     for pair in aligned:
         sources[pair[0].source_id].append(pair)
     counts = {
@@ -182,7 +197,9 @@ def _subjective_arrays(aligned: Aligned,
     )
 
 
-def _subjective_correlations(arrays: tuple[np.ndarray, ...]) -> tuple[float, float]:
+def _subjective_correlations(
+    arrays: tuple[np.ndarray, ...]
+) -> tuple[float, float]:
     reference, candidate, mos = arrays
     mos_ranks = rankdata(mos)
     return pearson(rankdata(reference),
@@ -190,7 +207,8 @@ def _subjective_correlations(arrays: tuple[np.ndarray, ...]) -> tuple[float, flo
 
 
 def _bootstrap_deltas(
-    arrays: tuple[np.ndarray, ...], clusters: list[np.ndarray], policy: SubjectivePolicy
+    arrays: tuple[np.ndarray, ...], clusters: list[np.ndarray],
+    policy: SubjectivePolicy
 ) -> tuple[list[float], int]:
     rng = np.random.default_rng(policy.seed)
     deltas = []
@@ -231,7 +249,9 @@ def _subjective_configuration(aligned: Aligned,
         }
     clusters = [np.array(sources[name]) for name in sorted(sources)]
     deltas, undefined = _bootstrap_deltas(arrays, clusters, policy.subjective)
-    lower = None if undefined else float(np.quantile(deltas, .05, method="linear"))
+    lower = None if undefined else float(
+        np.quantile(deltas, .05, method="linear")
+    )
     status = "inconclusive" if lower is None else (
         "pass" if lower >= -policy.subjective.margin else "fail"
     )
@@ -258,8 +278,10 @@ def _subjective_configuration(aligned: Aligned,
         policy.subjective.seed,
         "statistic":
         "pooled sample SRCC within configuration",
-        "interval":
-        "5th percentile of paired whole-source bootstrap deltas; linear quantile"
+        "interval": (
+            "5th percentile of paired whole-source bootstrap deltas; linear "
+            "quantile"
+        )
     }
 
 
@@ -271,13 +293,15 @@ def subjective_statistics(aligned: Aligned,
     are silently discarded. Whole original sources, including all derivatives,
     are sampled with replacement using the same draw for both implementations.
 
-    :param aligned: Original/candidate sample pairs with authoritative original MOS.
+    :param aligned: Original/candidate sample pairs with authoritative original
+        MOS.
     :param policy: Frozen directions and bootstrap settings.
     :returns: Per-configuration evidence and pass/fail/inconclusive status.
     """
     if not policy.subjective.required:
         return {"status": "not_requested"}
-    configurations: dict[str, list[tuple[ScoreSample, ScoreSample]]] = defaultdict(list)
+    configurations: dict[str, list[tuple[ScoreSample,
+                                         ScoreSample]]] = defaultdict(list)
     for pair in aligned:
         configurations[pair[0].configuration_id].append(pair)
     results = {

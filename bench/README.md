@@ -66,6 +66,11 @@ uv run --no-project --python 3.12 bench/benchmark.py --dry-run
 uv run --no-project --python 3.12 bench/benchmark.py
 ```
 
+Both suites accept `--build-dir DIR` (default `build/`). Relative build paths
+resolve from the repository root. The selected directory holds candidate
+binaries, copied native references and build fingerprints; provenance reads
+that same directory. The Python reference environment remains in `.venv/`.
+
 The smoke profile covers 39 clip pairs per metric with 12 frames per clip.
 The qualification profile covers 390 pairs per metric with 40 frames per clip.
 The five metrics are SSIMULACRA 2, Butteraugli, VMAF v0, VMAF v1 and CVVDP.
@@ -121,6 +126,17 @@ toolchain fingerprint changes. Fetch or build a named reference with
 `tools/fetch_references.py --only NAME` or
 `tools/build_references.py --only NAME`.
 [Reference setup and validation](../validation/README.md)
+
+For an alternate build, pass the same directory when building references and
+running the in-memory comparison. Its pair list has two columns: original and
+distorted paths separated by a tab. The corpus runner also accepts `--build-dir`.
+
+```sh
+python3 tools/build_references.py --only cloudinary --build-dir build-comparison
+.venv/bin/python bench/run_inmemory.py --mode latency --metric ssimu2 \
+  --only cloudinary --build-dir build-comparison --pairs-file image-pairs.tsv
+python3 tools/vscode_compile_commands.py --build-dir build-comparison
+```
 
 ## Profiling and specialist workflows
 

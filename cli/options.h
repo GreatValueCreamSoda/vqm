@@ -10,6 +10,8 @@
 #include <variant>
 #include <vector>
 
+#include "butteraugli.h"
+#include "ssimulacra2.h"
 #include "cvvdp_options.h"
 #include "io.h"
 #include "vmaf.h"
@@ -58,5 +60,11 @@ using ParseResult =
 [[nodiscard]] ParseResult ParseOptions(std::span<const std::string_view> args);
 [[nodiscard]] std::string Usage(std::string_view program);
 [[nodiscard]] std::string_view MetricName(Metric metric);
+[[nodiscard]] Ssimulacra2Config MakeSsimulacra2Config(
+    const Options& options, Size size
+);
+[[nodiscard]] ButteraugliConfig MakeButteraugliConfig(
+    const Options& options, Size size
+);
 
 }  // namespace vqm::cli

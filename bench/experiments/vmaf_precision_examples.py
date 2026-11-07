@@ -1,7 +1,8 @@
 """Illustrate VIF/ADM binary16 limits; not a GPU oracle or timing benchmark.
 
 Promoted from the FP16 research report's ``experiments/vif-adm-numerics.py``.
-The explicit casts and operation order retain the original diagnostic arithmetic.
+The explicit casts and operation order retain the original diagnostic
+arithmetic.
 """
 
 import argparse
@@ -14,7 +15,9 @@ import numpy as np
 from numpy.typing import NDArray
 
 ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_OUTPUT = ROOT / "artifacts/reports/precision-examples/vmaf-precision.json"
+DEFAULT_OUTPUT = ROOT / (
+    "artifacts/reports/precision-examples/vmaf-precision.json"
+)
 
 # Illustrative axial/diagonal CSF weights used in the original range experiment.
 CSF_WEIGHTS = np.asarray(
@@ -25,14 +28,16 @@ CSF_WEIGHTS = np.asarray(
 )
 
 
-def shader_coefficients(path: Path, name: str, count: int) -> NDArray[np.float32]:
-    """Read a literal GLSL coefficient array, failing visibly if its form changes.
+def shader_coefficients(path: Path, name: str,
+                        count: int) -> NDArray[np.float32]:
+    """Read a literal GLSL array and reject changes to its form.
 
     :param path: File to read, hash or update.
     :param name: Name of the coefficient array, stage or case.
     :param count: Expected number of coefficients or samples.
     :returns: Coefficient array in binary32 tap order.
-    :raises ValueError: If the array is missing or has the wrong number of coefficients.
+    :raises ValueError: If the array is missing or has the wrong number of
+        coefficients.
     """
     source = path.read_text()
     pattern = rf"{name}\[{count}\].*?\((.*?)\);"
@@ -119,8 +124,8 @@ def _vif_ratio(
 
 def vif_constant(
     reference: float, distorted: float, weights: NDArray[np.float32],
-    half_products: bool = False, center: tuple[float,
-                                               float] = (0.0, 0.0), scale: float = 1.0
+    half_products: bool = False, center: tuple[float, float] = (0.0, 0.0),
+    scale: float = 1.0
 ) -> dict[str, object]:
     """Filter one constant field with separate FP32 additions, then form VIF.
 
@@ -147,7 +152,9 @@ def vif_constant(
     horizontal_moments = np.zeros(3, dtype=np.float32)
     for weight in weights:
         horizontal_means = add32(horizontal_means, np.float32(weight * means))
-        horizontal_moments = add32(horizontal_moments, np.float32(weight * moments))
+        horizontal_moments = add32(
+            horizontal_moments, np.float32(weight * moments)
+        )
 
     mean = np.float32(horizontal_means * np.float32(scale))
     moment = np.float32(horizontal_moments * np.float32(scale * scale))
@@ -170,8 +177,9 @@ def vif_constant(
     }
 
 
-def _wavelet_product(weight: np.float32, value: NDArray[np.floating],
-                     mode: str) -> NDArray[np.floating]:
+def _wavelet_product(
+    weight: np.float32, value: NDArray[np.floating], mode: str
+) -> NDArray[np.floating]:
     """Multiply one DWT tap using the configured rounding.
 
     :param weight: Tap coefficient.
@@ -211,7 +219,8 @@ def wavelet(
         for y in range(4):
             rows = 2 * np.arange(output_height) - 1 + y
             rows = np.where(
-                rows < 0, -rows, np.where(rows >= height, 2 * height - rows - 1, rows)
+                rows < 0, -rows,
+                np.where(rows >= height, 2 * height - rows - 1, rows)
             )
             value = source[np.ix_(rows, columns)]
             low_product = _wavelet_product(low_weights[y], value, mode)
@@ -221,12 +230,14 @@ def wavelet(
         rows_low.append(low)
         rows_high.append(high)
 
-    bands = [np.zeros((output_height, output_width), dtype=dtype) for _ in range(4)]
+    bands = [
+        np.zeros((output_height, output_width), dtype=dtype) for _ in range(4)
+    ]
     for x in range(4):
-        for band, weight, value in [
-            (0, low_weights[x], rows_low[x]), (1, low_weights[x], rows_high[x]),
-            (2, high_weights[x], rows_low[x]), (3, high_weights[x], rows_high[x]),
-        ]:
+        for band, weight, value in [(0, low_weights[x], rows_low[x]),
+                                    (1, low_weights[x], rows_high[x]),
+                                    (2, high_weights[x], rows_low[x]),
+                                    (3, high_weights[x], rows_high[x]), ]:
             product = _wavelet_product(weight, value, mode)
             bands[band] = dtype(bands[band] + product.astype(dtype))
     return [np.asarray(band, dtype=np.float32) for band in bands]
@@ -259,7 +270,8 @@ def _adm_levels(
         levels.append(
             {
                 "max_abs_lowpass": float(abs(bands[0]).max()),
-                "max_abs_detail": float(max(abs(band).max() for band in bands[1:])),
+                "max_abs_detail":
+                float(max(abs(band).max() for band in bands[1:])),
                 "max_csf_weighted": maximum,
                 "max_cube_fp32": maximum**3,
                 "cube_exceeds_binary16": maximum**3 > 65504,
@@ -282,12 +294,15 @@ def generate_examples() -> dict[str, object]:
     low_weights = shader_coefficients(adm_path, "kLow", 4)
     high_weights = shader_coefficients(adm_path, "kHigh", 4)
     results = {
-        "note":
-        "IEEE binary16 CPU diagnostics; dot additions are separate FP32 operations, not a claim of exact GPU driver contraction behavior.",
+        "note": (
+            "IEEE binary16 CPU diagnostics; dot additions are separate FP32 "
+            "operations, not a claim of exact GPU driver contraction behavior."
+        ),
         "finfo": {
             "max": float(np.finfo(np.float16).max),
             "smallest_normal": float(np.finfo(np.float16).smallest_normal),
-            "smallest_subnormal": float(np.nextafter(np.float16(0), np.float16(1))),
+            "smallest_subnormal":
+            float(np.nextafter(np.float16(0), np.float16(1))),
         },
         "guards": {
             str(value): float(np.float16(value))
@@ -300,8 +315,8 @@ def generate_examples() -> dict[str, object]:
 
     for depth in [8, 10, 12, 16]:
         values = (
-            np.arange(1 << depth, dtype=np.float32) * np.float32(2.0**(8 - depth)) -
-            np.float32(128.0)
+            np.arange(1 << depth, dtype=np.float32) *
+            np.float32(2.0**(8 - depth)) - np.float32(128.0)
         )
         errors = np.abs(values.astype(np.float16).astype(np.float32) - values)
         results["coded_source"][str(depth)] = {
@@ -310,7 +325,8 @@ def generate_examples() -> dict[str, object]:
             "maximum_native_codes": float(errors.max() / 2.0**(8 - depth)),
         }
     for name, half, center, scale in [
-        ("fp32", False, (0, 0), 1), ("fp16_products_fp32_sums", True, (0, 0), 1),
+        ("fp32", False, (0, 0), 1),
+        ("fp16_products_fp32_sums", True, (0, 0), 1),
         ("recentered_uniform_field", True, (100.5, 100.25), 2),
         ("recentered_heterogeneous_tile_center_zero", True, (0, 0), 2),
     ]:
@@ -323,9 +339,12 @@ def generate_examples() -> dict[str, object]:
         "cross": 100.5 * 100.25,
     }
     results["vif"]["half_unfiltered_products"] = {
-        "reference_square": float(np.float16(np.float16(100.5) * np.float16(100.5))),
-        "distorted_square": float(np.float16(np.float16(100.25) * np.float16(100.25))),
-        "cross": float(np.float16(np.float16(100.5) * np.float16(100.25))),
+        "reference_square":
+        float(np.float16(np.float16(100.5) * np.float16(100.5))),
+        "distorted_square":
+        float(np.float16(np.float16(100.25) * np.float16(100.25))),
+        "cross":
+        float(np.float16(np.float16(100.5) * np.float16(100.25))),
     }
 
     for name in ["constant", "checker16", "stripes16"]:

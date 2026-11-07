@@ -19,16 +19,27 @@ import os
 import subprocess
 import sys
 import tempfile
-from collections.abc import Callable, Sequence
+from collections.abc import Callable
+from collections.abc import Sequence
 from pathlib import Path
-from typing import TypedDict, TypeVar, cast
+from typing import TypedDict
+from typing import TypeVar
+from typing import cast
+
+if __package__ in (None, ""):
+    # Keep direct script invocation compatible with package imports.
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import numpy as np
-from common import Pair, correlation_triple, enumerate_pairs, load_mcos
-from compare_vmaf_scores import direct_correlations, pair_input_hash, pair_sample_id
 from numpy.typing import NDArray
 from PIL import Image
 from PIL import __version__ as pillow_version
+
+from validation import compare_vmaf_scores as comparison
+from validation.common import Pair
+from validation.common import correlation_triple
+from validation.common import enumerate_pairs
+from validation.common import load_mcos
 
 ROOT = Path(__file__).resolve().parent.parent
 YUV_CACHE = Path(".cache/validation/vmaf-cid22-yuv")
@@ -151,8 +162,9 @@ def convert_file(path: Path, cache: Path) -> ConvertedFrame:
     }
 
 
-def reference_score(row: CorpusRow, executable: Path, model0: Path,
-                    model1: Path) -> list[float]:
+def reference_score(
+    row: CorpusRow, executable: Path, model0: Path, model1: Path
+) -> list[float]:
     """Score one raw 10-bit pair with both pinned libvmaf models.
 
     :param row: Prepared pair paths and frame dimensions.
@@ -182,7 +194,9 @@ def reference_score(row: CorpusRow, executable: Path, model0: Path,
     return scores
 
 
-def write_y4m(raw_path: str | Path, output_dir: Path, width: int, height: int) -> str:
+def write_y4m(
+    raw_path: str | Path, output_dir: Path, width: int, height: int
+) -> str:
     """Wrap the exact raw 10-bit LE samples in a one-frame Y4M file.
 
     :param raw_path: Planar YUV444P10LE data.
@@ -196,7 +210,8 @@ def write_y4m(raw_path: str | Path, output_dir: Path, width: int, height: int) -
     raw = source.read_bytes()
     if len(raw) != width * height * 3 * 2:
         raise ValueError(f"{source}: wrong YUV444P10LE frame length")
-    header = f"YUV4MPEG2 W{width} H{height} F1:1 Ip A0:0 C444p10\nFRAME\n".encode()
+    header = (f"YUV4MPEG2 W{width} H{height} F1:1 Ip A0:0 C444p10\nFRAME\n"
+              ).encode()
     target = output_dir / (source.stem + ".y4m")
     expected = hashlib.sha256(header + raw).digest()
     if not target.exists() or bytes.fromhex(digest(target)) != expected:
@@ -216,20 +231,24 @@ def _wrapper_sizes(rows: list[CorpusRow]) -> dict[str, tuple[int, int]]:
     return source_sizes
 
 
-def _write_vqm_pairs(rows: list[CorpusRow], output_dir: Path, jobs: int) -> Path:
+def _write_vqm_pairs(
+    rows: list[CorpusRow], output_dir: Path, jobs: int
+) -> Path:
     cache = ROOT / ".cache/validation/vmaf-cid22-y4m"
     cache.mkdir(parents=True, exist_ok=True)
     source_sizes = _wrapper_sizes(rows)
     sources = sorted(source_sizes)
     wrappers = parallel_map(
-        "Y4M", lambda path: write_y4m(path, cache, *source_sizes[path]), sources, jobs
+        "Y4M", lambda path: write_y4m(path, cache, *source_sizes[path]),
+        sources, jobs
     )
     lookup = dict(zip(sources, wrappers, strict=True))
     pairs_file = output_dir / "vqm-pairs.txt"
     with pairs_file.open("w") as output:
         for row in rows:
             output.write(
-                f"{lookup[row['original_yuv']]}\t{lookup[row['distorted_yuv']]}\n"
+                f"{lookup[row['original_yuv']]}\t"
+                f"{lookup[row['distorted_yuv']]}\n"
             )
     return pairs_file
 
@@ -252,11 +271,13 @@ def vqm_scores(rows: list[CorpusRow], output_dir: Path, jobs: int,
         raise ValueError(f"missing {executable}; run cmake --build build -j8")
     pairs_file = _write_vqm_pairs(rows, output_dir, jobs)
     command = [
-        str(executable), "--metric", "vmaf-" + model, "--score-only", "--input-matrix",
-        "bt709", "--pairs-file",
+        str(executable), "--metric", "vmaf-" + model, "--score-only",
+        "--input-matrix", "bt709", "--pairs-file",
         str(pairs_file)
     ]
-    print(f"VQM {model}: scoring {len(rows)} independent still pairs", flush=True)
+    print(
+        f"VQM {model}: scoring {len(rows)} independent still pairs", flush=True
+    )
     result = subprocess.run(
         command, text=True, capture_output=True, timeout=120 + 2 * len(rows)
     )
@@ -284,7 +305,8 @@ def vqm_scores(rows: list[CorpusRow], output_dir: Path, jobs: int,
 
 
 def parallel_map(
-    label: str, fn: Callable[[_Input], _Result], values: Sequence[_Input], jobs: int
+    label: str, fn: Callable[[_Input], _Result], values: Sequence[_Input],
+    jobs: int
 ) -> list[_Result]:
     """Process values concurrently while preserving their input order.
 
@@ -296,8 +318,12 @@ def parallel_map(
     """
     results: list[_Result | None] = [None] * len(values)
     with concurrent.futures.ThreadPoolExecutor(max_workers=jobs) as executor:
-        futures = {executor.submit(fn, value): i for i, value in enumerate(values)}
-        for completed, future in enumerate(concurrent.futures.as_completed(futures), 1):
+        futures = {
+            executor.submit(fn, value): i
+            for i, value in enumerate(values)
+        }
+        for completed, future in enumerate(
+                concurrent.futures.as_completed(futures), 1):
             results[futures[future]] = future.result()
             _print_progress(label, completed, len(values))
     return cast(list[_Result], results)
@@ -308,8 +334,9 @@ def _print_progress(label: str, completed: int, total: int) -> None:
         print(f"{label}: {completed}/{total}", flush=True)
 
 
-def _supplied_rows(path: Path,
-                   require_hashes: bool) -> tuple[list[str], dict[Pair, CorpusRow]]:
+def _supplied_rows(
+    path: Path, require_hashes: bool
+) -> tuple[list[str], dict[Pair, CorpusRow]]:
     with path.open(newline="") as source:
         reader = csv.DictReader(source)
         fields = reader.fieldnames or []
@@ -336,17 +363,23 @@ def _supplied_rows(path: Path,
     return models, provided
 
 
-def _apply_supplied(args: argparse.Namespace, rows: list[CorpusRow],
-                    pairs: list[Pair]) -> list[str]:
+def _apply_supplied(
+    args: argparse.Namespace, rows: list[CorpusRow], pairs: list[Pair]
+) -> list[str]:
     if not args.vqm_scores:
         return []
-    models, supplied = _supplied_rows(args.vqm_scores, bool(args.agreement_policy))
+    models, supplied = _supplied_rows(
+        args.vqm_scores, bool(args.agreement_policy)
+    )
     if set(supplied) != set(pairs):
-        raise ValueError("VQM score pairs do not exactly match selected CID22 pairs")
+        raise ValueError(
+            "VQM score pairs do not exactly match selected CID22 pairs"
+        )
     for row in rows:
         value = supplied[(row["original"], row["distorted"])]
         hashes = ("original_yuv_sha256", "distorted_yuv_sha256")
-        if args.agreement_policy and any(value[name] != row[name] for name in hashes):
+        if args.agreement_policy and any(value[name] != row[name]
+                                         for name in hashes):
             raise ValueError(
                 "supplied VQM decoded-input hashes differ from prepared inputs"
             )
@@ -358,7 +391,7 @@ def _agreement_sample(row: CorpusRow, column: str) -> dict[str, object]:
     pair = str(row["original"]), str(row["distorted"])
     return {
         "sample_id":
-        pair_sample_id(pair),
+        comparison.pair_sample_id(pair),
         "source_id":
         pair[0],
         "configuration_id":
@@ -368,7 +401,7 @@ def _agreement_sample(row: CorpusRow, column: str) -> dict[str, object]:
         "distortion_family":
         Path(pair[1]).parent.name,
         "input_hash":
-        pair_input_hash(
+        comparison.pair_input_hash(
             (str(row["original_yuv_sha256"]), str(row["distorted_yuv_sha256"]))
         ),
         "score":
@@ -382,17 +415,18 @@ def build_agreement_reports(
     rows: list[CorpusRow], model: str, model_hash: str, manifest_hash: str,
     candidate_revision: str
 ) -> tuple[dict, dict]:
-    """Build canonical single-frame reports from the measured CID22 input manifest.
+    """Build canonical single-frame reports from the CID22 input manifest.
 
     :param rows: Exact paired scores and decoded input hashes.
     :param model: VMAF v0 or v1 model identity.
     :param model_hash: Hash of the pinned model JSON.
     :param manifest_hash: Hash of the prepared input manifest.
-    :param candidate_revision: Supplied revision or fingerprint of the invoked binary.
+    :param candidate_revision: Supplied revision or fingerprint of the invoked
+        binary.
     :returns: Original and candidate canonical reports with matched provenance.
     :raises ValueError: If canonical scores or provenance are invalid.
     """
-    from agreement import report_from_rows
+    from validation.agreement import report_from_rows
 
     configuration = {
         "conversion": CONVERSION,
@@ -403,7 +437,8 @@ def build_agreement_reports(
         "temporal": "independent-single-frame-motion-zero"
     }
     configuration_hash = hashlib.sha256(
-        json.dumps(configuration, sort_keys=True, separators=(",", ":")).encode()
+        json.dumps(configuration, sort_keys=True,
+                   separators=(",", ":")).encode()
     ).hexdigest()
     shared = {
         "metric": "vmaf-" + model,
@@ -415,8 +450,8 @@ def build_agreement_reports(
         implementation="libvmaf", revision=REFERENCE_REVISION, **shared
     )
     candidate = report_from_rows(
-        [_agreement_sample(row, "vqm_" + model) for row in rows], implementation="vqm",
-        revision=candidate_revision, **shared
+        [_agreement_sample(row, "vqm_" + model) for row in rows],
+        implementation="vqm", revision=candidate_revision, **shared
     )
     return reference, candidate
 
@@ -425,7 +460,7 @@ def _record_agreement(
     args: argparse.Namespace, rows: list[CorpusRow], models: list[str],
     info: dict[str, object]
 ) -> bool:
-    from agreement import evaluate_agreement
+    from validation.agreement import evaluate_agreement
 
     policy = None if not args.agreement_policy else json.loads(
         args.agreement_policy.read_text()
@@ -433,10 +468,13 @@ def _record_agreement(
     policy_model = None if policy is None else str(policy.get("metric", "")
                                                    ).removeprefix("vmaf-")
     if policy is not None and policy_model not in models:
-        raise ValueError("agreement policy requires a matching selected VQM model")
+        raise ValueError(
+            "agreement policy requires a matching selected VQM model"
+        )
     binary_models = {
         model
-        for model, requested in (("v0", args.vqm_v0), ("v1", args.vqm_v1)) if requested
+        for model, requested in (("v0", args.vqm_v0), ("v1", args.vqm_v1))
+        if requested
     }
     reports = {}
     for model in models:
@@ -449,9 +487,12 @@ def _record_agreement(
             rows, model, str(info[model + "_model_sha256"]),
             str(info["input_manifest_sha256"]), revision
         )
-        for label, report in (("reference", reference), ("candidate", candidate)):
+        for label, report in (("reference", reference), ("candidate",
+                                                         candidate)):
             target = args.out_dir / f"{model}-{label}-agreement.json"
-            target.write_text(json.dumps(report, indent=2, allow_nan=False) + "\n")
+            target.write_text(
+                json.dumps(report, indent=2, allow_nan=False) + "\n"
+            )
         if model == policy_model:
             reports[model] = evaluate_agreement(reference, candidate, policy)
     info["agreement"] = reports if policy else {"status": "not_requested"}
@@ -465,7 +506,8 @@ def parse_args() -> argparse.Namespace:
     """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--data-root", type=Path, default=ROOT / "validation/data/CID22_validation_set"
+        "--data-root", type=Path,
+        default=ROOT / "validation/data/CID22_validation_set"
     )
     parser.add_argument(
         "--out-dir", type=Path, default=ROOT / "artifacts/reports/vmaf-cid22"
@@ -505,13 +547,20 @@ def parse_args() -> argparse.Namespace:
     if args.jobs < 1 or args.limit < 0:
         parser.error("--jobs must be positive and --limit non-negative")
     if args.agreement_policy and args.prepare_only:
-        parser.error("--agreement-policy cannot be combined with --prepare-only")
-    if args.agreement_policy and args.vqm_scores and not args.candidate_revision:
-        parser.error("ranking acceptance of --vqm-scores requires --candidate-revision")
+        parser.error(
+            "--agreement-policy cannot be combined with --prepare-only"
+        )
+    if (args.agreement_policy and args.vqm_scores
+            and not args.candidate_revision):
+        parser.error(
+            "ranking acceptance of --vqm-scores requires --candidate-revision"
+        )
     return args
 
 
-def _prepare_rows(args: argparse.Namespace) -> tuple[list[Pair], list[CorpusRow], Path]:
+def _prepare_rows(
+    args: argparse.Namespace
+) -> tuple[list[Pair], list[CorpusRow], Path]:
     data_root = args.data_root.resolve()
     cache = args.cache.resolve()
     cache.mkdir(parents=True, exist_ok=True)
@@ -525,7 +574,8 @@ def _prepare_rows(args: argparse.Namespace) -> tuple[list[Pair], list[CorpusRow]
     mcos = load_mcos(str(mcos_file))
     paths = sorted({name for pair in pairs for name in pair})
     converted = parallel_map(
-        "convert", lambda path: convert_file(data_root / path, cache), paths, args.jobs
+        "convert", lambda path: convert_file(data_root / path, cache), paths,
+        args.jobs
     )
     lookup = dict(zip(paths, converted, strict=True))
     rows = []
@@ -567,7 +617,8 @@ def _reference_paths() -> VmafPaths:
     for path in (executable, model0, model1):
         if not path.is_file():
             raise ValueError(
-                f"missing {path}; run python3 tools/build_references.py --only vmaf"
+                f"missing {path}; run python3 tools/build_references.py "
+                f"--only vmaf"
             )
     return executable, model0, model1
 
@@ -578,11 +629,12 @@ def _reuse_reference_scores(
 ) -> list[tuple[float, float]]:
     executable, model0, model1 = assets
     prior_summary = json.loads(path.with_name("summary.json").read_text())
-    for key, value in (("input_manifest_sha256", digest(manifest)), ("v0_model_sha256",
-                                                                     digest(model0)),
-                       ("v1_model_sha256", digest(model1)), ("driver_sha256",
-                                                             digest(executable)),
-                       ("mcos_sha256", digest(mcos_file)), ("conversion", CONVERSION)):
+    for key, value in (("input_manifest_sha256",
+                        digest(manifest)), ("v0_model_sha256", digest(model0)),
+                       ("v1_model_sha256",
+                        digest(model1)), ("driver_sha256", digest(executable)),
+                       ("mcos_sha256", digest(mcos_file)), ("conversion",
+                                                            CONVERSION)):
         if prior_summary.get(key) != value:
             raise ValueError(f"prior reference does not match: {key}")
     with path.open(newline="") as source:
@@ -591,19 +643,22 @@ def _reuse_reference_scores(
         raise ValueError("prior reference pair count differs")
     results = []
     for row, old in zip(rows, previous, strict=True):
-        if (row["original"], row["distorted"]) != (old["original"], old["distorted"]):
+        if (row["original"], row["distorted"]) != (old["original"],
+                                                   old["distorted"]):
             raise ValueError("prior reference pair order differs")
         values = float(old["libvmaf_v0"]), float(old["libvmaf_v1"])
         if not all(math.isfinite(value) for value in values):
             raise ValueError("prior reference contains non-finite scores")
         results.append(values)
-    print(f"libvmaf: reused {len(results)} matching reference scores", flush=True)
+    print(
+        f"libvmaf: reused {len(results)} matching reference scores", flush=True
+    )
     return results
 
 
 def _add_reference_scores(
-    args: argparse.Namespace, rows: list[CorpusRow], manifest: Path, mcos_file: Path,
-    assets: VmafPaths
+    args: argparse.Namespace, rows: list[CorpusRow], manifest: Path,
+    mcos_file: Path, assets: VmafPaths
 ) -> None:
     if args.reference_scores:
         results = _reuse_reference_scores(
@@ -611,14 +666,16 @@ def _add_reference_scores(
         )
     else:
         results = parallel_map(
-            "libvmaf", lambda row: reference_score(row, *assets), rows, args.jobs
+            "libvmaf", lambda row: reference_score(row, *assets), rows,
+            args.jobs
         )
     for row, (v0, v1) in zip(rows, results, strict=True):
         row["libvmaf_v0"], row["libvmaf_v1"] = v0, v1
 
 
-def _add_vqm_scores(args: argparse.Namespace, rows: list[CorpusRow],
-                    pairs: list[Pair]) -> list[str]:
+def _add_vqm_scores(
+    args: argparse.Namespace, rows: list[CorpusRow], pairs: list[Pair]
+) -> list[str]:
     vqm_models = _apply_supplied(args, rows, pairs)
     for model, requested in (("v0", args.vqm_v0), ("v1", args.vqm_v1)):
         if not requested:
@@ -696,7 +753,7 @@ def _build_summary(
         "parity": parity,
         "direct_agreement": {
             model:
-            direct_correlations(
+            comparison.direct_correlations(
                 [row["libvmaf_" + model]
                  for row in rows], [row["vqm_" + model] for row in rows]
             )
@@ -711,7 +768,7 @@ def _build_summary(
 
 
 def main() -> int:
-    """Run the still-image experiment and optional reference-ranking acceptance.
+    """Run the still-image experiment and optional ranking acceptance.
 
     :returns: Zero unless an explicitly requested agreement policy fails.
     """
@@ -728,7 +785,8 @@ def main() -> int:
     _write_rows(args.out_dir / "scores.csv", rows)
     info = _build_summary(args, rows, vqm_models, manifest, mcos_file, assets)
     agreement_passed = _record_agreement(args, rows, vqm_models, info)
-    (args.out_dir / "summary.json").write_text(json.dumps(info, indent=2) + "\n")
+    (args.out_dir /
+     "summary.json").write_text(json.dumps(info, indent=2) + "\n")
     print(json.dumps(info, indent=2))
     return 0 if agreement_passed else 1
 
@@ -736,6 +794,7 @@ def main() -> int:
 if __name__ == "__main__":
     try:
         sys.exit(main())
-    except (OSError, ValueError, RuntimeError, subprocess.TimeoutExpired) as error:
+    except (OSError, ValueError, RuntimeError,
+            subprocess.TimeoutExpired) as error:
         print(f"vmaf-cid22: {error}", file=sys.stderr)
         sys.exit(1)

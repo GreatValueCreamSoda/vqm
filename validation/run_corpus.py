@@ -36,12 +36,22 @@ import time
 from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import NotRequired, TextIO, TypedDict
+from typing import NotRequired
+from typing import TextIO
+from typing import TypedDict
 
-import common
+if __package__ in (None, ""):
+    # Keep direct script invocation compatible with package imports.
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 import numpy as np
-from agreement import default_gate_mode, evaluate_agreement, report_from_rows
-from agreement_policy import AgreementPolicy
+
+from tools.build_paths import relocate_build_path
+from validation import common
+from validation.agreement import default_gate_mode
+from validation.agreement import evaluate_agreement
+from validation.agreement import report_from_rows
+from validation.agreement_policy import AgreementPolicy
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MANIFEST = os.path.join(REPO_ROOT, "validation", "references.json")
@@ -70,8 +80,8 @@ class MetricSpec(TypedDict):
 Scores = dict[str, list[float | None]]
 Correlations = dict[str, tuple[float, float, float]]
 Timing = tuple[str, float, int]
-ParityRow = tuple[str, int, float | None, float | None, float | None, float | None,
-                  int | None, int | None]
+ParityRow = tuple[str, int, float | None, float | None, float | None,
+                  float | None, int | None, int | None]
 
 
 def parse_args() -> argparse.Namespace:
@@ -81,13 +91,16 @@ def parse_args() -> argparse.Namespace:
     :raises SystemExit: If an option is invalid.
     """
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--data-root", default="validation/data/CID22_validation_set")
+    parser.add_argument(
+        "--data-root", default="validation/data/CID22_validation_set"
+    )
     parser.add_argument(
         "--csv", default=None, help="MCOS annotations (default: "
         "<data-root>/CID22_validation_set.csv)"
     )
     parser.add_argument(
-        "--metric", default="all", choices=("all", "ssimulacra2", "butteraugli")
+        "--metric", default="all",
+        choices=("all", "ssimulacra2", "butteraugli")
     )
     parser.add_argument(
         "--only", default=None, help="comma-separated implementation names"
@@ -99,6 +112,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--limit", type=int, default=0, help="only the first N pairs (0 = all)"
     )
+    parser.add_argument("--build-dir", default="build")
     parser.add_argument("--out-dir", default="artifacts/reports/validation")
     parser.add_argument("--max-threshold", type=float, default=0.01)
     parser.add_argument("--mean-threshold", type=float, default=0.001)
@@ -118,8 +132,10 @@ def parse_args() -> argparse.Namespace:
         help="explicit frozen policy for canonical ranking qualification"
     )
     parser.add_argument(
-        "--gate-mode", choices=("both", "ranking", "numerical"), help=
-        "agreement gates to require (default: ranking for qualified domains; both otherwise)"
+        "--gate-mode", choices=("both", "ranking", "numerical"), help=(
+            "agreement gates to require (default: ranking for qualified "
+            "domains; both otherwise)"
+        )
     )
     parser.add_argument(
         "--timeout", type=float, default=120.0,
@@ -134,7 +150,9 @@ def parse_args() -> argparse.Namespace:
     for name in ("max_threshold", "mean_threshold", "accuracy_tolerance"):
         value = getattr(args, name)
         if not math.isfinite(value) or value < 0:
-            parser.error(f"--{name.replace('_', '-')} must be finite and non-negative")
+            parser.error(
+                f"--{name.replace('_', '-')} must be finite and non-negative"
+            )
     if not math.isfinite(args.timeout) or args.timeout <= 0:
         parser.error("--timeout must be finite and positive")
     if args.gate_mode and args.agreement_policy is None:
@@ -142,13 +160,21 @@ def parse_args() -> argparse.Namespace:
     return args
 
 
-def load_manifest() -> dict[str, MetricSpec]:
+def load_manifest(build_dir: str = "build") -> dict[str, MetricSpec]:
     """Load the local manifest of supported metric commands.
 
+    :param build_dir: Directory containing the selected candidate and
+        references.
     :returns: Metric names and their command configurations.
     """
     with open(MANIFEST) as f:
-        return json.load(f)
+        manifest = json.load(f)
+    for spec in manifest.values():
+        for entry in spec["implementations"]:
+            entry["command"] = [
+                relocate_build_path(arg, build_dir) for arg in entry["command"]
+            ]
+    return manifest
 
 
 def _digest_file(path: Path) -> str:
@@ -166,10 +192,13 @@ def _digest_json(value: object) -> str:
 
 def _reference_revision(spec: MetricSpec) -> str:
     """Verify the selected original checkout against the maintained lock pin."""
-    name = {"cloudinary": "ssimulacra2"}.get(spec["reference"], spec["reference"])
+    name = {
+        "cloudinary": "ssimulacra2"
+    }.get(spec["reference"], spec["reference"])
     rows = [
         line.split()
-        for line in (Path(REPO_ROOT) / "tools/references.lock").read_text().splitlines()
+        for line in (Path(REPO_ROOT) /
+                     "tools/references.lock").read_text().splitlines()
         if line.strip() and not line.lstrip().startswith("#")
     ]
     pins = {row[0]: row[2] for row in rows if len(row) == 3}
@@ -178,19 +207,23 @@ def _reference_revision(spec: MetricSpec) -> str:
     subprocess.run(
         [
             sys.executable,
-            str(Path(REPO_ROOT) / "tools/fetch_references.py"), "--check", "--only",
-            name
+            str(Path(REPO_ROOT) / "tools/fetch_references.py"), "--check",
+            "--only", name
         ], capture_output=True, text=True, check=True
     )
     return pins[name]
 
 
 def _agreement_inputs(
-    metric: str, pairs: list[tuple[str, str]], mcos: dict[tuple[str, str], float],
-    data_root: str
+    metric: str, pairs: list[tuple[str, str]], mcos: dict[tuple[str, str],
+                                                          float], data_root: str
 ) -> tuple[list[dict[str, object]], dict[str, str]]:
-    """Identify each raw source file and preserve complete pair/MOS membership."""
-    files = {str((Path(data_root) / name).resolve()) for pair in pairs for name in pair}
+    """Identify raw source files and preserve complete pair/MOS membership."""
+    files = {
+        str((Path(data_root) / name).resolve())
+        for pair in pairs
+        for name in pair
+    }
     hashes = {name: _digest_file(Path(name)) for name in sorted(files)}
     rows = []
     for original, distorted in pairs:
@@ -215,10 +248,10 @@ def _agreement_context(
     pairs: list[tuple[str, str]], mcos: dict[tuple[str, str],
                                              float], args: argparse.Namespace
 ) -> dict[str, object]:
-    """Freeze real input, command, binary and reference provenance before scoring."""
+    """Freeze input, command, binary and reference provenance before scoring."""
     names = {entry["name"] for entry in entries}
-    if "ours" not in names or spec["reference"] not in names or spec["reference"
-                                                                     ] == "ours":
+    if "ours" not in names or spec["reference"] not in names or spec[
+            "reference"] == "ours":
         raise ValueError(
             "agreement qualification requires ours and the pinned original arm"
         )
@@ -229,7 +262,9 @@ def _agreement_context(
         raise ValueError(
             "agreement policy metric or original pin does not match this run"
         )
-    inputs, fingerprints = _agreement_inputs(metric, pairs, mcos, args.data_root)
+    inputs, fingerprints = _agreement_inputs(
+        metric, pairs, mcos, args.data_root
+    )
     commands = {}
     for entry in entries:
         binary = str(Path(entry["command"][0]).resolve())
@@ -260,10 +295,12 @@ def _agreement_context(
 def _agreement_report(
     context: dict[str, object], scores: dict[str, list[float | None]], name: str
 ) -> dict[str, object]:
-    """Build one canonical arm, rejecting absent/nonfinite scores rather than dropping rows."""
+    """Build a canonical arm and reject missing or nonfinite scores."""
     values = scores[name]
     if any(value is None or not math.isfinite(value) for value in values):
-        raise ValueError(f"{name}: agreement requires every requested finite score")
+        raise ValueError(
+            f"{name}: agreement requires every requested finite score"
+        )
     rows = [
         {
             **row, "score": score
@@ -284,20 +321,24 @@ def _write_agreement(
     context: dict[str, object], scores: dict[str, list[float | None]],
     args: argparse.Namespace, numerical_passed: bool
 ) -> bool:
-    """Retain separate ranking/numerical results and apply the requested conjunction."""
+    """Retain separate gate results and apply the requested conjunction."""
     if any(_digest_file(Path(path)) != expected
            for path, expected in context["fingerprints"].items()):
-        raise ValueError("source inputs or measured executables changed during scoring")
+        raise ValueError(
+            "source inputs or measured executables changed during scoring"
+        )
     original = _agreement_report(context, scores, context["reference"])
     candidate = _agreement_report(context, scores, "ours")
     result = evaluate_agreement(original, candidate, context["policy"])
     mode = getattr(args, "gate_mode",
                    None) or default_gate_mode(original, context["policy"])
     ranking_passed = result["proposed_status"] == "pass"
-    numerical_gate = numerical_passed and result["numerical"]["status"] != "fail"
+    numerical_gate = (
+        numerical_passed and result["numerical"]["status"] != "fail"
+    )
     passed = (
-        ranking_passed if mode == "ranking" else
-        numerical_gate if mode == "numerical" else ranking_passed and numerical_gate
+        ranking_passed if mode == "ranking" else numerical_gate
+        if mode == "numerical" else ranking_passed and numerical_gate
     )
     result.update(
         gate_mode=mode, legacy_numerical_passed=numerical_passed,
@@ -324,7 +365,7 @@ def _prepare_agreement(
     pairs: list[tuple[str, str]], mcos: dict[tuple[str, str],
                                              float], args: argparse.Namespace
 ) -> dict[str, object] | bool | None:
-    """Validate requested agreement before scoring; distinguish rejection from no policy."""
+    """Validate agreement options and distinguish rejection from no policy."""
     if getattr(args, "agreement_policy", None) is None:
         return None
     try:
@@ -338,9 +379,11 @@ def _finish_metric(
     agreement: dict[str, object] | None, scores: dict[str, list[float | None]],
     args: argparse.Namespace, errors: int, accuracy_ok: bool, parity_ok: bool
 ) -> bool:
-    """Keep legacy acceptance unchanged unless an explicit agreement policy is supplied."""
+    """Preserve legacy acceptance unless an agreement policy is supplied."""
     if agreement is None:
-        return errors == 0 and accuracy_ok and (parity_ok or not args.strict_parity)
+        return errors == 0 and accuracy_ok and (
+            parity_ok or not args.strict_parity
+        )
     try:
         return _write_agreement(
             agreement, scores, args, errors == 0 and accuracy_ok and parity_ok
@@ -351,7 +394,7 @@ def _finish_metric(
 
 
 def _available_binaries(entries: list[Implementation]) -> bool:
-    """Reject a missing selected executable before any scoring process is started."""
+    """Reject missing executables before starting any scoring process."""
     for entry in entries:
         binary = entry["command"][0]
         if not os.path.exists(binary):
@@ -366,7 +409,7 @@ def _available_binaries(entries: list[Implementation]) -> bool:
 
 def implementation_names(manifest: dict[str, MetricSpec],
                          metrics: list[str]) -> list[str]:
-    """List unique implementations in manifest order for the selected metrics.
+    """List unique implementations in manifest order by selected metric.
 
     :param manifest: All metric command specifications.
     :param metrics: Metric names to search.
@@ -389,11 +432,14 @@ def _parse_batch_line(line: str) -> common.ScoreResult:
         return None, f"unparsable line {line[:80]!r}"
 
 
-def _score_batch_command(argv: list[str], count: int, budget: float,
-                         log_path: str) -> list[common.ScoreResult]:
+def _score_batch_command(
+    argv: list[str], count: int, budget: float, log_path: str
+) -> list[common.ScoreResult]:
     command = " ".join(argv) + "\n"
     try:
-        result = subprocess.run(argv, capture_output=True, text=True, timeout=budget)
+        result = subprocess.run(
+            argv, capture_output=True, text=True, timeout=budget
+        )
     except subprocess.TimeoutExpired:
         message = f"timeout after {budget:.0f}s"
         Path(log_path).write_text(command + message + "\n")
@@ -406,15 +452,19 @@ def _score_batch_command(argv: list[str], count: int, budget: float,
         return [
             (None, f"exit {result.returncode}: {result.stderr.strip()[:200]}")
         ] * count
-    lines = [line.strip() for line in result.stdout.splitlines() if line.strip()]
+    lines = [
+        line.strip() for line in result.stdout.splitlines() if line.strip()
+    ]
     if len(lines) != count:
-        return [(None, f"expected {count} score lines, got {len(lines)}")] * count
+        return [
+            (None, f"expected {count} score lines, got {len(lines)}")
+        ] * count
     return [_parse_batch_line(line) for line in lines]
 
 
 def run_batch_chunk(
-    entry: Implementation, pairs: list[common.Pair], data_root: str, timeout: float,
-    log_path: str
+    entry: Implementation, pairs: list[common.Pair], data_root: str,
+    timeout: float, log_path: str
 ) -> list[common.ScoreResult]:
     """Run one batch command over a contiguous slice of pairs.
 
@@ -426,7 +476,8 @@ def run_batch_chunk(
     :returns: A score or error for each pair in input order.
     """
     absolute = [
-        (os.path.join(data_root, o), os.path.join(data_root, d)) for o, d in pairs
+        (os.path.join(data_root, o), os.path.join(data_root, d))
+        for o, d in pairs
     ]
     directory = os.path.dirname(log_path)
     os.makedirs(directory, exist_ok=True)
@@ -436,7 +487,10 @@ def run_batch_chunk(
             handle.write(f"{original}\t{distorted}\n")
         pairs_path = handle.name
     try:
-        argv = [part.replace("{pairs_file}", pairs_path) for part in entry["command"]]
+        argv = [
+            part.replace("{pairs_file}", pairs_path)
+            for part in entry["command"]
+        ]
         # The driver parallelizes within one process, avoiding per-pair setup.
         argv += [
             "--iterations", "1", "--warmup", "0", "--threads",
@@ -451,8 +505,8 @@ def run_batch_chunk(
 
 
 def batch_scores(
-    entry: Implementation, pairs: list[common.Pair], data_root: str, timeout: float,
-    log_path: str, jobs: int
+    entry: Implementation, pairs: list[common.Pair], data_root: str,
+    timeout: float, log_path: str, jobs: int
 ) -> list[common.ScoreResult]:
     """Score pairs in one batch process or in contiguous parallel slices.
 
@@ -510,7 +564,8 @@ def per_pair_scores(
         original, distorted = pairs[index]
         value, error = common.run_score(
             command, os.path.join(data_root, original),
-            os.path.join(data_root, distorted), timeout=timeout, score_line=score_line
+            os.path.join(data_root, distorted), timeout=timeout,
+            score_line=score_line
         )
         return index, value, error
 
@@ -521,7 +576,8 @@ def per_pair_scores(
     return results
 
 
-def parity_table(scores: Scores, names: list[str], reference: str) -> list[ParityRow]:
+def parity_table(scores: Scores, names: list[str],
+                 reference: str) -> list[ParityRow]:
     """Summarize absolute score differences on pairs scored by both arms.
 
     :param scores: Score vectors indexed by implementation name.
@@ -546,10 +602,12 @@ def parity_table(scores: Scores, names: list[str], reference: str) -> list[Parit
         diffs_array = np.asarray(diffs, dtype=np.float64)
         rows.append(
             (
-                name, len(diffs), float(diffs_array.max()), float(diffs_array.mean()),
+                name, len(diffs), float(diffs_array.max()),
+                float(diffs_array.mean()),
                 float(np.percentile(diffs_array, 99)),
                 float(math.sqrt(float(np.mean(diffs_array**2)))),
-                int((diffs_array > 0.001).sum()), int((diffs_array > 0.01).sum())
+                int((diffs_array
+                     > 0.001).sum()), int((diffs_array > 0.01).sum())
             )
         )
     return rows
@@ -609,7 +667,9 @@ def write_summary(
     """
     with open(path, "w") as f:
         f.write(f"# {metric} validation\n\n")
-        f.write(f"generated: {datetime.datetime.now(datetime.UTC).isoformat()}\n")
+        f.write(
+            f"generated: {datetime.datetime.now(datetime.UTC).isoformat()}\n"
+        )
         f.write(f"pairs: {pair_count}\n")
         f.write(f"MCOS: {mcos_path}\n")
         f.write(f"command: {command}\n\n")
@@ -648,7 +708,9 @@ def _score_implementation(
         jobs = entry.get("jobs") or args.jobs
         print(f"  {name}: {jobs} job(s), {len(pairs)} pairs")
         started = time.perf_counter()
-        values = per_pair_scores(entry, pairs, args.data_root, jobs, args.timeout)
+        values = per_pair_scores(
+            entry, pairs, args.data_root, jobs, args.timeout
+        )
     elapsed = time.perf_counter() - started
     return values, (name, elapsed, sum(error is None for _, error in values))
 
@@ -662,7 +724,9 @@ def _record_scores(
         if error is not None:
             errors += 1
             original, distorted = pairs[index]
-            print(f"error {name} {original} {distorted}: {error}", file=sys.stderr)
+            print(
+                f"error {name} {original} {distorted}: {error}", file=sys.stderr
+            )
         else:
             scores[index] = value
     return scores, errors
@@ -687,7 +751,8 @@ def _score_pairs(
 
 
 def _write_scores(
-    path: str, pairs: list[common.Pair], mcos: dict[common.Pair, float], scores: Scores
+    path: str, pairs: list[common.Pair], mcos: dict[common.Pair, float],
+    scores: Scores
 ) -> int:
     names = list(scores)
     rows_written = 0
@@ -696,15 +761,18 @@ def _write_scores(
         writer.writerow(["original", "distorted", "MCOS"] + names)
         for original, distorted, row_scores in _scored_pairs(pairs, scores):
             writer.writerow(
-                [original, distorted, f"{mcos[(original, distorted)]:.8f}"] +
-                ["" if value is None else f"{value:.8f}" for value in row_scores]
+                [original, distorted, f"{mcos[(original, distorted)]:.8f}"] + [
+                    "" if value is None else f"{value:.8f}"
+                    for value in row_scores
+                ]
             )
             rows_written += 1
     return rows_written
 
 
-def _scored_pairs(pairs: list[common.Pair],
-                  scores: Scores) -> Iterator[tuple[str, str, list[float | None]]]:
+def _scored_pairs(
+    pairs: list[common.Pair], scores: Scores
+) -> Iterator[tuple[str, str, list[float | None]]]:
     for index, (original, distorted) in enumerate(pairs):
         row_scores = [values[index] for values in scores.values()]
         if any(value is not None for value in row_scores):
@@ -724,7 +792,8 @@ def _print_timings(timings: list[Timing]) -> None:
 
 
 def _print_parity(
-    parity_rows: list[ParityRow], parity_available: bool, args: argparse.Namespace
+    parity_rows: list[ParityRow], parity_available: bool,
+    args: argparse.Namespace
 ) -> bool:
     parity_ok = parity_available or not args.strict_parity
     print(
@@ -743,7 +812,9 @@ def _print_parity(
         if maximum > args.max_threshold or mean > args.mean_threshold:
             parity_ok = False
     if not parity_available:
-        print("parity vs reference: SKIP (reference or comparison not selected)")
+        print(
+            "parity vs reference: SKIP (reference or comparison not selected)"
+        )
     else:
         parity_text = "PASS" if parity_ok else "FAIL"
         print(
@@ -770,7 +841,9 @@ def _correlate_scores(
         values = [value for value, _ in paired]
         if direction == "lower":
             values = [-value for value in values]
-        correlations[name] = common.correlation_triple(values, [m for _, m in paired])
+        correlations[name] = common.correlation_triple(
+            values, [m for _, m in paired]
+        )
 
     return correlations
 
@@ -793,7 +866,10 @@ def _check_accuracy(
     args: argparse.Namespace
 ) -> bool:
     if "ours" not in correlations:
-        reason = "ours not selected" if "ours" not in names else "fewer than two scored pairs for ours"
+        reason = (
+            "ours not selected"
+            if "ours" not in names else "fewer than two scored pairs for ours"
+        )
         print(f"accuracy vs MCOS: SKIP ({reason})")
         accuracy_ok = True
     elif reference not in correlations:
@@ -818,7 +894,8 @@ def _check_accuracy(
 
 def run_metric(
     metric: str, spec: MetricSpec, pairs: list[common.Pair],
-    mcos: dict[common.Pair, float], args: argparse.Namespace, only: set[str] | None
+    mcos: dict[common.Pair,
+               float], args: argparse.Namespace, only: set[str] | None
 ) -> bool:
     """Score selected implementations and evaluate the requested gates.
 
@@ -858,18 +935,23 @@ def run_metric(
     names = list(scores)
     _print_timings(timings)
     parity_rows = parity_table(scores, names, reference)
-    parity_ok = _print_parity(parity_rows, reference in scores and len(names) > 1, args)
+    parity_ok = _print_parity(
+        parity_rows, reference in scores and len(names) > 1, args
+    )
     correlations = _correlate_scores(scores, mcos, pairs, spec["direction"])
     _print_correlations(correlations, names, reference)
     accuracy_ok = _check_accuracy(correlations, names, reference, args)
     command = shlex.join([sys.executable, *sys.argv])
     write_summary(
-        os.path.join(out_dir, f"{metric}-summary.md"), metric, spec, rows_written,
-        args.csv or os.path.join(args.data_root, "CID22_validation_set.csv"), command,
-        parity_rows, correlations, timings
+        os.path.join(out_dir,
+                     f"{metric}-summary.md"), metric, spec, rows_written,
+        args.csv or os.path.join(args.data_root, "CID22_validation_set.csv"),
+        command, parity_rows, correlations, timings
     )
 
-    return _finish_metric(agreement, scores, args, errors, accuracy_ok, parity_ok)
+    return _finish_metric(
+        agreement, scores, args, errors, accuracy_ok, parity_ok
+    )
 
 
 def main() -> int:
@@ -881,14 +963,17 @@ def main() -> int:
     args = parse_args()
     data_root = args.data_root
     mcos_path = args.csv or os.path.join(data_root, "CID22_validation_set.csv")
-    manifest = load_manifest()
+    manifest = load_manifest(args.build_dir)
     metrics = (
-        ["ssimulacra2", "butteraugli"] if args.metric == "all" else [args.metric]
+        ["ssimulacra2", "butteraugli"]
+        if args.metric == "all" else [args.metric]
     )
 
     only = None
     if args.only:
-        only = set(part.strip() for part in args.only.split(",") if part.strip())
+        only = set(
+            part.strip() for part in args.only.split(",") if part.strip()
+        )
         known = implementation_names(manifest, metrics)
         unknown = sorted(only - set(known))
         if unknown:
@@ -909,7 +994,9 @@ def main() -> int:
 
     ok = True
     for metric in metrics:
-        ok = run_metric(metric, manifest[metric], pairs, mcos, args, only) and ok
+        ok = run_metric(
+            metric, manifest[metric], pairs, mcos, args, only
+        ) and ok
     print("\nPASS" if ok else "\nFAIL")
     return 0 if ok else 1
 

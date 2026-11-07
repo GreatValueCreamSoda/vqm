@@ -21,10 +21,10 @@ spec.loader.exec_module(fetch)
 
 
 class FetchCid22Tests(unittest.TestCase):
-    """Exercise CID22 download, verification and publication with a local archive."""
+    """Test CID22 fetching and publication with a local archive."""
 
     def setUp(self) -> None:
-        """Prepare a temporary pinned archive and patch its expected metadata."""
+        """Create a pinned archive and patch expected metadata."""
         self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
         root = Path(self.directory.name)
@@ -87,8 +87,12 @@ class FetchCid22Tests(unittest.TestCase):
     def test_download_extract_check_and_rerun(self) -> None:
         """Extract a valid download and verify subsequent offline runs."""
         self.assertEqual(self.fetch_download(), 0)
-        self.assertEqual((self.data / "LICENSE").read_bytes(), b"official license\n")
-        self.assertEqual((self.dataset / "original/a.png").read_bytes(), b"original")
+        self.assertEqual(
+            (self.data / "LICENSE").read_bytes(), b"official license\n"
+        )
+        self.assertEqual(
+            (self.dataset / "original/a.png").read_bytes(), b"original"
+        )
         with mock.patch.object(fetch.urllib.request, "urlopen",
                                side_effect=AssertionError("network used")):
             self.assertEqual(fetch.main(["--check"]), 0)
@@ -146,8 +150,10 @@ class FetchCid22Tests(unittest.TestCase):
         self.assertEqual(license_path.read_text(), "mine")
         self.assertFalse(self.dataset.exists())
 
-    def test_tampered_extracted_file_and_missing_license_fail_check(self) -> None:
-        """Detect changed image bytes and a missing license during verification."""
+    def test_tampered_extracted_file_and_missing_license_fail_check(
+        self
+    ) -> None:
+        """Detect changed images and missing licenses."""
         self.cache()
         self.assertEqual(fetch.main([]), 0)
         image = self.dataset / "original/a.png"
@@ -163,9 +169,10 @@ class FetchCid22Tests(unittest.TestCase):
     def test_csv_missing_pair_rejected_before_publication(self) -> None:
         """Reject a CSV that omits a distortion pair before publication."""
         key = f"{fetch.DATASET_NAME}/{fetch.DATASET_NAME}.csv"
-        self.members[
-            key
-        ] = b"reference_img,distorted_img,MCOS\noriginal/a.png,original/a.png,99\n"
+        self.members[key] = (
+            b"reference_img,distorted_img,MCOS\n"
+            b"original/a.png,original/a.png,99\n"
+        )
         self.create_archive()
         self.cache()
         with self.assertRaisesRegex(SystemExit, "does not cover"):
@@ -173,8 +180,12 @@ class FetchCid22Tests(unittest.TestCase):
         self.assertFalse(self.dataset.exists())
         self.assertFalse((self.data / "LICENSE").exists())
 
-    @unittest.skipIf(fetch.os.name == "nt", "directory publication differs on Windows")
-    def test_failed_publication_leaves_no_partial_dataset_and_can_retry(self) -> None:
+    @unittest.skipIf(
+        fetch.os.name == "nt", "directory publication differs on Windows"
+    )
+    def test_failed_publication_leaves_no_partial_dataset_and_can_retry(
+        self
+    ) -> None:
         """Clean a failed dataset reservation and permit a retry."""
         self.cache()
         with (mock.patch.object(fetch.os, "replace",

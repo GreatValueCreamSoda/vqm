@@ -16,8 +16,9 @@ import make_vmaf_fixtures as fixtures
 ROOT = Path(__file__).resolve().parent.parent
 BUILD = ROOT / "build/vmaf-build"
 SOURCE = ROOT / "build/vmaf-src"
-ORACLE_AVAILABLE = (BUILD / "vmaf_reference").is_file() and (BUILD /
-                                                             "tools/vmaf").is_file()
+ORACLE_AVAILABLE = (BUILD /
+                    "vmaf_reference").is_file() and (BUILD /
+                                                     "tools/vmaf").is_file()
 
 
 class FixtureTests(unittest.TestCase):
@@ -30,7 +31,9 @@ class FixtureTests(unittest.TestCase):
             with self.subTest(depth=depth):
                 self._check_low_bits(depth, width, height, frames)
 
-    def _check_low_bits(self, depth: int, width: int, height: int, frames: int) -> None:
+    def _check_low_bits(
+        self, depth: int, width: int, height: int, frames: int
+    ) -> None:
         """Compare luma and unchanged chroma across one complete fixture.
 
         :param depth: Input bit depth.
@@ -64,8 +67,8 @@ class FixtureTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             cmd = [
                 sys.executable,
-                str(ROOT / "tests/make_vmaf_fixtures.py"), "--out-dir", directory,
-                "--width", "32", "--height", "32", "--frames", "2"
+                str(ROOT / "tests/make_vmaf_fixtures.py"), "--out-dir",
+                directory, "--width", "32", "--height", "32", "--frames", "2"
             ]
             subprocess.run(cmd, check=True, capture_output=True, text=True)
             manifest = Path(directory) / "manifest.json"
@@ -84,7 +87,8 @@ class LibvmafOracleTests(unittest.TestCase):
         width, height = 512, 512
         n = width * height
         reference = [
-            64 + ((x * 11 + y * 7) % 877) for y in range(height) for x in range(width)
+            64 + ((x * 11 + y * 7) % 877) for y in range(height)
+            for x in range(width)
         ]
         distorted = [
             max(64, min(940, value + (i % 15) - 7))
@@ -121,9 +125,9 @@ class LibvmafOracleTests(unittest.TestCase):
                     str(base / "ref.yuv"), "--distorted",
                     str(base / "dist.yuv"), "--width",
                     str(width), "--height",
-                    str(height), "--pixel_format", "444", "--bitdepth", "10", "--model",
-                    f"path={models[0]}:name=v0", "--model", f"path={models[1]}:name=v1",
-                    "--json", "--output",
+                    str(height), "--pixel_format", "444", "--bitdepth", "10",
+                    "--model", f"path={models[0]}:name=v0", "--model",
+                    f"path={models[1]}:name=v1", "--json", "--output",
                     str(result), "--threads", "1", "--quiet",
                 ], check=True, capture_output=True, text=True
             )
@@ -152,7 +156,8 @@ class LibvmafOracleTests(unittest.TestCase):
         """
         with self.subTest(kind=kind, depth=depth):
             model = SOURCE / "model" / (
-                "vmaf_float_v0.6.1.json" if kind == "float" else "vmaf_v0.6.1.json"
+                "vmaf_float_v0.6.1.json"
+                if kind == "float" else "vmaf_v0.6.1.json"
             )
             output = subprocess.check_output(
                 [
@@ -172,8 +177,8 @@ class LibvmafOracleTests(unittest.TestCase):
                     str(base / "ref.yuv"), "--distorted",
                     str(base / "dist.yuv"), "--width", "64", "--height", "48",
                     "--pixel_format", "420", "--bitdepth",
-                    str(depth), "--model", f"path={model}:name=test_score", "--json",
-                    "--output",
+                    str(depth), "--model", f"path={model}:name=test_score",
+                    "--json", "--output",
                     str(result), "--threads", "1", "--quiet",
                 ], check=True, capture_output=True, text=True
             )
@@ -192,8 +197,8 @@ class LibvmafOracleTests(unittest.TestCase):
         :param kind: Float or integer feature extractor.
         """
         self.assertEqual(int(row["frame"]), frame["frameNum"])
-        for feature in ("adm2", "motion2", "vif_scale0", "vif_scale1", "vif_scale2",
-                        "vif_scale3", "vmaf"):
+        for feature in ("adm2", "motion2", "vif_scale0", "vif_scale1",
+                        "vif_scale2", "vif_scale3", "vmaf"):
             key = "test_score" if feature == "vmaf" else (
                 ("integer_" if kind == "integer" else "") + feature
             )
@@ -202,7 +207,9 @@ class LibvmafOracleTests(unittest.TestCase):
                 msg=f"{kind} {key}"
             )
 
-    def test_low_bits_are_measured_and_truncated_sequences_rejected(self) -> None:
+    def test_low_bits_are_measured_and_truncated_sequences_rejected(
+        self
+    ) -> None:
         """Measure low-bit distortion and reject truncated frame payloads."""
         ref, dist = fixtures.make_pair(64, 48, 10, 1, True)
         with tempfile.TemporaryDirectory() as directory:
@@ -271,8 +278,8 @@ class LibvmafOracleTests(unittest.TestCase):
                 str(base / "ref.yuv"), "--distorted",
                 str(base / "dist.yuv"), "--width", "64", "--height", "48",
                 "--pixel_format", "420", "--bitdepth",
-                str(depth), "--no_prediction", "--feature", "float_adm=debug=true",
-                "--json", "--output",
+                str(depth), "--no_prediction", "--feature",
+                "float_adm=debug=true", "--json", "--output",
                 str(result), "--threads", "1", "--quiet",
             ], check=True, capture_output=True, text=True
         )
@@ -281,7 +288,9 @@ class LibvmafOracleTests(unittest.TestCase):
         for row, frame in zip(rows, upstream, strict=True):
             self._check_adm_frame(row, frame)
 
-    def _check_adm_frame(self, row: dict[str, str], frame: dict[str, object]) -> None:
+    def _check_adm_frame(
+        self, row: dict[str, str], frame: dict[str, object]
+    ) -> None:
         """Compare the ADM score and per-scale terms for one frame.
 
         :param row: CSV frame result from the diagnostic harness.

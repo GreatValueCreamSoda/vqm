@@ -28,7 +28,9 @@ def parse_args() -> argparse.Namespace:
     :returns: Requested pair list settings.
     """
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--data-root", default="validation/data/CID22_validation_set")
+    parser.add_argument(
+        "--data-root", default="validation/data/CID22_validation_set"
+    )
     parser.add_argument("--out-dir", default=".cache/bench/pairs")
     parser.add_argument(
         "--count", type=int, default=100, help="CID22 pairs to list (0 = all)"
@@ -38,8 +40,9 @@ def parse_args() -> argparse.Namespace:
         help="do not read or include the CID22 corpus"
     )
     parser.add_argument(
-        "--sizes", default="512x512,1920x1080,3840x2160",
-        help="comma-separated WxH synthetic pairs with positive, even dimensions"
+        "--sizes", default="512x512,1920x1080,3840x2160", help=(
+            "comma-separated WxH synthetic pairs with positive, even dimensions"
+        )
     )
     parser.add_argument(
         "--force", action="store_true", help="regenerate the synthetic images"
@@ -113,8 +116,8 @@ def synthetic_pairs(out_dir: str, sizes: list[tuple[int, int]],
                     "ffmpeg", "-y", "-loglevel", "error", "-f", "lavfi", "-i",
                     f"testsrc2=size={width}x{height}:rate=1", "-vf",
                     "scale=iw/2:ih/2:flags=bicubic,"
-                    "scale=iw*2:ih*2:flags=bicubic", "-frames:v", "1", "-pix_fmt",
-                    "rgb24", distorted
+                    "scale=iw*2:ih*2:flags=bicubic", "-frames:v", "1",
+                    "-pix_fmt", "rgb24", distorted
                 ], check=True
             )
         pair_file = os.path.join(out_dir, f"synthetic-{width}x{height}.txt")
@@ -167,7 +170,8 @@ def main() -> int:
     """
     args = parse_args()
     sizes = [
-        _parse_size(size) for part in args.sizes.split(",") if (size := part.strip())
+        _parse_size(size) for part in args.sizes.split(",")
+        if (size := part.strip())
     ]
     os.makedirs(args.out_dir, exist_ok=True)
     pair_files = _cid22_pairs(args)

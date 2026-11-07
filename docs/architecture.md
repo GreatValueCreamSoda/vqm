@@ -38,8 +38,15 @@ tests/
   input/                       formats, conversion and decoding
   metrics/                     metric tests and oracles mirroring src/metrics/
 bench/driver/                  routing, metric measurements and shared modes
+bench/inmemory_measure.py       individual driver runs and result validation
+bench/inmemory_environment.py   input, build and device provenance
+bench/run_inmemory.py           interleaved rounds and report orchestration
 bench/video.py                 hosted-video benchmark setup, timing and reports
+cli/options.*                  parsing and shared spatial configuration
+cli/report.*                   clip results, statistics and presentation
+cli/video.cc                   sequence scoring, reader selection and caches
 tools/image_io/                PNG, JPEG and Y4M decoding outside the core library
+tools/build_paths.py            shared build-directory and manifest path resolution
 validation/temporal/            hosted clips, reproducible representations and score oracles
 ```
 
@@ -54,6 +61,10 @@ Cross-component implementation includes are rooted at `src`, for example
 `metrics/vmaf/features/vmaf_vif.h` or `vulkan/vulkan_runtime.h`. A header in the
 same directory can use a local include. CMake exposes one implementation include
 root, so moving a component cannot silently change which header an include finds.
+
+The root CMake file owns the core and installed package. Shader variants and
+embedding live in `cmake/shaders.cmake`; `cli/`, `bench/` and `tests/` register
+their own executable targets. Executable output paths remain at the build root.
 
 A pipeline validates and describes its inputs, records metric-owned passes
 through `VulkanRuntime`, then converts readback into metric results. The layout

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Copyright (c) 2026 VQM contributors. BSD-3-Clause; see LICENSE.
-"""Bootstrap and benchmark the five qualified metrics on pinned hosted videos.
+"""Benchmark five qualified metrics on pinned hosted videos.
 
 This module uses only the standard library until the managed reference Python
 environment is available. Candidate clips are always scored by the normal vqm
@@ -31,6 +31,7 @@ ROOT = Path(__file__).resolve().parent.parent
 if __package__ in (None, ""):
     sys.path.insert(0, str(ROOT))
 
+from tools.build_paths import build_directory  # noqa: E402
 from validation.temporal.cli_results import validate_cli_result  # noqa: E402
 
 METRICS = ("ssimulacra2", "butteraugli", "vmaf-v0", "vmaf-v1", "cvvdp")
@@ -39,14 +40,15 @@ BUILD_STEPS = "cloudinary,libjxl,vmaf,cvvdp"
 SMOKE_SOURCES = "foreman_cif,bus_cif,mobile_cif"
 RUNTIME = Path(".venv/bin/python")
 PACKAGES = (
-    "vulkan", "libpng", "libjpeg", "libhwy", "lcms2", "libbrotlienc", "libbrotlidec",
-    "libbrotlicommon"
+    "vulkan", "libpng", "libjpeg", "libhwy", "lcms2", "libbrotlienc",
+    "libbrotlidec", "libbrotlicommon"
 )
 PACKAGE_VERSIONS = ("libhwy >= 0.15", "lcms2 >= 2.13")
 BUILD_ENVIRONMENT = (
-    "CC", "CXX", "CFLAGS", "CXXFLAGS", "CPPFLAGS", "LDFLAGS", "CMAKE_PREFIX_PATH",
-    "CMAKE_TOOLCHAIN_FILE", "PKG_CONFIG_PATH", "PKG_CONFIG_LIBDIR", "VULKAN_SDK",
-    "VK_ICD_FILENAMES", "VK_DRIVER_FILES", "VK_INSTANCE_LAYERS"
+    "CC", "CXX", "CFLAGS", "CXXFLAGS", "CPPFLAGS", "LDFLAGS",
+    "CMAKE_PREFIX_PATH", "CMAKE_TOOLCHAIN_FILE", "PKG_CONFIG_PATH",
+    "PKG_CONFIG_LIBDIR", "VULKAN_SDK", "VK_ICD_FILENAMES", "VK_DRIVER_FILES",
+    "VK_INSTANCE_LAYERS"
 )
 
 
@@ -64,14 +66,16 @@ def positive(value: str) -> int:
 
 
 def arguments(argv: Sequence[str] | None = None) -> argparse.Namespace:
-    """Parse workload and bootstrap options before importing optional packages.
+    """Parse workload and setup options before importing optional packages.
 
     :param argv: Explicit arguments or the process command line.
     :returns: Validated settings for one isolated benchmark run.
     """
     parser = argparse.ArgumentParser(
-        description=__doc__, epilog=
-        "bench/benchmark.py defaults to --suite video; use --suite images for still-image peer comparisons."
+        description=__doc__, epilog=(
+            "bench/benchmark.py defaults to --suite video; use --suite images "
+            "for still-image peer comparisons."
+        )
     )
     parser.add_argument(
         "--profile", choices=("smoke", "qualification"), default="smoke"
@@ -80,13 +84,20 @@ def arguments(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--rounds", type=positive, default=5)
     parser.add_argument("--iterations", type=positive, default=20)
     parser.add_argument("--warmup", type=int, default=3)
-    parser.add_argument("--jobs", type=positive, default=min(os.cpu_count() or 1, 8))
-    parser.add_argument("--out-dir", type=Path)
     parser.add_argument(
-        "--offline", action="store_true", help="require cached sources and packages"
+        "--jobs", type=positive, default=min(os.cpu_count() or 1, 8)
     )
     parser.add_argument(
-        "--setup-only", action="store_true", help="fetch and build without timing clips"
+        "--build-dir", type=build_directory, default=build_directory()
+    )
+    parser.add_argument("--out-dir", type=Path)
+    parser.add_argument(
+        "--offline", action="store_true",
+        help="require cached sources and packages"
+    )
+    parser.add_argument(
+        "--setup-only", action="store_true",
+        help="fetch and build without timing clips"
     )
     parser.add_argument(
         "--dry-run", action="store_true",
@@ -95,11 +106,14 @@ def arguments(argv: Sequence[str] | None = None) -> argparse.Namespace:
     args = parser.parse_args(argv)
     selected = tuple(name.strip() for name in args.metrics.split(","))
     if not set(selected) <= set(METRICS) or len(selected) != len(set(selected)):
-        parser.error("--metrics must select unique names from " + ",".join(METRICS))
+        parser.error(
+            "--metrics must select unique names from " + ",".join(METRICS)
+        )
     if args.warmup < 0:
         parser.error("--warmup must be nonnegative")
     args.metrics = selected
-    timestamp = datetime.datetime.now(datetime.UTC).strftime("%Y%m%dT%H%M%S.%fZ")
+    timestamp = datetime.datetime.now(datetime.UTC
+                                      ).strftime("%Y%m%dT%H%M%S.%fZ")
     args.out_dir = (
         args.out_dir or ROOT / "artifacts/reports/video-benchmark" / timestamp
     ).resolve()
@@ -124,11 +138,16 @@ def setup_commands(args: argparse.Namespace) -> list[list[str]]:
         [
             sys.executable, "tools/build_references.py", "--only", BUILD_STEPS,
             "--jobs",
-            str(args.jobs)
-        ], ["cmake", "--preset", "release"],
+            str(args.jobs), "--build-dir",
+            str(args.build_dir)
+        ],
         [
-            "cmake", "--build", "--preset", "release", "--target", "vqm", "vqm_bench",
-            "--parallel",
+            "cmake", "--preset", "release", "-B",
+            str(args.build_dir), "-DVQM_BUILD_CLI=ON", "-DVQM_BUILD_BENCH=ON"
+        ],
+        [
+            "cmake", "--build",
+            str(args.build_dir), "--target", "vqm", "vqm_bench", "--parallel",
             str(args.jobs)
         ], hosted
     ]
@@ -147,7 +166,7 @@ def metric_order(metrics: Sequence[str], round_index: int) -> tuple[str, ...]:
 
 def measurement_command(args: argparse.Namespace, metric: str,
                         output: Path) -> list[str]:
-    """Use the public CLI workflow with checked originals for each measured arm.
+    """Measure each CLI arm against checked original evidence.
 
     :param args: Workload and iteration settings.
     :param metric: One qualified metric.
@@ -155,17 +174,18 @@ def measurement_command(args: argparse.Namespace, metric: str,
     :returns: Managed-Python validation command; no original score regeneration.
     """
     return [
-        str(ROOT / RUNTIME), "-m", "validation.temporal.run", "--profile", args.profile,
-        "--metrics", metric, "--iterations",
+        str(ROOT / RUNTIME), "-m", "validation.temporal.run", "--profile",
+        args.profile, "--metrics", metric, "--iterations",
         str(args.iterations), "--warmup",
         str(args.warmup), "--jobs",
         str(args.jobs), "--offline", "--out-dir",
-        str(output)
+        str(output), "--binary",
+        str(args.build_dir / "vqm")
     ]
 
 
 def preview(args: argparse.Namespace) -> int:
-    """Print a complete dry-run without requiring dependencies or creating files.
+    """Print a complete dry-run without dependencies or file creation.
 
     :param args: Validated command-line settings.
     :returns: Zero after printing the plan.
@@ -184,11 +204,13 @@ def preview(args: argparse.Namespace) -> int:
 
 def _capture(command: Sequence[str]) -> str:
     result = subprocess.run(
-        command, cwd=ROOT, capture_output=True, text=True, check=False, timeout=60
+        command, cwd=ROOT, capture_output=True, text=True, check=False,
+        timeout=60
     )
     if result.returncode:
         raise RuntimeError(
-            f"{shlex.join(command)}: {result.stderr.strip() or result.stdout.strip()}"
+            f"{shlex.join(command)}: "
+            f"{result.stderr.strip() or result.stdout.strip()}"
         )
     return result.stdout.strip()
 
@@ -211,10 +233,13 @@ def preflight() -> dict[str, object]:
     """Check system tools and development headers before downloads or builds.
 
     :returns: Exact tool paths/versions and development-package versions.
-    :raises RuntimeError: If a required tool, header or compiler feature is missing.
+    :raises RuntimeError: If a required tool, header or compiler feature is
+        missing.
     """
     commands = _tool_commands()
-    missing = [value for value in commands.values() if shutil.which(value) is None]
+    missing = [
+        value for value in commands.values() if shutil.which(value) is None
+    ]
     if missing:
         raise RuntimeError(
             "missing prerequisites: " + ", ".join(missing) +
@@ -227,14 +252,17 @@ def preflight() -> dict[str, object]:
         }
         for name, command in commands.items()
     }
-    version = re.search(r"cmake version (\d+)\.(\d+)", tools["cmake"]["version"])
+    version = re.search(
+        r"cmake version (\d+)\.(\d+)", tools["cmake"]["version"]
+    )
     if version is None or tuple(map(int, version.groups())) < (3, 25):
         raise RuntimeError("CMake 3.25 or later is required")
     try:
         _capture(["pkg-config", "--exists", *PACKAGES, *PACKAGE_VERSIONS])
     except RuntimeError as error:
         raise RuntimeError(
-            "install Vulkan, PNG, JPEG, Highway >=0.15, LCMS2 >=2.13 and Brotli development packages with pkg-config metadata"
+            "install Vulkan, PNG, JPEG, Highway >=0.15, LCMS2 >=2.13 and "
+            "Brotli development packages with pkg-config metadata"
         ) from error
     flags = shlex.split(_capture(["pkg-config", "--cflags", *PACKAGES]))
     _check_headers(commands["cxx"], flags)
@@ -248,15 +276,26 @@ def preflight() -> dict[str, object]:
 
 
 def _check_headers(compiler: str, flags: list[str]) -> None:
-    source = "#include <cstddef>\n#include <cstdio>\n#include <vulkan/vulkan.h>\n#include <png.h>\n#include <jpeglib.h>\n#include <hwy/highway.h>\n#include <lcms2.h>\n#include <brotli/encode.h>\n#include <brotli/decode.h>\nint main() { static_assert(__cplusplus >= 202002L); }\n"
-    with tempfile.TemporaryDirectory(prefix="vqm-video-preflight-") as directory:
+    source = (
+        "#include <cstddef>\n#include <cstdio>\n#include <vulkan/vulkan.h>\n"
+        "#include <png.h>\n#include <jpeglib.h>\n#include <hwy/highway.h>\n"
+        "#include <lcms2.h>\n#include <brotli/encode.h>\n#include "
+        "<brotli/decode.h>\nint main() { static_assert(__cplusplus >= "
+        "202002L); }\n"
+    )
+    with tempfile.TemporaryDirectory(prefix="vqm-video-preflight-"
+                                     ) as directory:
         path = Path(directory) / "headers.cc"
         path.write_text(source)
         try:
-            _capture([compiler, "-std=c++20", "-fsyntax-only", *flags, str(path)])
+            _capture(
+                [compiler, "-std=c++20", "-fsyntax-only", *flags,
+                 str(path)]
+            )
         except RuntimeError as error:
             raise RuntimeError(
-                f"C++20/Vulkan/PNG/JPEG development-header check failed: {error}"
+                f"C++20/Vulkan/PNG/JPEG development-header check failed: "
+                f"{error}"
             ) from error
 
 
@@ -279,8 +318,8 @@ def _run_command(command: list[str], log: Path,
         stream.write(shlex.join(command) + "\n")
         stream.flush()
         result = subprocess.run(
-            command, cwd=ROOT, env=environment, stdout=stream, stderr=subprocess.STDOUT,
-            check=False
+            command, cwd=ROOT, env=environment, stdout=stream,
+            stderr=subprocess.STDOUT, check=False
         )
     return {
         "command": command,
@@ -291,7 +330,8 @@ def _run_command(command: list[str], log: Path,
 
 
 def _setup(
-    args: argparse.Namespace, report: dict[str, object], environment: dict[str, str]
+    args: argparse.Namespace, report: dict[str, object], environment: dict[str,
+                                                                           str]
 ) -> None:
     records = report["setup"]
     for index, command in enumerate(setup_commands(args)):
@@ -301,12 +341,14 @@ def _setup(
         records.append(record)
         if record["exit_code"]:
             raise RuntimeError(
-                f"setup command failed with exit {record['exit_code']}; see {record['log']}"
+                f"setup command failed with exit {record['exit_code']}; "
+                f"see {record['log']}"
             )
 
 
 def _source_provenance(output: Path) -> dict[str, object]:
-    names = _capture(["git", "ls-files", "-co", "--exclude-standard", "-z"]).split("\0")
+    names = _capture(["git", "ls-files", "-co", "--exclude-standard",
+                      "-z"]).split("\0")
     hashes = {
         name: digest(ROOT / name)
         for name in sorted(set(names)) if name and (ROOT / name).is_file()
@@ -320,7 +362,8 @@ def _source_provenance(output: Path) -> dict[str, object]:
     status = _capture(["git", "status", "--short"])
     (output / "working-tree.txt").write_text(status + "\n")
     return {
-        "revision": revision.stdout.strip() if revision.returncode == 0 else None,
+        "revision":
+        revision.stdout.strip() if revision.returncode == 0 else None,
         "dirty": bool(status),
         "manifest": str(manifest),
         "manifest_sha256": digest(manifest),
@@ -329,7 +372,11 @@ def _source_provenance(output: Path) -> dict[str, object]:
 
 
 def _runtime_provenance() -> dict[str, object]:
-    code = "import importlib.metadata as m,json,sys;print(json.dumps({'python':sys.version,'executable':sys.executable,'packages':{d.metadata['Name']:d.version for d in m.distributions()}}))"
+    code = (
+        "import importlib.metadata as m,json,sys;print(json.dumps({'python':sys"
+        ".version,'executable':sys.executable,'packages':{d.metadata['Name']:d."
+        "version for d in m.distributions()}}))"
+    )
     return json.loads(_capture([str(ROOT / RUNTIME), "-c", code]))
 
 
@@ -342,7 +389,7 @@ def _reference_provenance(args: argparse.Namespace) -> dict[str, object]:
         }
         for metric in args.metrics
     }
-    stamps = ROOT / "build/reference-fingerprints"
+    stamps = args.build_dir / "reference-fingerprints"
     builds = {
         name: json.loads((stamps / f"{name}.json").read_text())
         for name in BUILD_STEPS.split(",")
@@ -351,51 +398,62 @@ def _reference_provenance(args: argparse.Namespace) -> dict[str, object]:
         ".reference/vmaf/model/vmaf_float_v0.6.1.json",
         ".reference/vmaf/model/vmaf_v1.0.16/vmaf_v1.0.16_3d0h.json", *[
             str(path.relative_to(ROOT)) for path in sorted(
-                (ROOT / ".reference/ColorVideoVDP/pycvvdp/vvdp_data").glob("*.json")
+                (ROOT /
+                 ".reference/ColorVideoVDP/pycvvdp/vvdp_data").glob("*.json")
             )
         ]
     ]
     return {
-        "checked_score_fixtures": fixtures,
-        "reference_builds": builds,
+        "checked_score_fixtures":
+        fixtures,
+        "reference_builds":
+        builds,
         "models_sha256": {
             name: digest(ROOT / name)
             for name in models
         },
-        "lock_sha256": digest(ROOT / "tools/references.lock"),
-        "runtime_lock_sha256": digest(ROOT / "tools/cvvdp-reference-requirements.txt"),
-        "sources_sha256": digest(ROOT / "validation/temporal/sources.json")
+        "lock_sha256":
+        digest(ROOT / "tools/references.lock"),
+        "runtime_lock_sha256":
+        digest(ROOT / "tools/cvvdp-reference-requirements.txt"),
+        "sources_sha256":
+        digest(ROOT / "validation/temporal/sources.json")
     }
 
 
 def provenance(args: argparse.Namespace) -> dict[str, object]:
-    """Fingerprint candidate, sources, originals, runtime and the shared device selector.
+    """Fingerprint binaries, inputs, originals, runtime and device selection.
 
     :param args: Selected corpus and output path.
-    :returns: Reproduction evidence, excluding any original timing interpretation.
+    :returns: Reproduction evidence, excluding any original timing
+        interpretation.
     :raises RuntimeError: If the actual Vulkan device cannot be probed.
     """
-    probe = ROOT / "build/vqm_bench"
+    probe = args.build_dir / "vqm_bench"
     device = json.loads(_capture([str(probe), "--device-info"]))
     if not device.get("name") or not device.get("uuid"):
-        raise RuntimeError("default Vulkan device probe omitted its name or UUID")
+        raise RuntimeError(
+            "default Vulkan device probe omitted its name or UUID"
+        )
     return {
         "candidate": {
-            "path": str(ROOT / "build/vqm"),
-            "sha256": digest(ROOT / "build/vqm")
+            "path": str(args.build_dir / "vqm"),
+            "sha256": digest(args.build_dir / "vqm")
         },
         "device": device,
         "device_probe": {
             "command": [str(probe), "--device-info"],
             "sha256":
             digest(probe),
-            "selection":
-            "same default Vulkan selector as normal CLI; probe only, no clip scoring"
+            "selection": (
+                "same default Vulkan selector as normal CLI; probe only, no "
+                "clip scoring"
+            )
         },
         "source": _source_provenance(args.out_dir),
         "references": _reference_provenance(args),
         "runtime": _runtime_provenance(),
-        "cmake_cache_sha256": digest(ROOT / "build/CMakeCache.txt"),
+        "cmake_cache_sha256": digest(args.build_dir / "CMakeCache.txt"),
         "platform": platform.platform(),
         "machine": platform.machine(),
         "build_environment": {
@@ -413,20 +471,25 @@ def _validate_payload(
     values: list[dict[str, object]], metric: str, args: argparse.Namespace
 ) -> None:
     pairs, frames = (39, 12) if args.profile == "smoke" else (390, 40)
-    if len(values) != pairs or len({value["sample_id"] for value in values}) != pairs:
-        raise ValueError(f"{metric}: expected {pairs} distinct complete clip results")
+    if len(values) != pairs or len({value["sample_id"]
+                                    for value in values}) != pairs:
+        raise ValueError(
+            f"{metric}: expected {pairs} distinct complete clip results"
+        )
     for value in values:
         validate_cli_result(value, metric, value["sample_id"], frames)
 
 
-def _timings(values: list[dict[str, object]], timing: dict[str,
-                                                           object]) -> dict[str, float]:
+def _timings(values: list[dict[str, object]],
+             timing: dict[str, object]) -> dict[str, float]:
     core = [float(row["core_seconds"]) for row in values]
     decode = [float(row["decode_seconds"]) for row in values]
     frames = sum(int(row["frames"]) for row in values)
     wall = float(timing["wall_seconds_including_warmup_decode_and_setup"])
     if not math.isfinite(wall) or wall < 0:
-        raise ValueError("candidate process wall time must be finite and nonnegative")
+        raise ValueError(
+            "candidate process wall time must be finite and nonnegative"
+        )
     return {
         "selected_core_seconds_sum": sum(core),
         "selected_core_clip_median_seconds": statistics.median(core),
@@ -442,7 +505,8 @@ def _metric_result(
 ) -> dict[str, object]:
     values = [
         json.loads(line)
-        for line in (output / f"{metric}-candidate.jsonl").read_text().splitlines()
+        for line in (output /
+                     f"{metric}-candidate.jsonl").read_text().splitlines()
     ]
     _validate_payload(values, metric, args)
     agreement = _load(output / f"{metric}-agreement.json")
@@ -451,7 +515,9 @@ def _metric_result(
         raise ValueError("candidate executable changed between benchmark arms")
     if (timing["iterations_per_clip"] != args.iterations
             or timing["warmup_per_clip"] != args.warmup):
-        raise ValueError("candidate repetition counts differ from benchmark settings")
+        raise ValueError(
+            "candidate repetition counts differ from benchmark settings"
+        )
     files = (
         f"{metric}-candidate.jsonl", f"{metric}-agreement.json",
         f"{metric}-timing.json", "inputs.json", f"{metric}-pairs.tsv"
@@ -484,10 +550,12 @@ def _measure_metric(
     directory = args.out_dir / f"round-{index + 1:02}"
     output = directory / metric
     record = _run_command(
-        measurement_command(args, metric, output), directory / f"{metric}-workflow.log",
-        environment
+        measurement_command(args, metric, output),
+        directory / f"{metric}-workflow.log", environment
     )
-    record.update(metric=metric, round=index + 1, output=str(output), valid=False)
+    record.update(
+        metric=metric, round=index + 1, output=str(output), valid=False
+    )
     try:
         record.update(_metric_result(output, metric, args, binary_hash))
         record["valid"] = record["exit_code"] == 0 and record["quality_passed"]
@@ -508,9 +576,10 @@ def _distribution(values: list[float]) -> dict[str, float] | None:
     }
 
 
-def aggregate(records: list[dict[str, object]], metrics: Sequence[str],
-              rounds: int) -> dict[str, object]:
-    """Summarize repeated arms without treating failed or absent rounds as success.
+def aggregate(
+    records: list[dict[str, object]], metrics: Sequence[str], rounds: int
+) -> dict[str, object]:
+    """Summarize arms without treating missing or failed rounds as success.
 
     :param records: Every attempted arm with raw report references.
     :param metrics: Complete selected metric list.
@@ -519,14 +588,18 @@ def aggregate(records: list[dict[str, object]], metrics: Sequence[str],
     """
     return {
         metric:
-        _aggregate_metric([row for row in records if row["metric"] == metric], rounds)
+        _aggregate_metric(
+            [row for row in records if row["metric"] == metric], rounds
+        )
         for metric in metrics
     }
 
 
 def _aggregate_metric(records: list[dict[str, object]],
                       rounds: int) -> dict[str, object]:
-    timed = [record for record in records if record["valid"] and "timings" in record]
+    timed = [
+        record for record in records if record["valid"] and "timings" in record
+    ]
     names = tuple(timed[0]["timings"]) if timed else ()
     return {
         "expected_rounds":
@@ -536,8 +609,9 @@ def _aggregate_metric(records: list[dict[str, object]],
         "valid_rounds":
         sum(bool(record["valid"]) for record in records),
         "passed":
-        len(records) == rounds and {record["round"]
-                                    for record in records} == set(range(1, rounds + 1))
+        len(records) == rounds
+        and {record["round"]
+             for record in records} == set(range(1, rounds + 1))
         and all(record["valid"] for record in records),
         "durations": {
             name: _distribution([float(row["timings"][name]) for row in timed])
@@ -556,8 +630,8 @@ def _parameters(args: argparse.Namespace) -> dict[str, object]:
 
 
 def _measure_all(
-    args: argparse.Namespace, records: list[dict[str, object]], binary_hash: str,
-    environment: dict[str, str]
+    args: argparse.Namespace, records: list[dict[str, object]],
+    binary_hash: str, environment: dict[str, str]
 ) -> None:
     for index in range(args.rounds):
         for metric in metric_order(args.metrics, index):
@@ -569,37 +643,54 @@ def _measure_all(
 def _markdown(report: dict[str, object]) -> str:
     lines = [
         "# Hosted video benchmark", "", f"Status: {report['status']}", "",
-        "Candidate scores and timing come from the normal `vqm` CLI. Checked original scores are quality evidence; reference cache durations are not benchmark measurements.",
-        "",
-        "Core/decode durations describe each clip's selected median-core-time iteration. Candidate process wall includes all repetitions, warmups, decode and setup. Workflow wall additionally includes preparation, hashing and agreement evaluation.",
-        "",
-        "| Metric | Valid rounds | Core median ms/clip | Decode median ms/clip | Candidate wall median s |",
-        "| --- | ---: | ---: | ---: | ---: |"
+        (
+            "Candidate scores and timing come from the normal `vqm` CLI. "
+            "Checked original scores are quality evidence; reference cache "
+            "durations are not benchmark measurements."
+        ), "",
+        (
+            "Core/decode durations describe each clip's selected "
+            "median-core-time iteration. Candidate process wall includes all "
+            "repetitions, warmups, decode and setup. Workflow wall "
+            "additionally includes preparation, hashing and agreement "
+            "evaluation."
+        ), "",
+        (
+            "| Metric | Valid rounds | Core median ms/clip | Decode median "
+            "ms/clip | Candidate wall median s |"
+        ), "| --- | ---: | ---: | ---: | ---: |"
     ]
     for metric, value in report.get("metrics", {}).items():
         durations = value["durations"]
         names = (
-            "selected_core_clip_median_seconds", "selected_decode_clip_median_seconds",
+            "selected_core_clip_median_seconds",
+            "selected_decode_clip_median_seconds",
             "candidate_process_wall_seconds"
         )
         numbers = [
-            durations[name]["median"] if name in durations else None for name in names
+            durations[name]["median"] if name in durations else None
+            for name in names
         ]
         cells = [
-            "—" if number is None else f"{number * (1000 if index < 2 else 1):.6f}"
+            "—"
+            if number is None else f"{number * (1000 if index < 2 else 1):.6f}"
             for index, number in enumerate(numbers)
         ]
         lines.append(
-            f"| {metric} | {value['valid_rounds']}/{value['expected_rounds']} | " +
-            " | ".join(cells) + " |"
+            (
+                f"| {metric} | {value['valid_rounds']}/"
+                f"{value['expected_rounds']} | "
+            ) + " | ".join(cells) + " |"
         )
     if "error" in report:
         lines.extend(("", "Error: " + str(report["error"])))
     lines.extend(
         (
-            "",
-            "All rounds, dispersion (minimum/maximum/MAD), parameters, fingerprints and raw report paths are retained in `summary.json`.",
-            ""
+            "", (
+                "All rounds, dispersion (minimum/maximum/MAD), parameters, "
+                "fingerprints and raw report paths are retained in "
+                "`summary.json`."
+            ), ""
         )
     )
     return "\n".join(lines)
@@ -607,8 +698,8 @@ def _markdown(report: dict[str, object]) -> str:
 
 def _write_summary(args: argparse.Namespace, report: dict[str, object]) -> None:
     report["metrics"] = aggregate(report["rounds"], args.metrics, args.rounds)
-    (args.out_dir /
-     "summary.json").write_text(json.dumps(report, indent=2, allow_nan=False) + "\n")
+    (args.out_dir / "summary.json"
+     ).write_text(json.dumps(report, indent=2, allow_nan=False) + "\n")
     (args.out_dir / "summary.md").write_text(_markdown(report))
 
 
@@ -630,7 +721,8 @@ def _execute(args: argparse.Namespace, report: dict[str, object]) -> int:
             value["passed"] for value in metrics.values()
         ) else "fail"
         return 0 if report["status"] == "pass" else 1
-    except (OSError, RuntimeError, ValueError, subprocess.TimeoutExpired) as error:
+    except (OSError, RuntimeError, ValueError,
+            subprocess.TimeoutExpired) as error:
         report.update(status="fail", error=str(error))
         print(f"video benchmark: {error}", file=sys.stderr)
         return 1

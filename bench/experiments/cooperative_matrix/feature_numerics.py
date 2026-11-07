@@ -16,7 +16,9 @@ import numpy as np
 from numpy.typing import NDArray
 
 ROOT = Path(__file__).resolve().parents[3]
-DEFAULT_OUTPUT = ROOT / "artifacts/reports/vmaf-cooperative-matrix/feature-mapping/numerics.json"
+DEFAULT_OUTPUT = ROOT / (
+    "artifacts/reports/vmaf-cooperative-matrix/feature-mapping/numerics.json"
+)
 SHADERS = ROOT / "src/metrics/vmaf/features/shaders"
 SPLIT_SCALE = np.float32(4096.0)
 MODES = ("fp32", "half_products", "wide_half", "split_three", "split_four")
@@ -31,7 +33,9 @@ def coefficients(path: Path, name: str, count: int) -> NDArray[np.float32]:
     :returns: Coefficient array in binary32 tap order.
     :raises ValueError: If the shader array is missing or its count differs.
     """
-    match = re.search(rf"{name}\[{count}\].*?\((.*?)\);", path.read_text(), re.S)
+    match = re.search(
+        rf"{name}\[{count}\].*?\((.*?)\);", path.read_text(), re.S
+    )
     if match is None:
         raise ValueError(f"Could not read {name}[{count}] in {path}")
     values = [float(value) for value in match.group(1).split(",")]
@@ -76,8 +80,9 @@ def dot(weights: NDArray[np.float32], samples: NDArray[np.float32],
     :returns: Dot products reduced across the sample axis.
     :raises ValueError: If the precision mode is unsupported.
     """
-    weights = np.asarray(weights, np.float32
-                         ).reshape((len(weights), ) + (1, ) * (samples.ndim - 1))
+    weights = np.asarray(
+        weights, np.float32
+    ).reshape((len(weights), ) + (1, ) * (samples.ndim - 1))
     samples = np.asarray(samples, np.float32)
     if mode == "fp32":
         return sum32(np.float32(weights * samples))
@@ -86,7 +91,8 @@ def dot(weights: NDArray[np.float32], samples: NDArray[np.float32],
     if mode == "half_products":
         with np.errstate(over="raise", invalid="raise"):
             products = np.multiply(
-                high_w.astype(np.float16), high_x.astype(np.float16), dtype=np.float16
+                high_w.astype(np.float16), high_x.astype(np.float16),
+                dtype=np.float16
             )
         return sum32(products.astype(np.float32))
     total = sum32(np.float32(high_w * high_x))
@@ -98,7 +104,9 @@ def dot(weights: NDArray[np.float32], samples: NDArray[np.float32],
     total = np.float32(total + np.float32(cross / SPLIT_SCALE))
     if mode == "split_four":
         residual = sum32(np.float32(low_w * low_x))
-        total = np.float32(total + np.float32(residual / (SPLIT_SCALE * SPLIT_SCALE)))
+        total = np.float32(
+            total + np.float32(residual / (SPLIT_SCALE * SPLIT_SCALE))
+        )
     elif mode != "split_three":
         raise ValueError(mode)
     return total
@@ -112,7 +120,9 @@ def errors(reference: NDArray[np.floating],
     :param candidate: Candidate values to compare with the reference.
     :returns: Absolute error statistics and changed sample count.
     """
-    difference = np.abs(candidate.astype(np.float64) - reference.astype(np.float64))
+    difference = np.abs(
+        candidate.astype(np.float64) - reference.astype(np.float64)
+    )
     return {
         "maximum": float(np.max(difference)),
         "mean": float(np.mean(difference)),
@@ -129,8 +139,8 @@ def operand_report() -> dict[str, object]:
     result = {}
     for depth in (8, 10, 12, 16):
         values = np.float32(
-            np.arange(1 << depth, dtype=np.float32) * np.float32(2.0**(8 - depth)) -
-            np.float32(128.0)
+            np.arange(1 << depth, dtype=np.float32) *
+            np.float32(2.0**(8 - depth)) - np.float32(128.0)
         )
         high, low = split(values)
         result[str(depth)] = {
@@ -142,7 +152,9 @@ def operand_report() -> dict[str, object]:
     return result
 
 
-def coefficient_report(filters: dict[str, NDArray[np.float32]]) -> dict[str, object]:
+def coefficient_report(
+    filters: dict[str, NDArray[np.float32]]
+) -> dict[str, object]:
     """Compare binary32 filter weights with their binary16 encodings.
 
     :param filters: Named arrays of filter coefficients.
@@ -154,10 +166,12 @@ def coefficient_report(filters: dict[str, NDArray[np.float32]]) -> dict[str, obj
         result[name] = {
             "fp32": weights.astype(float).tolist(),
             "half": high.astype(float).tolist(),
-            "sum_fp32_values_in_fp64": float(np.sum(weights.astype(np.float64))),
+            "sum_fp32_values_in_fp64":
+            float(np.sum(weights.astype(np.float64))),
             "sum_half_values_in_fp64": float(np.sum(high.astype(np.float64))),
             "half_error": errors(weights, high),
-            "split_error": errors(weights, np.float32(high + low / SPLIT_SCALE)),
+            "split_error":
+            errors(weights, np.float32(high + low / SPLIT_SCALE)),
         }
     return result
 
@@ -171,10 +185,13 @@ def dot_report(filters: dict[str, NDArray[np.float32]]) -> dict[str, object]:
     random = np.random.default_rng(20261105)
     result = {}
     for name, weights in filters.items():
-        samples = np.float32(random.uniform(-128.0, 128.0, (len(weights), 4096)))
+        samples = np.float32(
+            random.uniform(-128.0, 128.0, (len(weights), 4096))
+        )
         reference = dot(weights, samples, "fp32")
         ideal = np.sum(
-            weights.astype(np.float64)[:, None] * samples.astype(np.float64), axis=0
+            weights.astype(np.float64)[:, None] * samples.astype(np.float64),
+            axis=0
         )
         result[name] = {}
         for mode in MODES:
@@ -186,8 +203,9 @@ def dot_report(filters: dict[str, NDArray[np.float32]]) -> dict[str, object]:
     return result
 
 
-def constant_moments(value: np.float32, weights: NDArray[np.float32],
-                     mode: str) -> dict[str, float | bool]:
+def constant_moments(
+    value: np.float32, weights: NDArray[np.float32], mode: str
+) -> dict[str, float | bool]:
     """Filter the first and second moments of a constant field.
 
     :param value: Input sample value.
@@ -200,7 +218,9 @@ def constant_moments(value: np.float32, weights: NDArray[np.float32],
     vertical = dot(weights, samples, mode)
     samples = np.repeat(vertical[None, :], len(weights), axis=0)
     horizontal = dot(weights, samples, mode)
-    variance = np.float32(horizontal[1] - np.float32(horizontal[0] * horizontal[0]))
+    variance = np.float32(
+        horizontal[1] - np.float32(horizontal[0] * horizontal[0])
+    )
     return {
         "mean": float(horizontal[0]),
         "second_moment": float(horizontal[1]),
@@ -233,8 +253,9 @@ def weighted_gram_report(weights: NDArray[np.float32]) -> dict[str, object]:
     weights_2d = np.float32(weights[:, None] * weights[None, :]).reshape(-1)
     roots = np.sqrt(weights_2d, dtype=np.float32)
     result = {}
-    checker = ((np.indices((len(weights), len(weights))).sum(axis=0) % 2) * 2 -
-               1).reshape(-1)
+    checker = (
+        (np.indices((len(weights), len(weights))).sum(axis=0) % 2) * 2 - 1
+    ).reshape(-1)
     cases = {
         str(value): np.full(len(roots), value, np.float32)
         for value in (100.5, 100.25, 127.0, -128.0)
@@ -257,12 +278,18 @@ def weighted_gram_report(weights: NDArray[np.float32]) -> dict[str, object]:
                 square / norm - np.float32(normalized_mean * normalized_mean)
             )
             moments[mode] = {
-                "mean": float(mean),
-                "second_moment": float(square),
-                "variance_before_clamp": float(variance),
-                "weight_norm": float(norm),
-                "variance_with_extra_weight_normalization": float(normalized_variance),
-                "low_variance_branch": bool(max(variance, np.float32(0.0)) < 2.0)
+                "mean":
+                float(mean),
+                "second_moment":
+                float(square),
+                "variance_before_clamp":
+                float(variance),
+                "weight_norm":
+                float(norm),
+                "variance_with_extra_weight_normalization":
+                float(normalized_variance),
+                "low_variance_branch":
+                bool(max(variance, np.float32(0.0)) < 2.0)
             }
         result[name] = moments
     return result
@@ -294,10 +321,13 @@ def motion_report(weights: NDArray[np.float32]) -> dict[str, dict[str, float]]:
     :returns: Filtered transitions by initial value, step and precision mode.
     """
     result = {}
-    for base, step in ((127.0, 1.0 / 256.0), (127.0, 1.0 / 16.0), (100.5, 0.25)):
+    for base, step in ((127.0, 1.0 / 256.0), (127.0, 1.0 / 16.0), (100.5,
+                                                                   0.25)):
         result[f"{base}+{step}"] = {}
         for mode in MODES:
-            result[f"{base}+{step}"][mode] = _motion_step(weights, mode, base, step)
+            result[f"{base}+{step}"][mode] = _motion_step(
+                weights, mode, base, step
+            )
     return result
 
 
@@ -305,7 +335,7 @@ def wavelet(
     source: NDArray[np.float32], low_weights: NDArray[np.float32],
     high_weights: NDArray[np.float32], mode: str
 ) -> tuple[NDArray[np.float32], ...]:
-    """Apply a separable wavelet level with the selected dot-product precision.
+    """Apply a wavelet level with the selected dot-product precision.
 
     :param source: Input sample plane.
     :param low_weights: Lowpass coefficients in tap order.
@@ -326,7 +356,8 @@ def wavelet(
         for y in range(4):
             rows = 2 * np.arange(out_h) - 1 + y
             rows = np.where(
-                rows < 0, -rows, np.where(rows >= height, 2 * height - rows - 1, rows)
+                rows < 0, -rows,
+                np.where(rows >= height, 2 * height - rows - 1, rows)
             )
             taps.append(source[np.ix_(rows, columns)])
         samples = np.asarray(taps, np.float32)
@@ -340,7 +371,8 @@ def wavelet(
 
 
 def _wavelet_levels(
-    source: NDArray[np.float32], low: NDArray[np.float32], high: NDArray[np.float32]
+    source: NDArray[np.float32], low: NDArray[np.float32],
+    high: NDArray[np.float32]
 ) -> dict[str, object]:
     """Compare four DWT levels for one source plane.
 
@@ -377,7 +409,8 @@ def wavelet_report(low: NDArray[np.float32],
     random = np.random.default_rng(20261105)
     sources = {
         "native10": np.float32(random.integers(0, 1024, (65, 67)) * 0.25 - 128),
-        "native16": np.float32(random.integers(0, 65536, (65, 67)) / 256.0 - 128)
+        "native16":
+        np.float32(random.integers(0, 65536, (65, 67)) / 256.0 - 128)
     }
     result = {}
     for name, source in sources.items():
@@ -410,17 +443,23 @@ def historical_stage_shares(path: Path) -> dict[str, object]:
                     "ms":
                     statistics.median(run["stages"][stage] for run in runs),
                     "fraction_of_frame":
-                    statistics.median(run["stages"][stage] for run in runs) / frame
+                    statistics.median(run["stages"][stage]
+                                      for run in runs) / frame
                 }
                 for stage in runs[0]["stages"]
             }
         }
     return {
-        "available": True,
-        "source_sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
-        "scope":
-        "historical retained arm; not a new measurement or covariance-only share",
-        "cases": cases
+        "available":
+        True,
+        "source_sha256":
+        hashlib.sha256(path.read_bytes()).hexdigest(),
+        "scope": (
+            "historical retained arm; not a new measurement or covariance-only "
+            "share"
+        ),
+        "cases":
+        cases
     }
 
 
@@ -430,10 +469,14 @@ def main() -> None:
     parser.add_argument("--out", type=Path, default=DEFAULT_OUTPUT)
     args = parser.parse_args()
     paths = {
-        "vif": SHADERS / "vif/vmaf_vif_common.glsl",
-        "adm": SHADERS / "adm/vmaf_adm_dwt.comp",
-        "motion": SHADERS / "preprocess/vmaf_motion_common.glsl",
-        "speed": ROOT / "src/metrics/vmaf/speed/shaders/vmaf_speed_filter_common.glsl"
+        "vif":
+        SHADERS / "vif/vmaf_vif_common.glsl",
+        "adm":
+        SHADERS / "adm/vmaf_adm_dwt.comp",
+        "motion":
+        SHADERS / "preprocess/vmaf_motion_common.glsl",
+        "speed":
+        ROOT / "src/metrics/vmaf/speed/shaders/vmaf_speed_filter_common.glsl"
     }
     filters = {
         f"vif{count}": coefficients(paths["vif"], f"kVif{count}", count)
@@ -455,12 +498,15 @@ def main() -> None:
         np.__version__,
         "seed":
         20261105,
-        "arithmetic":
-        "explicit separate FP32 products/additions; binary16 operands; no driver summation emulation",
+        "arithmetic": (
+            "explicit separate FP32 products/additions; binary16 operands; no "
+            "driver summation emulation"
+        ),
         "split_scale":
         float(SPLIT_SCALE),
         "shader_sha256": {
-            str(path.relative_to(ROOT)): hashlib.sha256(path.read_bytes()).hexdigest()
+            str(path.relative_to(ROOT)):
+            hashlib.sha256(path.read_bytes()).hexdigest()
             for path in paths.values()
         },
         "native_operands":
@@ -479,7 +525,10 @@ def main() -> None:
         wavelet_report(filters["adm_low"], filters["adm_high"]),
         "historical_stages":
         historical_stage_shares(
-            ROOT / "artifacts/reports/vmaf-fp16/production-native-resident/results.json"
+            ROOT / (
+                "artifacts/reports/vmaf-fp16/production-native-resident/results"
+                ".json"
+            )
         )
     }
     args.out.parent.mkdir(parents=True, exist_ok=True)

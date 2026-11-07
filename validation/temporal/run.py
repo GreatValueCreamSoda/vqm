@@ -1,4 +1,4 @@
-"""Run old numerical and new ranking gates on reproducible hosted video clips."""
+"""Run numerical and ranking gates on reproducible hosted video clips."""
 
 from __future__ import annotations
 
@@ -8,20 +8,32 @@ import multiprocessing
 import subprocess
 import sys
 import time
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
+from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import numpy as np
 
-from ..agreement import evaluate_agreement, load_report, report_from_rows
+from ..agreement import evaluate_agreement
+from ..agreement import load_report
+from ..agreement import report_from_rows
 from ..gate_defaults import default_gate_mode
 from . import corpus
 from .cli_results import validate_cli_result
-from .corpus import MANIFEST, ROOT, SMOKE_SOURCES
-from .fetch import DEFAULT_OUTPUT, fetch_sources, load_manifest, select_sources
-from .reference import PINS, provenance, score_reference, verify_references
+from .corpus import MANIFEST
+from .corpus import ROOT
+from .corpus import SMOKE_SOURCES
+from .fetch import DEFAULT_OUTPUT
+from .fetch import fetch_sources
+from .fetch import load_manifest
+from .fetch import select_sources
+from .reference import PINS
+from .reference import provenance
+from .reference import score_reference
+from .reference import verify_references
 from .spatial_inputs import PROTOCOL as SPATIAL_PROTOCOL
-from .spatial_inputs import SPATIAL_METRICS, ensure_spatial
+from .spatial_inputs import SPATIAL_METRICS
+from .spatial_inputs import ensure_spatial
 
 METRICS = (*SPATIAL_METRICS, "vmaf-v0", "vmaf-v1", "cvvdp")
 OLD_MAX = {
@@ -45,7 +57,8 @@ def arguments() -> argparse.Namespace:
     )
     parser.add_argument("--metrics", default=",".join(METRICS))
     parser.add_argument(
-        "--only", help="source IDs; partial qualification cannot pass full policy"
+        "--only",
+        help="source IDs; partial qualification cannot pass full policy"
     )
     parser.add_argument(
         "--offline", action="store_true",
@@ -63,8 +76,10 @@ def arguments() -> argparse.Namespace:
     parser.add_argument("--reference-only", action="store_true")
     parser.add_argument("--oracle-dir", type=Path, default=ORACLES)
     parser.add_argument(
-        "--gate-mode", choices=("both", "ranking", "numerical"), help=
-        "gates to require (default: ranking for registered qualified domains, both otherwise)"
+        "--gate-mode", choices=("both", "ranking", "numerical"), help=(
+            "gates to require (default: ranking for registered qualified "
+            "domains, both otherwise)"
+        )
     )
     parser.add_argument("--iterations", type=int, default=1)
     parser.add_argument("--warmup", type=int, default=0)
@@ -72,12 +87,16 @@ def arguments() -> argparse.Namespace:
     args = parser.parse_args()
     selected = args.metrics.split(",")
     if not set(selected) <= set(METRICS) or len(selected) != len(set(selected)):
-        parser.error("--metrics must select unique names from " + ",".join(METRICS))
+        parser.error(
+            "--metrics must select unique names from " + ",".join(METRICS)
+        )
     if args.iterations < 1 or args.warmup < 0 or args.jobs < 1:
         parser.error("iterations/jobs must be positive and warmup nonnegative")
     if args.reference_only and args.reference != "generate":
         parser.error("--reference-only requires --reference generate")
-    args.out_dir = args.out_dir or ROOT / "artifacts/reports" / f"temporal-{args.profile}"
+    args.out_dir = args.out_dir or ROOT / "artifacts/reports" / (
+        f"temporal-{args.profile}"
+    )
     return args
 
 
@@ -90,7 +109,8 @@ def configuration_id(row: dict[str, object], metric: str) -> str:
     """
     if metric in SPATIAL_METRICS:
         return f"{metric}-srgb444-8bit-frame-mean"
-    return f"cvvdp-standard4k-{row['fps']}" if metric == "cvvdp" else f"{metric}-native444-8bit"
+    return (f"cvvdp-standard4k-{row['fps']}"
+            ) if metric == "cvvdp" else (f"{metric}-native444-8bit")
 
 
 def sample_metadata(row: dict[str, object], metric: str) -> dict[str, object]:
@@ -100,7 +120,9 @@ def sample_metadata(row: dict[str, object], metric: str) -> dict[str, object]:
     :param metric: Temporal metric/model name.
     :returns: Canonical sample fields excluding its score.
     """
-    representation = SPATIAL_PROTOCOL if metric in SPATIAL_METRICS else "YUV444-8bit-BT601-limited-and-reference-RGB-FP32"
+    representation = SPATIAL_PROTOCOL if metric in SPATIAL_METRICS else (
+        "YUV444-8bit-BT601-limited-and-reference-RGB-FP32"
+    )
     prefix = "spatial_" if metric in SPATIAL_METRICS else ""
     try:
         original = row[prefix + "original_hashes"]
@@ -117,13 +139,18 @@ def sample_metadata(row: dict[str, object], metric: str) -> dict[str, object]:
         "representation": representation
     }
     return {
-        "sample_id": row["sample_id"],
-        "source_id": row["source_id"],
+        "sample_id":
+        row["sample_id"],
+        "source_id":
+        row["source_id"],
         "stratum":
         "sdr-spatial-srgb444" if metric in SPATIAL_METRICS else row["stratum"],
-        "distortion_family": row["distortion_family"],
-        "configuration_id": configuration_id(row, metric),
-        "input_hash": corpus.json_digest(identity)
+        "distortion_family":
+        row["distortion_family"],
+        "configuration_id":
+        configuration_id(row, metric),
+        "input_hash":
+        corpus.json_digest(identity)
     }
 
 
@@ -131,7 +158,7 @@ def report(
     rows: list[dict[str, object]], values: list[dict[str, object]], metric: str,
     implementation: str, revision: str
 ) -> dict[str, object]:
-    """Build a portable report with content hashes independent of cache paths.
+    """Build a portable report with hashes independent of cache paths.
 
     :param rows: Prepared clip records.
     :param values: Scores in matching input order.
@@ -146,43 +173,61 @@ def report(
         for item, value in zip(metadata, values, strict=True)
     ]
     settings = {
-        "metric": metric,
-        "protocol": 1,
-        "display": "standard_4k",
-        "vmaf_input": "native444-8bit",
-        "rgb": "BT601-limited-nearest-FP32-sRGB",
-        "configurations": sorted({str(item["configuration_id"])
-                                  for item in metadata})
+        "metric":
+        metric,
+        "protocol":
+        1,
+        "display":
+        "standard_4k",
+        "vmaf_input":
+        "native444-8bit",
+        "rgb":
+        "BT601-limited-nearest-FP32-sRGB",
+        "configurations":
+        sorted({str(item["configuration_id"])
+                for item in metadata})
     }
     if metric in SPATIAL_METRICS:
         settings = _spatial_settings(metric, metadata)
     return report_from_rows(
-        samples, metric=metric, implementation=implementation, revision=revision,
-        configuration_hash=corpus.json_digest(settings),
+        samples, metric=metric, implementation=implementation,
+        revision=revision, configuration_hash=corpus.json_digest(settings),
         input_manifest_hash=corpus.json_digest(metadata)
     )
 
 
-def _spatial_settings(metric: str, metadata: list[dict[str,
-                                                       object]]) -> dict[str, object]:
+def _spatial_settings(metric: str,
+                      metadata: list[dict[str, object]]) -> dict[str, object]:
     return {
-        "metric": metric,
-        "protocol": SPATIAL_PROTOCOL,
-        "input_transfer": "srgb",
-        "input_matrix": "bt470bg",
-        "input_range": "limited",
-        "pooling": "arithmetic-mean-final-frame-score",
-        "configurations": sorted({str(item["configuration_id"])
-                                  for item in metadata}),
-        "half_planes": False,
-        "hf_asymmetry": 1.0,
-        "xmul": 1.0,
-        "intensity_target": 80.0
+        "metric":
+        metric,
+        "protocol":
+        SPATIAL_PROTOCOL,
+        "input_transfer":
+        "srgb",
+        "input_matrix":
+        "bt470bg",
+        "input_range":
+        "limited",
+        "pooling":
+        "arithmetic-mean-final-frame-score",
+        "configurations":
+        sorted({str(item["configuration_id"])
+                for item in metadata}),
+        "half_planes":
+        False,
+        "hf_asymmetry":
+        1.0,
+        "xmul":
+        1.0,
+        "intensity_target":
+        80.0
     }
 
 
-def frozen_policy(reference: dict[str, object], profile: str) -> dict[str, object]:
-    """Freeze original-only ambiguity margins before observing candidate results.
+def frozen_policy(reference: dict[str, object],
+                  profile: str) -> dict[str, object]:
+    """Freeze original-only margins before observing candidate results.
 
     :param reference: Original report generated from the hosted corpus.
     :param profile: Smoke or full qualification coverage.
@@ -193,7 +238,8 @@ def frozen_policy(reference: dict[str, object], profile: str) -> dict[str, objec
     margins = {}
     for config in configurations:
         values = [
-            float(row["score"]) for row in samples if row["configuration_id"] == config
+            float(row["score"]) for row in samples
+            if row["configuration_id"] == config
         ]
         span = float(np.percentile(values, 95) - np.percentile(values, 5))
         margins[config] = max(1e-6, .01 * span)
@@ -232,7 +278,7 @@ def frozen_policy(reference: dict[str, object], profile: str) -> dict[str, objec
 def generated_original(
     rows: list[dict[str, object]], metric: str, args: argparse.Namespace
 ) -> tuple[dict[str, object], dict[str, object]]:
-    """Generate independent original evidence and freeze its acceptance policy.
+    """Generate independent original evidence and freeze acceptance policy.
 
     :param rows: Prepared clip records.
     :param metric: Temporal metric/model name.
@@ -259,13 +305,16 @@ def _original_values(
     rows: list[dict[str, object]], metric: str, args: argparse.Namespace,
     identity: dict[str, object]
 ) -> list[dict[str, object]]:
-    tasks = [(row, metric, args.cache_dir / "reference", identity) for row in rows]
+    tasks = [
+        (row, metric, args.cache_dir / "reference", identity) for row in rows
+    ]
     workers = min(4, getattr(args, "jobs", 1))
     if workers == 1:
         return [_original_task(task) for task in tasks]
     executor = (
         ProcessPoolExecutor(
-            max_workers=workers, mp_context=multiprocessing.get_context("spawn")
+            max_workers=workers,
+            mp_context=multiprocessing.get_context("spawn")
         ) if metric == "cvvdp" else ThreadPoolExecutor(max_workers=workers)
     )
     values = []
@@ -273,8 +322,10 @@ def _original_values(
         for index, value in enumerate(executor.map(_original_task, tasks)):
             values.append(value)
             print(
-                f"{metric} original {index + 1}/{len(rows)} {rows[index]['sample_id']}",
-                flush=True
+                (
+                    f"{metric} original {index + 1}/{len(rows)} "
+                    f"{rows[index]['sample_id']}"
+                ), flush=True
             )
     return values
 
@@ -282,7 +333,7 @@ def _original_values(
 def original_and_policy(
     rows: list[dict[str, object]], metric: str, args: argparse.Namespace
 ) -> tuple[dict[str, object], dict[str, object]]:
-    """Load checked evidence or generate originals before running the candidate.
+    """Load evidence or generate originals before running the candidate.
 
     :param rows: Prepared input records.
     :param metric: Temporal metric/model name.
@@ -299,15 +350,21 @@ def original_and_policy(
     if (original["metric"] != metric or policy.get("metric") != metric
             or original["revision"] != PINS[metric]
             or policy.get("reference_revision") != PINS[metric]):
-        raise ValueError("original and policy must match the pinned reference revision")
+        raise ValueError(
+            "original and policy must match the pinned reference revision"
+        )
     values = [{"score": 0} for _ in rows]
-    expected = report(rows, values, metric, "input-verification", "prepared-inputs")
-    if (expected["input_manifest_hash"] != original["input_manifest_hash"]
-            or expected["configuration_hash"] != original["configuration_hash"]):
-        raise ValueError("prepared clips do not match the frozen original corpus")
+    expected = report(
+        rows, values, metric, "input-verification", "prepared-inputs"
+    )
+    if (expected["input_manifest_hash"] != original["input_manifest_hash"] or
+            expected["configuration_hash"] != original["configuration_hash"]):
+        raise ValueError(
+            "prepared clips do not match the frozen original corpus"
+        )
     for suffix, value in (("original", original), ("policy", policy)):
-        (args.out_dir /
-         f"{metric}-{suffix}.json").write_text(json.dumps(value, indent=2) + "\n")
+        (args.out_dir / f"{metric}-{suffix}.json"
+         ).write_text(json.dumps(value, indent=2) + "\n")
     return original, policy
 
 
@@ -320,17 +377,21 @@ def candidate_scores(
     :param metric: Temporal metric/model name.
     :param args: Driver, repetition and output settings.
     :returns: Complete ordered candidate score/frame/timing records.
-    :raises RuntimeError: If scoring fails, omits inputs or emits invalid scores.
+    :raises RuntimeError: If scoring fails, omits inputs or emits invalid
+        scores.
     """
     pairs = args.out_dir / f"{metric}-pairs.tsv"
     pairs.write_text(
         "".join(
-            f"{row['sample_id']}\t{_input_path(row, metric, 'original')}\t{_input_path(row, metric, 'distorted')}\n"
-            for row in rows
+            (
+                f"{row['sample_id']}\t{_input_path(row, metric, 'original')}\t"
+                f"{_input_path(row, metric, 'distorted')}\n"
+            ) for row in rows
         )
     )
     command = [
-        str(args.binary.resolve()), "--metric", metric, "--json", "--pairs-file",
+        str(args.binary.resolve()), "--metric", metric, "--json",
+        "--pairs-file",
         str(pairs.resolve()), "--iterations",
         str(args.iterations), "--warmup",
         str(args.warmup)
@@ -346,13 +407,15 @@ def candidate_scores(
         check=False
     )
     (args.out_dir / f"{metric}-candidate.log").write_text(
-        json.dumps(command) + f"\nreturncode={result.returncode}\n" + result.stderr
+        json.dumps(command) + f"\nreturncode={result.returncode}\n" +
+        result.stderr
     )
     (args.out_dir / f"{metric}-candidate.jsonl").write_text(result.stdout)
     values = [json.loads(line) for line in result.stdout.splitlines()]
     if result.returncode or len(values) != len(rows):
         raise RuntimeError(
-            f"{metric}: candidate exit {result.returncode}, {len(values)}/{len(rows)} "
+            f"{metric}: candidate exit {result.returncode}, "
+            f"{len(values)}/{len(rows)} "
             "clip results; see candidate.log"
         )
     for row, value in zip(rows, values, strict=True):
@@ -360,11 +423,14 @@ def candidate_scores(
             validate_cli_result(value, metric, row["sample_id"], row["frames"])
         except ValueError as error:
             raise RuntimeError(
-                f"candidate returned mismatched or invalid clip results: {error}"
+                f"candidate returned mismatched or invalid clip results: "
+                f"{error}"
             ) from error
     timing = {
-        "wall_seconds_including_warmup_decode_and_setup": time.perf_counter() - started,
-        "timed_frames": sum(int(row["frames"]) for row in rows) * args.iterations,
+        "wall_seconds_including_warmup_decode_and_setup":
+        time.perf_counter() - started,
+        "timed_frames":
+        sum(int(row["frames"]) for row in rows) * args.iterations,
         "warmup_frames": sum(int(row["frames"]) for row in rows) * args.warmup,
         "iterations_per_clip": args.iterations,
         "warmup_per_clip": args.warmup
@@ -396,7 +462,7 @@ def qualifies(result: dict[str, object], mode: str) -> bool:
 def run_metric(
     rows: list[dict[str, object]], metric: str, args: argparse.Namespace
 ) -> bool:
-    """Record the paired old/new gate results for one complete temporal corpus.
+    """Record old/new gate results for one complete temporal corpus.
 
     :param rows: Prepared input records.
     :param metric: Temporal metric/model name.
@@ -415,8 +481,8 @@ def run_metric(
     _verify_metric_inputs(rows, metric)
     if corpus.digest(args.binary) != binary_hash:
         raise ValueError("candidate binary changed during validation")
-    (args.out_dir /
-     f"{metric}-candidate.json").write_text(json.dumps(observed, indent=2) + "\n")
+    (args.out_dir / f"{metric}-candidate.json"
+     ).write_text(json.dumps(observed, indent=2) + "\n")
     result = evaluate_agreement(original, observed, policy)
     mode = args.gate_mode or default_gate_mode(original, policy)
     result.update(gate_mode=mode, selected_gate_passed=qualifies(result, mode))
@@ -424,8 +490,8 @@ def run_metric(
      ).write_text(json.dumps(result, indent=2, allow_nan=False) + "\n")
     print(
         f"{metric}: old numerical {result['numerical']['status']}; "
-        f"new ranking {result['ranking']['status']}; subjective {result['subjective']['status']}",
-        flush=True
+        f"new ranking {result['ranking']['status']}; "
+        f"subjective {result['subjective']['status']}", flush=True
     )
     return result["selected_gate_passed"]
 
@@ -453,12 +519,13 @@ def main() -> int:
     args.out_dir.mkdir(parents=True, exist_ok=True)
     selected = args.only or (SMOKE_SOURCES if args.profile == "smoke" else None)
     fetch_sources(
-        select_sources(load_manifest(MANIFEST), selected), args.download_dir, args.jobs,
-        args.offline
+        select_sources(load_manifest(MANIFEST), selected), args.download_dir,
+        args.jobs, args.offline
     )
     metrics = args.metrics.split(",")
     rows = corpus.prepare(
-        args.download_dir, args.cache_dir / args.profile, args.profile, args.only
+        args.download_dir, args.cache_dir / args.profile, args.profile,
+        args.only
     )
     if any(metric in SPATIAL_METRICS for metric in metrics):
         rows = ensure_spatial(rows)
@@ -470,11 +537,15 @@ def main() -> int:
     return 0 if all(passed) else 1
 
 
-def _summary(metrics: list[str], passed: list[bool], args: argparse.Namespace) -> None:
+def _summary(
+    metrics: list[str], passed: list[bool], args: argparse.Namespace
+) -> None:
     results = {}
     if not args.reference_only:
         for metric in metrics:
-            result = json.loads((args.out_dir / f"{metric}-agreement.json").read_text())
+            result = json.loads(
+                (args.out_dir / f"{metric}-agreement.json").read_text()
+            )
             results[metric] = {
                 "gate_mode": result["gate_mode"],
                 "selected_gate_passed": result["selected_gate_passed"],
@@ -498,25 +569,30 @@ def _summary(metrics: list[str], passed: list[bool], args: argparse.Namespace) -
         "selected_gate_passed": all(passed),
         "results": results
     }
-    (args.out_dir /
-     "summary.json").write_text(json.dumps(summary, indent=2, allow_nan=False) + "\n")
+    (args.out_dir / "summary.json"
+     ).write_text(json.dumps(summary, indent=2, allow_nan=False) + "\n")
     _print_summary(results)
 
 
-def _summary_mode(results: dict[str, dict[str, object]], requested: str | None) -> str:
+def _summary_mode(
+    results: dict[str, dict[str, object]], requested: str | None
+) -> str:
     modes = {str(result["gate_mode"]) for result in results.values()}
-    return next(iter(modes)) if len(modes) == 1 else requested or "domain-default"
+    return next(iter(modes)
+                ) if len(modes) == 1 else requested or "domain-default"
 
 
 def _print_summary(results: dict[str, dict[str, object]]) -> None:
     if not results:
         return
-    print("\nmetric           SRCC       tau-b      Pearson    ranking  numerical")
+    print(
+        "\nmetric           SRCC       tau-b      Pearson    ranking  numerical"
+    )
     for metric, result in results.items():
         print(
             f"{metric:<16} {result['srcc']:.7f}  {result['tau_b']:.7f}  "
-            f"{result['pearson']:.7f}  {result['ranking']:<8} {result['numerical']}",
-            flush=True
+            f"{result['pearson']:.7f}  {result['ranking']:<8} "
+            f"{result['numerical']}", flush=True
         )
 
 

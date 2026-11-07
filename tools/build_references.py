@@ -3,7 +3,8 @@
 # BSD-3-Clause; see LICENSE.
 """Build every reference implementation this repository measures against.
 
-Each pinned checkout in .reference/ is copied under build/ first (libjxl
+Each pinned checkout in .reference/ is copied under the selected --build-dir
+(default: build/) first (libjxl
 excepted only in that its copy is the sparse tree), so nothing is ever written
 into .reference/. The in-memory harness for each reference is compiled here as
 well.
@@ -36,7 +37,14 @@ import shutil
 import subprocess
 import sys
 import tempfile
-from collections.abc import Callable, Sequence
+from collections.abc import Callable
+from collections.abc import Sequence
+from pathlib import Path
+
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from tools.build_paths import build_directory
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -54,7 +62,8 @@ STEP_CHECKOUTS = {
     "vmaf": "vmaf",
     "cvvdp": "ColorVideoVDP"
 }
-FINGERPRINT_DIR = "build/reference-fingerprints"
+BUILD_DIR = build_directory()
+FINGERPRINT_DIR = str(BUILD_DIR / "reference-fingerprints")
 CVVDP_ENV = ".venv"
 CVVDP_REQUIREMENTS = "tools/cvvdp-reference-requirements.txt"
 BUILD_ENV = (
@@ -71,7 +80,9 @@ def capture(argv: Sequence[str]) -> str | None:
     :returns: Tool output, or None if the command cannot run successfully.
     """
     try:
-        result = subprocess.run(argv, capture_output=True, text=True, check=True)
+        result = subprocess.run(
+            argv, capture_output=True, text=True, check=True
+        )
         return result.stdout.strip()
     except (OSError, subprocess.CalledProcessError):
         return None
@@ -86,7 +97,9 @@ def reference_fingerprint(step: str) -> dict[str, object]:
     """
     checkout = os.path.join(".reference", STEP_CHECKOUTS[step])
     revision = capture(["git", "-C", checkout, "rev-parse", "HEAD"])
-    submodules = capture(["git", "-C", checkout, "submodule", "status", "--recursive"])
+    submodules = capture(
+        ["git", "-C", checkout, "submodule", "status", "--recursive"]
+    )
     if revision is None or submodules is None:
         raise SystemExit(f"cannot fingerprint reference {checkout}")
     compiler = os.environ.get("CXX", "g++")
@@ -137,7 +150,8 @@ def reference_fingerprint(step: str) -> dict[str, object]:
 def _cvvdp_fingerprint() -> dict[str, object]:
     """Fingerprint the locked CPU environment without importing the original.
 
-    :returns: Requested interpreter, actual environment versions and lock digest.
+    :returns: Requested interpreter, actual environment versions and lock
+        digest.
     """
     python = os.path.join(REPO_ROOT, CVVDP_ENV, "bin", "python")
     with open(CVVDP_REQUIREMENTS, "rb") as source:
@@ -147,7 +161,8 @@ def _cvvdp_fingerprint() -> dict[str, object]:
         "python": python,
         "python_version": capture([python, "--version"]),
         "requirements_sha256": requirements_hash,
-        "installed_packages": capture(["uv", "pip", "freeze", "--python", python]),
+        "installed_packages":
+        capture(["uv", "pip", "freeze", "--python", python]),
     }
 
 
@@ -173,7 +188,10 @@ def build_fingerprinted(
         previous = None
     rebuild = force or previous != fingerprint
     if rebuild:
-        print(f"{step}: build fingerprint changed or missing; rebuilding", flush=True)
+        print(
+            f"{step}: build fingerprint changed or missing; rebuilding",
+            flush=True
+        )
     # The stamp must never survive a failed rebuild, even an incremental one.
     with contextlib.suppress(FileNotFoundError):
         os.remove(stamp)
@@ -260,7 +278,8 @@ def cmake_configure(source: str, build: str, extra: Sequence[str] = ()) -> None:
     run(
         [
             "cmake", "-S", source, "-B", build, "-G", "Ninja",
-            "-DCMAKE_BUILD_TYPE=Release", "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON", *extra
+            "-DCMAKE_BUILD_TYPE=Release", "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
+            *extra
         ]
     )
 
@@ -322,7 +341,7 @@ def build_cloudinary(jobs: int, force: bool) -> None:
     :raises SystemExit: If a required tool or build step fails.
     """
     require_reference("ssimulacra2")
-    out = "build/reference-build"
+    out = str(BUILD_DIR / "reference-build")
     if not need_build(f"{out}/ss2_cloudinary_bench", force):
         # Let the existing build system track our harness and its headers.
         run(
@@ -334,11 +353,11 @@ def build_cloudinary(jobs: int, force: bool) -> None:
         )
         return
     if force:
-        shutil.rmtree("build/reference-src", ignore_errors=True)
+        shutil.rmtree(str(BUILD_DIR / "reference-src"), ignore_errors=True)
         shutil.rmtree(out, ignore_errors=True)
-    copy_reference(".reference/ssimulacra2", "build/reference-src")
+    copy_reference(".reference/ssimulacra2", str(BUILD_DIR / "reference-src"))
     append_harness_target(
-        "build/reference-src/src/CMakeLists.txt", f"""\
+        str(BUILD_DIR / "reference-src/src/CMakeLists.txt"), f"""\
 add_executable(ss2_cloudinary_bench
   {cmake_literal(os.path.join(REPO_ROOT, 'bench/inmemory/cloudinary_bench.cc'))}
   ssimulacra2.cc)
@@ -346,20 +365,22 @@ target_compile_features(ss2_cloudinary_bench PRIVATE cxx_std_20)
 target_link_libraries(ss2_cloudinary_bench jxl jxl_extras-static hwy)"""
     )
     cmake_configure(
-        "build/reference-src/src", out, [
+        str(BUILD_DIR / "reference-src/src"), out, [
             "-DJPEGXL_ENABLE_OPENEXR=OFF",
             "-DCMAKE_CXX_FLAGS=-DHWY_COMPILE_ONLY_SCALAR",
         ]
     )
     run(
         [
-            "cmake", "--build", out, "--target", "ssimulacra2", "ss2_cloudinary_bench",
-            "-j",
+            "cmake", "--build", out, "--target", "ssimulacra2",
+            "ss2_cloudinary_bench", "-j",
             str(jobs)
         ]
     )
-    print(f"cloudinary: built {out}/ssimulacra2 and "
-          f"{out}/ss2_cloudinary_bench")
+    print(
+        f"cloudinary: built {out}/ssimulacra2 and "
+        f"{out}/ss2_cloudinary_bench"
+    )
 
 
 def build_libjxl(jobs: int, force: bool) -> None:
@@ -370,22 +391,22 @@ def build_libjxl(jobs: int, force: bool) -> None:
     :raises SystemExit: If a required tool or build step fails.
     """
     require_reference("libjxl")
-    out = "build/libjxl-build"
+    out = str(BUILD_DIR / "libjxl-build")
     if not need_build(f"{out}/tools/ss2_libjxl_bench", force):
         run(
             [
-                "cmake", "--build", out, "--target", "ssimulacra2", "butteraugli_main",
-                "ss2_libjxl_bench", "-j",
+                "cmake", "--build", out, "--target", "ssimulacra2",
+                "butteraugli_main", "ss2_libjxl_bench", "-j",
                 str(jobs)
             ]
         )
         return
     if force:
-        shutil.rmtree("build/libjxl-src", ignore_errors=True)
+        shutil.rmtree(str(BUILD_DIR / "libjxl-src"), ignore_errors=True)
         shutil.rmtree(out, ignore_errors=True)
-    copy_reference(".reference/libjxl", "build/libjxl-src")
+    copy_reference(".reference/libjxl", str(BUILD_DIR / "libjxl-src"))
     append_harness_target(
-        "build/libjxl-src/tools/CMakeLists.txt", f"""\
+        str(BUILD_DIR / "libjxl-src/tools/CMakeLists.txt"), f"""\
 add_executable(ss2_libjxl_bench
   {cmake_literal(os.path.join(REPO_ROOT, 'bench/inmemory/libjxl_bench.cc'))}
   ssimulacra2.cc)
@@ -394,7 +415,7 @@ target_link_libraries(ss2_libjxl_bench PRIVATE jxl_extras-internal
   jxl_threads jxl_tool jxl_gauss_blur)"""
     )
     cmake_configure(
-        "build/libjxl-src", out, [
+        str(BUILD_DIR / "libjxl-src"), out, [
             "-DJPEGXL_ENABLE_TOOLS=ON", "-DJPEGXL_ENABLE_DEVTOOLS=ON",
             "-DJPEGXL_ENABLE_BENCHMARK=OFF", "-DJPEGXL_ENABLE_EXAMPLES=OFF",
             "-DJPEGXL_ENABLE_VIEWERS=OFF", "-DBUILD_TESTING=OFF",
@@ -406,8 +427,8 @@ target_link_libraries(ss2_libjxl_bench PRIVATE jxl_extras-internal
     )
     run(
         [
-            "cmake", "--build", out, "--target", "ssimulacra2", "butteraugli_main",
-            "ss2_libjxl_bench", "-j",
+            "cmake", "--build", out, "--target", "ssimulacra2",
+            "butteraugli_main", "ss2_libjxl_bench", "-j",
             str(jobs)
         ]
     )
@@ -425,8 +446,8 @@ def build_fssimu2(jobs: int, force: bool) -> None:
     :raises SystemExit: If a required tool or build step fails.
     """
     require_reference("fssimu2")
-    out = "build/fssimu2-build"
-    source = "build/fssimu2-src"
+    out = str(BUILD_DIR / "fssimu2-build")
+    source = str(BUILD_DIR / "fssimu2-src")
     have_library = (
         not need_build(f"{out}/bin/ssimu2_bench", force)
         and os.path.isfile(f"{out}/lib/libssimu2.so")
@@ -456,12 +477,12 @@ def build_fssimu2(jobs: int, force: bool) -> None:
     run(
         [
             compiler, "-std=c++20", "-O2", "-Wall", "-Wextra", "-Wpedantic",
-            f"{REPO_ROOT}/bench/inmemory/fssimu2_bench.cc", f"-I{REPO_ROOT}/src",
-            f"-I{REPO_ROOT}/tools/image_io", f"-I{REPO_ROOT}/include",
-            f"-I{REPO_ROOT}/{source}/src/include", f"{REPO_ROOT}/build/libvqm_io.a",
-            f"{REPO_ROOT}/build/libvqm_core.a", f"-L{REPO_ROOT}/{out}/lib",
-            "-l:libssimu2.so", f"-Wl,-rpath,{REPO_ROOT}/{out}/lib", "-lpng", "-ljpeg",
-            "-lvulkan", "-o", f"{REPO_ROOT}/{out}/bin/ssimu2_bench"
+            f"{REPO_ROOT}/bench/inmemory/fssimu2_bench.cc",
+            f"-I{REPO_ROOT}/src", f"-I{REPO_ROOT}/tools/image_io",
+            f"-I{REPO_ROOT}/include", f"-I{source}/src/include",
+            f"{BUILD_DIR}/libvqm_io.a", f"{BUILD_DIR}/libvqm_core.a",
+            f"-L{out}/lib", "-l:libssimu2.so", f"-Wl,-rpath,{out}/lib", "-lpng",
+            "-ljpeg", "-lvulkan", "-o", f"{out}/bin/ssimu2_bench"
         ]
     )
     print(f"fssimu2: built {out}/bin/fssimu2 and {out}/bin/ssimu2_bench")
@@ -474,22 +495,28 @@ def build_vship_reference(
 
     :param reference: Pinned Vship checkout name.
     :param backend: Upstream build backend name.
-    :param out: Output directory name under build/.
+    :param out: Output directory name under the selected build directory.
     :param jobs: Parallel build job limit.
     :param force: Whether to recreate the copied source and build directories.
     :raises SystemExit: If a required tool or build step fails.
     """
     require_reference(reference)
-    source = f"build/{reference}-src-{backend}"
-    library = f"build/{out}/libvship.so"
+    source = str(BUILD_DIR / f"{reference}-src-{backend}")
+    out = str(BUILD_DIR / out)
+    library = f"{out}/libvship.so"
     have_library = os.path.isfile(library)
     if force:
         shutil.rmtree(source, ignore_errors=True)
-        shutil.rmtree(f"build/{out}", ignore_errors=True)
+        shutil.rmtree(out, ignore_errors=True)
     copy_reference(f".reference/{reference}", source)
     if force or not have_library:
-        run(["make", "-C", source, f"BACKEND={backend}", "-j", str(jobs), "build"])
-        os.makedirs(f"build/{out}", exist_ok=True)
+        run(
+            [
+                "make", "-C", source, f"BACKEND={backend}", "-j",
+                str(jobs), "build"
+            ]
+        )
+        os.makedirs(out, exist_ok=True)
         shutil.copyfile(f"{source}/libvship.so", library)
     # The checkout's own src/ comes first on the include path: a system Vship
     # installation puts a VshipAPI.h in /usr/include, and mixing that header
@@ -499,15 +526,15 @@ def build_vship_reference(
     run(
         [
             compiler, "-std=c++20", "-O2", "-Wall", "-Wextra", "-Wpedantic",
-            f"{REPO_ROOT}/bench/vship_bench.cc", f"-I{REPO_ROOT}/{source}/src",
+            f"{REPO_ROOT}/bench/vship_bench.cc", f"-I{source}/src",
             f"-I{REPO_ROOT}/src", f"-I{REPO_ROOT}/tools/image_io",
-            f"-I{REPO_ROOT}/include", f"{REPO_ROOT}/build/libvqm_io.a",
-            f"{REPO_ROOT}/build/libvqm_core.a", f"-L{REPO_ROOT}/build/{out}",
-            "-l:libvship.so", f"-Wl,-rpath,{REPO_ROOT}/build/{out}", "-lpng", "-ljpeg",
-            "-lvulkan", "-o", f"{REPO_ROOT}/build/{out}/vship_bench"
+            f"-I{REPO_ROOT}/include", f"{BUILD_DIR}/libvqm_io.a",
+            f"{BUILD_DIR}/libvqm_core.a", f"-L{out}", "-l:libvship.so",
+            f"-Wl,-rpath,{out}", "-lpng", "-ljpeg", "-lvulkan", "-o",
+            f"{out}/vship_bench"
         ]
     )
-    print(f"{out}: built build/{out}/vship_bench")
+    print(f"vship: built {out}/vship_bench")
 
 
 def build_vmaf(jobs: int, force: bool) -> None:
@@ -522,7 +549,7 @@ def build_vmaf(jobs: int, force: bool) -> None:
     :raises SystemExit: If a required tool or build step fails.
     """
     require_reference("vmaf")
-    source, out = "build/vmaf-src", "build/vmaf-build"
+    source, out = str(BUILD_DIR / "vmaf-src"), str(BUILD_DIR / "vmaf-build")
     if force:
         shutil.rmtree(source, ignore_errors=True)
         shutil.rmtree(out, ignore_errors=True)
@@ -530,9 +557,10 @@ def build_vmaf(jobs: int, force: bool) -> None:
     if not os.path.isfile(f"{out}/build.ninja"):
         run(
             [
-                "meson", "setup", out, f"{source}/libvmaf", "--buildtype=release",
-                "-Ddefault_library=static", "-Dbuilt_in_models=false",
-                "-Denable_float=true", "-Denable_asm=false", "-Denable_tests=false",
+                "meson", "setup", out, f"{source}/libvmaf",
+                "--buildtype=release", "-Ddefault_library=static",
+                "-Dbuilt_in_models=false", "-Denable_float=true",
+                "-Denable_asm=false", "-Denable_tests=false",
                 "-Denable_docs=false", "-Denable_tools=true"
             ]
         )
@@ -542,9 +570,8 @@ def build_vmaf(jobs: int, force: bool) -> None:
         [
             compiler, "-std=c++20", "-O2", "-Wall", "-Wextra", "-Wpedantic",
             f"{REPO_ROOT}/validation/vmaf_reference.cc",
-            f"-I{REPO_ROOT}/{source}/libvmaf/include",
-            f"{REPO_ROOT}/{out}/src/libvmaf.a", "-pthread", "-lm", "-o",
-            f"{REPO_ROOT}/{out}/vmaf_reference"
+            f"-I{source}/libvmaf/include", f"{out}/src/libvmaf.a", "-pthread",
+            "-lm", "-o", f"{out}/vmaf_reference"
         ]
     )
     print(f"vmaf: built {out}/tools/vmaf and {out}/vmaf_reference")
@@ -553,14 +580,17 @@ def build_vmaf(jobs: int, force: bool) -> None:
 def build_cvvdp(jobs: int, force: bool) -> None:
     """Create and validate a locked, isolated CPU ColorVideoVDP runtime.
 
-    :param jobs: Shared build concurrency setting, unused for this Python runtime.
+    :param jobs: Shared build concurrency setting, unused for this Python
+        runtime.
     :param force: Whether to reapply the original's locked dependency versions.
     :raises SystemExit: If uv, dependency installation or the CPU probe fails.
     """
     del jobs
     require_reference("ColorVideoVDP")
     if shutil.which("uv") is None:
-        raise SystemExit("uv is required for the isolated CVVDP reference runtime")
+        raise SystemExit(
+            "uv is required for the isolated CVVDP reference runtime"
+        )
     python = os.path.join(REPO_ROOT, CVVDP_ENV, "bin", "python")
     if not os.path.isfile(python):
         run(["uv", "venv", "--no-project", "--python", "3.12", CVVDP_ENV])
@@ -574,13 +604,15 @@ def build_cvvdp(jobs: int, force: bool) -> None:
             ]
         )
     if not _runtime_matches(python):
-        raise SystemExit("CVVDP runtime does not match its locked package versions")
+        raise SystemExit(
+            "CVVDP runtime does not match its locked package versions"
+        )
     _probe_cvvdp(python)
     print(f"cvvdp: validated CPU original runtime {python}")
 
 
 def _validate_cvvdp_python(python: str) -> None:
-    """Preserve an existing environment while requiring the qualified Python version.
+    """Preserve the environment and require the qualified Python version.
 
     :param python: Project environment interpreter.
     :raises SystemExit: If the existing interpreter is not Python 3.12.
@@ -591,19 +623,21 @@ def _validate_cvvdp_python(python: str) -> None:
     if version != "3.12":
         raise SystemExit(
             f"CVVDP's locked runtime requires Python 3.12; existing {python} "
-            f"reports {version or 'unavailable'}. Existing .venv files were preserved."
+            f"reports {version or 'unavailable'}. "
+            "Existing .venv files were preserved."
         )
 
 
 def _runtime_matches(python: str) -> bool:
-    """Compare every locked dependency while allowing unrelated project packages.
+    """Check locked dependencies while allowing unrelated project packages.
 
     :param python: Project environment interpreter.
     :returns: Whether all exact original dependency versions are installed.
     """
     query = (
         "import importlib.metadata, json; "
-        "print(json.dumps({d.metadata['Name'].lower().replace('_', '-'): d.version "
+        "print(json.dumps({d.metadata['Name'].lower().replace('_', '-'): "
+        "d.version "
         "for d in importlib.metadata.distributions()}))"
     )
     recorded = capture([python, "-c", query])
@@ -625,7 +659,8 @@ def _probe_cvvdp(python: str) -> None:
     """Run one CPU prediction without creating files in the pinned checkout.
 
     :param python: Isolated locked original interpreter.
-    :raises SystemExit: If import, original model loading or CPU prediction fails.
+    :raises SystemExit: If import, original model loading or CPU prediction
+        fails.
     """
     checkout = os.path.join(REPO_ROOT, ".reference", "ColorVideoVDP")
     probe = """
@@ -643,7 +678,9 @@ metric = pycvvdp.cvvdp(display_name="standard_4k", device=torch.device("cpu"),
                      quiet=True, temp_padding="replicate")
 pixels = torch.full((1, 3, 2, 64, 64), .5, dtype=torch.float32)
 with torch.inference_mode():
-    score, _ = metric.predict(pixels, pixels, dim_order="BCFHW", frames_per_second=30)
+    score, _ = metric.predict(
+        pixels, pixels, dim_order="BCFHW", frames_per_second=30
+    )
 assert math.isfinite(float(score))
 assert torch.version.cuda is None
 print(json.dumps({"python": sys.version, "torch": str(torch.__version__),
@@ -656,9 +693,10 @@ print(json.dumps({"python": sys.version, "torch": str(torch.__version__),
     )
     if result.returncode:
         raise SystemExit(
-            "CVVDP CPU original probe failed:\n" + (result.stderr or result.stdout)
+            "CVVDP CPU original probe failed:\n" +
+            (result.stderr or result.stdout)
         )
-    target = os.path.join(REPO_ROOT, "build", "cvvdp-reference-probe.json")
+    target = str(BUILD_DIR / "cvvdp-reference-probe.json")
     with open(target, "w", encoding="utf-8") as output:
         json.dump(json.loads(result.stdout), output, indent=2)
         output.write("\n")
@@ -668,18 +706,25 @@ def preflight(jobs: int, selected: list[str] | None = None) -> None:
     """Build the project archives required by selected reference drivers.
 
     :param jobs: Parallel build job limit.
-    :param selected: Build steps that may require the core and image IO archives.
+    :param selected: Build steps that may require the core and image IO
+        archives.
     :raises SystemExit: If CMake cannot configure or build the archives.
     """
     core_steps = {"fssimu2", "vship-cuda", "vship-vulkan", "vship-fast-vulkan"}
     if selected is not None and not core_steps.intersection(selected):
         return
     # Restore the IO target after an earlier core-only configure of this cache.
-    run(["cmake", "--preset", "release", "-DVQM_BUILD_CLI=ON"])
+    run(
+        [
+            "cmake", "--preset", "release", "-B",
+            str(BUILD_DIR), "-DVQM_BUILD_CLI=ON"
+        ]
+    )
     # Source archives can exist but predate the current working tree.
     run(
         [
-            "cmake", "--build", "build", "--target", "vqm_io", "vqm_core", "-j",
+            "cmake", "--build",
+            str(BUILD_DIR), "--target", "vqm_io", "vqm_core", "-j",
             str(jobs)
         ]
     )
@@ -710,26 +755,33 @@ def _selected_steps(args: argparse.Namespace,
 
 
 def main() -> int:
-    """Verify sources, build the selected references and refresh clangd's database.
+    """Verify sources, build references and refresh clangd's database.
 
     :returns: Zero after all selected builds succeed.
     :raises SystemExit: If selection, verification or a build command fails.
     """
+    global BUILD_DIR, FINGERPRINT_DIR
+
     # The command owns its working directory; importing build helpers does not.
     os.chdir(REPO_ROOT)
     parser = argparse.ArgumentParser(
-        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter
     )
     parser.add_argument(
         "--only", default=None, help="comma-separated steps (default: all)"
     )
     parser.add_argument(
-        "--force", action="store_true", help="remove the step's build trees and rebuild"
+        "--force", action="store_true",
+        help="remove the step's build trees and rebuild"
     )
     parser.add_argument("--jobs", type=int, default=os.cpu_count() or 1)
+    parser.add_argument("--build-dir", type=Path, default=Path("build"))
     args = parser.parse_args()
 
     selected = _selected_steps(args, parser)
+    BUILD_DIR = build_directory(args.build_dir)
+    FINGERPRINT_DIR = str(BUILD_DIR / "reference-fingerprints")
 
     # A matching HEAD alone is not enough: uncommitted and ignored files can
     # also be copied into the reference build, including inside submodules.
@@ -751,13 +803,15 @@ def main() -> int:
         "fssimu2":
         build_fssimu2,
         "vship-cuda":
-        lambda j, f: build_vship_reference("Vship", "Cuda", "vship-build-cuda", j, f),
+        lambda j, f:
+        build_vship_reference("Vship", "Cuda", "vship-build-cuda", j, f),
         "vship-vulkan":
         lambda j, f:
         build_vship_reference("Vship", "Vulkan", "vship-build-vulkan", j, f),
         "vship-fast-vulkan":
-        lambda j, f:
-        build_vship_reference("Vship-fast", "Vulkan", "vship-fast-build-vulkan", j, f),
+        lambda j, f: build_vship_reference(
+            "Vship-fast", "Vulkan", "vship-fast-build-vulkan", j, f
+        ),
         "vmaf":
         build_vmaf,
         "cvvdp":
@@ -768,11 +822,8 @@ def main() -> int:
             build_fingerprinted(step, jobs, args.force, builders[step])
             built.append(step)
     # Refresh the clangd database so the editor sees the harness entries.
-    try:
-        import vscode_compile_commands
-        vscode_compile_commands.merge()
-    except ImportError:
-        pass
+    from tools import vscode_compile_commands
+    vscode_compile_commands.merge(BUILD_DIR)
     print(f"built: {' '.join(built)}")
     return 0
 

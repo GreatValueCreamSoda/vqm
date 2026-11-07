@@ -10,14 +10,15 @@ import numpy as np
 from numpy.typing import NDArray
 
 from . import corpus
-from .fetch import Source, load_manifest
+from .fetch import Source
+from .fetch import load_manifest
 
 PROTOCOL = "clipped-rgb-gamut0.02-0.98-bt601-limited444-rne-fp32-v1"
 SPATIAL_METRICS = ("ssimulacra2", "butteraugli")
 
 
 def encode_frame(rgb: NDArray[np.float32]) -> NDArray[np.uint8]:
-    """Map encoded RGB into a safe gamut and encode exact limited-range bytes.
+    """Map encoded RGB to a safe gamut and encode limited-range bytes.
 
     :param rgb: Three full-resolution encoded RGB planes in [0, 1].
     :returns: Full-resolution YUV444 byte planes.
@@ -37,7 +38,7 @@ def encode_frame(rgb: NDArray[np.float32]) -> NDArray[np.uint8]:
 
 def write_spatial_clip(source_rgb: Path, target: Path,
                        source: Source) -> dict[str, str]:
-    """Serialize a video whose public CLI and reference RGB conversions agree.
+    """Serialize video with matching CLI and reference RGB conversions.
 
     :param source_rgb: Existing clipped FP32 RGB representation.
     :param target: New canonical Y4M path.
@@ -75,8 +76,8 @@ def _prepared_side(row: dict[str, object], side: str,
     }
     if metadata.exists():
         recorded = json.loads(metadata.read_text())
-        if recorded.get("identity") == identity and _valid_files(target,
-                                                                 recorded["hashes"]):
+        if recorded.get("identity") == identity and _valid_files(
+                target, recorded["hashes"]):
             return str(target), recorded["hashes"]
     hashes = write_spatial_clip(rgb, target, source)
     metadata.write_text(
@@ -103,16 +104,19 @@ def _valid_files(target: Path, hashes: dict[str, str]) -> bool:
 def ensure_spatial(
     rows: list[dict[str, object]], sources: Sequence[Source] | None = None
 ) -> list[dict[str, object]]:
-    """Add separately fingerprinted spatial representations without changing temporal inputs.
+    """Add fingerprinted spatial inputs while preserving temporal inputs.
 
     :param rows: Prepared hosted video pairs.
-    :param sources: Optional verified source records, primarily for offline tests.
-    :returns: Copies with complete spatial paths, hashes and protocol identifiers.
+    :param sources: Optional verified source records, primarily for offline
+        tests.
+    :returns: Copies with complete spatial paths, hashes and protocol
+        identifiers.
     :raises ValueError: If source identity or original RGB data is invalid.
     """
     by_id = {
         source.id: source
-        for source in (load_manifest(corpus.MANIFEST) if sources is None else sources)
+        for source in
+        (load_manifest(corpus.MANIFEST) if sources is None else sources)
     }
     cached: dict[str, tuple[str, dict[str, str]]] = {}
     result = []
@@ -125,13 +129,14 @@ def ensure_spatial(
 
 
 def _spatial_row(
-    row: dict[str, object], source: Source, cached: dict[str, tuple[str, dict[str,
-                                                                              str]]]
+    row: dict[str, object], source: Source,
+    cached: dict[str, tuple[str, dict[str, str]]]
 ) -> dict[str, object]:
     value = dict(row, spatial_protocol=PROTOCOL)
     for side in ("original", "distorted"):
         path = str(row[side])
         if path not in cached:
             cached[path] = _prepared_side(row, side, source)
-        value["spatial_" + side], value["spatial_" + side + "_hashes"] = cached[path]
+        value["spatial_" + side], value["spatial_" + side +
+                                        "_hashes"] = cached[path]
     return value

@@ -1,0 +1,47 @@
+line-length = 80
+indent-width = 4
+preview = false
+unsafe-fixes = false
+
+# Leave target-version unset so Ruff can infer it from requires-python.
+
+[lint]
+# PLR1702 requires lint preview; only explicitly named preview rules are selected.
+preview = true
+explicit-preview-rules = true
+select = [
+    "E",    # pycodestyle errors
+    "F",    # Pyflakes
+    "I",    # Import sorting
+    "UP",   # Python modernization
+    "B",    # Common bugs (flake8-bugbear)
+    "SIM",  # Simplification
+    "C901", # Function complexity (McCabe)
+    "ANN",  # Type annotations
+    "D",    # Docstrings
+    "N",    # Naming conventions
+    "Q",    # Double quotes (YAPF preserves existing quote styles)
+    "PLR0915", # Limit statements within functions and methods
+    "PLR1702", # Limit nested blocks within functions and methods
+]
+
+[lint.flake8-quotes]
+inline-quotes = "double"
+multiline-quotes = "double"
+docstring-quotes = "double"
+
+[lint.mccabe]
+max-complexity = 7
+
+[lint.isort]
+# Keep imports stable when Ruff and YAPF run in either order.
+force-single-line = true
+
+[lint.pydocstyle]
+# Sphinx/reStructuredText field lists use PEP 257 checks. Ruff has no
+# Sphinx-specific convention and does not validate :param:/:returns: fields.
+convention = "pep257"
+
+[lint.pylint]
+max-nested-blocks = 2
+max-statements = 30

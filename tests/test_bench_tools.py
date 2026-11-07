@@ -13,8 +13,14 @@ import tempfile
 import unittest
 from collections.abc import Sequence
 from pathlib import Path
-from types import ModuleType, SimpleNamespace
+from types import ModuleType
+from types import SimpleNamespace
 from unittest import mock
+
+from bench import inmemory_environment as probes
+from bench import inmemory_measure as measurements
+from bench import inmemory_report as reports
+from bench import run_inmemory as inmemory
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -32,210 +38,13 @@ def load_module(name: str, path: str | Path) -> ModuleType:
     return module
 
 
-inmemory = load_module("run_inmemory", "bench/run_inmemory.py")
 bench = load_module("run_bench", "bench/run_bench.py")
-references = load_module("build_references", "tools/build_references.py")
 fetch_cid22 = load_module("fetch_cid22", "validation/fetch_cid22.py")
 bootstrap = load_module("benchmark_bootstrap", "bench/benchmark.py")
-fetch_references = load_module("fetch_references", "tools/fetch_references.py")
 
 
 class BenchmarkBootstrapTests(unittest.TestCase):
     """Check reference bootstrap, benchmark plans and provenance."""
-
-    def test_importing_reference_helpers_preserves_working_directory(self) -> None:
-        """Preserve the working directory when loading reference helpers."""
-        previous = Path.cwd()
-        with tempfile.TemporaryDirectory() as directory:
-            try:
-                os.chdir(directory)
-                load_module("reference_import_probe", "tools/build_references.py")
-                self.assertEqual(Path.cwd(), Path(directory))
-            finally:
-                os.chdir(previous)
-
-    def test_generated_cmake_preserves_source_path(self) -> None:
-        """Check literal source path quoting with CMake's parser."""
-        # Exercise CMake's parser itself, independently of a reference build.
-        with tempfile.TemporaryDirectory(prefix="vqm cmake ") as directory:
-            source = Path(directory) / "source $literal [[x]].cc"
-            source.touch()
-            script = Path(directory) / "probe.cmake"
-            script.write_text(
-                f"set(source {references.cmake_literal(str(source))})\n"
-                'if(NOT EXISTS "${source}")\n'
-                '  message(FATAL_ERROR "source path was changed: ${source}")\n'
-                "endif()\n"
-            )
-            subprocess.run(
-                ["cmake", "-P", str(script)], check=True, capture_output=True, text=True
-            )
-
-    def test_reference_fingerprint_invalidates_cache_and_failed_build(self) -> None:
-        """Rebuild when reference inputs change and clear failed build stamps."""
-        directory = self.enterContext(tempfile.TemporaryDirectory())
-        calls = []
-        current = {"revision": "first", "compiler": "A"}
-        with mock.patch.object(references, "FINGERPRINT_DIR", directory), \
-             mock.patch.object(references, "reference_fingerprint",
-                               side_effect=lambda _: dict(current)):
-
-            def build(jobs: int, force: bool) -> None:
-                calls.append((jobs, force))
-
-            references.build_fingerprinted("vship-vulkan", 2, False, build)
-            references.build_fingerprinted("vship-vulkan", 2, False, build)
-            current["revision"] = "second"
-            references.build_fingerprinted("vship-vulkan", 2, False, build)
-            current["compiler"] = "B"
-            references.build_fingerprinted("vship-vulkan", 2, False, build)
-            references.build_fingerprinted("vship-vulkan", 2, True, build)
-            self.assertEqual(
-                calls, [(2, True), (2, False), (2, True), (2, True), (2, True)]
-            )
-            with self.assertRaisesRegex(RuntimeError, "failed"):
-                references.build_fingerprinted(
-                    "vship-vulkan", 2, False, lambda *_:
-                    (_ for _ in ()).throw(RuntimeError("failed"))
-                )
-            self.assertFalse((Path(directory) / "vship-vulkan.json").exists())
-            references.build_fingerprinted("vship-vulkan", 2, False, build)
-            self.assertEqual(calls[-1], (2, True))
-
-    @staticmethod
-    def make_git_repo(path: Path) -> None:
-        """Create a temporary Git checkout with tracked and ignored files.
-
-        :param path: Directory for the temporary Git repository.
-        :raises subprocess.CalledProcessError: If the temporary checkout cannot be initialized.
-        """
-        subprocess.run(["git", "init", "-q", str(path)], check=True)
-        subprocess.run(
-            ["git", "-C", str(path), "config", "user.name", "Test"], check=True
-        )
-        subprocess.run(
-            ["git", "-C",
-             str(path), "config", "user.email", "test@example.com"], check=True
-        )
-        (path / "tracked").write_text("original\n")
-        (path / ".gitignore").write_text("ignored\n")
-        subprocess.run(["git", "-C", str(path), "add", "."], check=True)
-        subprocess.run(["git", "-C", str(path), "commit", "-qm", "initial"], check=True)
-
-    def test_reference_detects_edits_before_force_or_check(self) -> None:
-        """Reject dirty reference checkouts in both verification modes."""
-        directory = self.enterContext(tempfile.TemporaryDirectory())
-        repo = Path(directory)
-        self.make_git_repo(repo)
-        self.assertFalse(fetch_references.checkout_dirty(str(repo)))
-        pin = subprocess.check_output(
-            ["git", "-C", str(repo), "rev-parse", "HEAD"], text=True
-        ).strip()
-        status, mismatches = set(), []
-        with contextlib.redirect_stdout(io.StringIO()):
-            fetch_references.check_state(
-                "reference", "unused", str(repo), pin, True, False, status, mismatches
-            )
-        self.assertFalse(status)
-        with contextlib.redirect_stdout(io.StringIO()):
-            fetch_references.check_state(
-                "reference", "unused", str(repo), "different-pin", True, False, status,
-                mismatches
-            )
-        self.assertEqual(status, {"failed"})
-        for name in ("tracked", "untracked", "ignored"):
-            path = repo / name
-            path.write_text("local work\n")
-            self.assertTrue(fetch_references.checkout_dirty(str(repo)), name)
-            status, mismatches = set(), []
-            with contextlib.redirect_stdout(io.StringIO()):
-                fetch_references.check_state(
-                    "reference", "unused", str(repo), "different-pin", False, True,
-                    status, mismatches
-                )
-            self.assertEqual(status, {"failed"})
-            self.assertEqual(mismatches, ["reference"])
-            self.assertEqual(path.read_text(), "local work\n")
-            if name == "tracked":
-                path.write_text("original\n")
-            else:
-                path.unlink()
-
-    def test_force_checks_out_pin_only_when_checkout_is_clean(self) -> None:
-        """Restore the pinned revision only for a clean reference checkout."""
-        with tempfile.TemporaryDirectory() as directory:
-            repo = Path(directory)
-            self.make_git_repo(repo)
-            pin = subprocess.check_output(
-                ["git", "-C", str(repo), "rev-parse", "HEAD"], text=True
-            ).strip()
-            (repo / "tracked").write_text("second commit\n")
-            subprocess.run(
-                ["git", "-C", str(repo), "commit", "-qam", "second"], check=True
-            )
-            subprocess.run(
-                ["git", "-C",
-                 str(repo), "remote", "add", "origin",
-                 str(repo)], check=True
-            )
-            status, mismatches = set(), []
-            with contextlib.redirect_stdout(io.StringIO()), \
-                 contextlib.redirect_stderr(io.StringIO()):
-                fetch_references.check_state(
-                    "reference", "unused", str(repo), pin, False, True, status,
-                    mismatches
-                )
-            self.assertFalse(status)
-            head = subprocess.check_output(
-                ["git", "-C", str(repo), "rev-parse", "HEAD"], text=True
-            ).strip()
-            self.assertEqual(head, pin)
-            self.assertEqual((repo / "tracked").read_text(), "original\n")
-
-    def test_reference_detects_ignored_file_in_submodule(self) -> None:
-        """Detect ignored files in reference submodules."""
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            child, parent = root / "child", root / "parent"
-            child.mkdir()
-            parent.mkdir()
-            self.make_git_repo(child)
-            self.make_git_repo(parent)
-            subprocess.run(
-                [
-                    "git", "-C",
-                    str(parent), "-c", "protocol.file.allow=always", "submodule", "add",
-                    "-q",
-                    str(child), "nested"
-                ], check=True
-            )
-            subprocess.run(
-                ["git", "-C", str(parent), "commit", "-qam", "submodule"], check=True
-            )
-            self.assertFalse(fetch_references.checkout_dirty(str(parent)))
-            (parent / "nested/ignored").write_text("local work\n")
-            self.assertTrue(fetch_references.checkout_dirty(str(parent)))
-
-    def test_direct_reference_build_verifies_sources_before_preflight(self) -> None:
-        """Verify source pins before checking build prerequisites."""
-        calls = []
-        with (mock.patch.object(
-                sys, "argv",
-            ["build_references.py", "--only", "vship-cuda,vship-vulkan"]),
-              mock.patch.object(references, "run", side_effect=calls.append),
-              mock.patch.object(references, "preflight",
-                                side_effect=RuntimeError("stop")),
-              self.assertRaisesRegex(RuntimeError, "stop"),
-              ):
-            references.main()
-        self.assertEqual(
-            calls, [
-                [
-                    sys.executable, "tools/fetch_references.py", "--check", "--only",
-                    "Vship"
-                ]
-            ]
-        )
 
     def test_synthetic_only_does_not_import_numpy(self) -> None:
         """Generate synthetic pairs without importing NumPy."""
@@ -253,32 +62,23 @@ class BenchmarkBootstrapTests(unittest.TestCase):
 
     def test_synthetic_dimensions_are_checked_before_writing(self) -> None:
         """Reject invalid geometries before generating any synthetic pair."""
-        target = Path(self.enterContext(tempfile.TemporaryDirectory())) / "pairs"
+        target = Path(
+            self.enterContext(tempfile.TemporaryDirectory())
+        ) / "pairs"
         for invalid in ("17x20", "20x19", "0x16", "-2x16"):
             with self.subTest(invalid=invalid):
                 result = subprocess.run(
                     [
                         sys.executable, "-S",
-                        str(ROOT / "bench/make_bench_pairs.py"), "--synthetic-only",
-                        "--sizes", f"32x32,{invalid}", "--out-dir",
+                        str(ROOT / "bench/make_bench_pairs.py"
+                            ), "--synthetic-only", "--sizes",
+                        f"32x32,{invalid}", "--out-dir",
                         str(target)
                     ], capture_output=True, text=True, check=False, timeout=10
                 )
                 self.assertNotEqual(result.returncode, 0)
                 self.assertIn("positive and even", result.stderr)
                 self.assertFalse(target.exists())
-
-    def test_fetch_rejects_unknown_reference(self) -> None:
-        """Reject an unknown reference selection before fetching."""
-        result = subprocess.run(
-            [
-                sys.executable,
-                str(ROOT / "tools/fetch_references.py"), "--only", "not-a-reference",
-                "--check"
-            ], capture_output=True, text=True
-        )
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn("known checkout names", result.stderr)
 
     def test_custom_pair_runs_selected_references(self) -> None:
         """Forward custom pairs and the selected reference arms."""
@@ -295,14 +95,16 @@ class BenchmarkBootstrapTests(unittest.TestCase):
                 str(distorted), "--references", "vship-vulkan,vship-cuda",
                 "--iterations", "2", "--rounds", "1"
             ]
-            with mock.patch.object(bootstrap, "ROOT", root), \
-                 mock.patch.object(bootstrap, "run", side_effect=commands.append), \
-                 mock.patch.object(sys, "argv", arguments):
+            with (mock.patch.object(bootstrap, "ROOT", root),
+                  mock.patch.object(bootstrap, "run",
+                                    side_effect=commands.append),
+                  mock.patch.object(sys, "argv", arguments)):
                 self.assertEqual(bootstrap.main(), 0)
             self.assertEqual(commands[0][-1], "Vship")
             self.assertIn("vship-vulkan,vship-cuda", commands[3])
             self.assertIn(
-                "ours-resident,ours-streaming,vship-vulkan,vship-cuda", commands[4]
+                "ours-resident,ours-streaming,vship-vulkan,vship-cuda",
+                commands[4]
             )
             self.assertEqual(
                 (root / ".cache/bench/quick-pairs/custom.txt").read_text(),
@@ -315,17 +117,21 @@ class BenchmarkBootstrapTests(unittest.TestCase):
 
     def test_report_header_has_nine_columns(self) -> None:
         """Keep the benchmark report header aligned with its table columns."""
-        args = SimpleNamespace(pairs_file="pairs.txt", iterations=1, warmup=0, rounds=1)
+        args = SimpleNamespace(
+            pairs_file="pairs.txt", iterations=1, warmup=0, rounds=1
+        )
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "summary.md"
-            inmemory.write_summary(path, args, 1, [])
+            reports.write_summary(path, args, 1, [])
             header = next(
                 line for line in path.read_text().splitlines()
                 if line.startswith("| implementation")
             )
             self.assertEqual(len(header.split("|")) - 2, 9)
 
-    def test_device_matching_uses_vship_enumeration_and_flags_ambiguity(self) -> None:
+    def test_device_matching_uses_vship_enumeration_and_flags_ambiguity(
+        self
+    ) -> None:
         """Match the benchmark device uniquely against Vship's enumeration."""
         ours = {"name": "ours-resident", "driver": "ours"}
         vship = {"name": "vship-cuda", "driver": "vship"}
@@ -335,43 +141,52 @@ class BenchmarkBootstrapTests(unittest.TestCase):
             if command[0] == "ours":
                 return json.dumps({"name": "Target GPU", "uuid": "our-uuid"})
             return json.dumps(
-                [{
-                    "id": 0,
-                    "name": "Other GPU"
-                }, {
-                    "id": 1,
-                    "name": "Target GPU"
-                }]
+                [
+                    {
+                        "id": 0,
+                        "name": "Other GPU"
+                    }, {
+                        "id": 1,
+                        "name": "Target GPU"
+                    }
+                ]
             )
-        with mock.patch.object(inmemory, "command_output", side_effect=probe), \
-             contextlib.redirect_stderr(io.StringIO()):
-            report = inmemory.probe_devices([ours, vship, duplicate_metric])
+
+        with (mock.patch.object(probes, "command_output", side_effect=probe),
+              contextlib.redirect_stderr(io.StringIO())):
+            report = probes.probe_devices([ours, vship, duplicate_metric])
         self.assertEqual(vship["args"], ["--gpu", "1"])
         self.assertEqual(duplicate_metric["args"], ["--gpu", "1"])
         self.assertEqual(report["status"], "matched_by_name_only")
 
-        def ambiguous(command: Sequence[str], cwd: str | Path | None = None) -> str:
+        def ambiguous(
+            command: Sequence[str], cwd: str | Path | None = None
+        ) -> str:
             if command[0] == "ours":
                 return json.dumps({"name": "Target GPU", "uuid": "our-uuid"})
             return json.dumps(
-                [{
-                    "id": 0,
-                    "name": "Target GPU"
-                }, {
-                    "id": 1,
-                    "name": "Target GPU"
-                }]
+                [
+                    {
+                        "id": 0,
+                        "name": "Target GPU"
+                    }, {
+                        "id": 1,
+                        "name": "Target GPU"
+                    }
+                ]
             )
-        with mock.patch.object(inmemory, "command_output", side_effect=ambiguous), \
-             contextlib.redirect_stderr(io.StringIO()):
+
+        with (mock.patch.object(probes, "command_output",
+                                side_effect=ambiguous),
+              contextlib.redirect_stderr(io.StringIO())):
             with self.assertRaisesRegex(SystemExit, "multiple devices"):
-                inmemory.probe_devices(
+                probes.probe_devices(
                     [ours, {
                         "name": "vship-cuda",
                         "driver": "vship"
                     }]
                 )
-            report = inmemory.probe_devices(
+            report = probes.probe_devices(
                 [ours, {
                     "name": "vship-cuda",
                     "driver": "vship"
@@ -401,9 +216,15 @@ class BenchmarkBootstrapTests(unittest.TestCase):
                 if "rev-parse" in command:
                     return "deadbeef"
                 return None
-            with mock.patch.object(inmemory, "REPO_ROOT", str(root)), \
-                 mock.patch.object(inmemory, "command_output", side_effect=output):
-                environment = inmemory.capture_environment(
+
+            with (mock.patch.object(probes, "REPO_ROOT", str(root)),
+                  mock.patch.object(measurements, "REPO_ROOT",
+                                    str(root)), mock.patch.object(inmemory,
+                                                                  "REPO_ROOT",
+                                                                  str(root)),
+                  mock.patch.object(probes, "command_output",
+                                    side_effect=output)):
+                environment = probes.capture_environment(
                     [(str(image), str(image))],
                     [{
                         "name": "ours-resident",
@@ -416,8 +237,12 @@ class BenchmarkBootstrapTests(unittest.TestCase):
                     "dirty": False
                 }
             )
-            self.assertEqual(environment["compiler"]["version"], "compiler version")
-            self.assertEqual(len(environment["inputs"][str(image)]["sha256"]), 64)
+            self.assertEqual(
+                environment["compiler"]["version"], "compiler version"
+            )
+            self.assertEqual(
+                len(environment["inputs"][str(image)]["sha256"]), 64
+            )
             self.assertEqual(
                 len(environment["executables"]["ours-resident"]["sha256"]), 64
             )
@@ -445,7 +270,7 @@ def _write_pair_lists(root: Path) -> tuple[list[Path], list[Path], Path, Path]:
 
 
 def _write_benchmark_driver(root: Path, calls: Path) -> Path:
-    """Write a stand-in driver that records invocation order and emits valid scores.
+    """Write a stand-in driver that logs calls and emits valid scores.
 
     :param root: Isolated temporary benchmark repository.
     :param calls: Log that receives one line per invocation.
@@ -468,9 +293,12 @@ def _write_benchmark_driver(root: Path, calls: Path) -> Path:
         "    out = args[args.index('--csv') + 1]\n"
         "    with open(out, 'w', newline='') as f:\n"
         "        writer = csv.writer(f)\n"
-        "        writer.writerow(['original','distorted','width','height','core_ms','score'])\n"
-        "        pairs_file = pathlib.Path(args[args.index('--pairs-file') + 1])\n"
-        "        for index, pair in enumerate(pairs_file.read_text().splitlines()):\n"
+        "        writer.writerow(['original','distorted','width','height',"
+        "'core_ms','score'])\n"
+        "        pairs_file = pathlib.Path(args[args.index('--pairs-file') + "
+        "1])\n"
+        "        for index, pair in "
+        "enumerate(pairs_file.read_text().splitlines()):\n"
         "            writer.writerow([*pair.split('\\t'),8,8,index + 1,42])\n"
         "    print('checksum 84')\n"
     )
@@ -493,9 +321,12 @@ class BenchmarkFailureTests(unittest.TestCase):
                 "a,b,8,8,1,42\n"
             )
             with mock.patch.object(inmemory.subprocess, "run",
-                                   return_value=SimpleNamespace(returncode=0, stdout="",
+                                   return_value=SimpleNamespace(returncode=0,
+                                                                stdout="",
                                                                 stderr="")):
-                rows, error = inmemory.run_round(entry, "ssimu2", args, 0, directory)
+                rows, error = measurements.run_round(
+                    entry, "ssimu2", args, 0, directory
+                )
             self.assertIsNone(rows)
             self.assertIn("no CSV from driver", error)
             self.assertFalse(stale.exists())
@@ -514,7 +345,9 @@ class BenchmarkFailureTests(unittest.TestCase):
             final = Path(directory, "ssimu2-fake-round0.csv")
             final.write_text("stale")
 
-            def write_csv(command: Sequence[str], **kwargs: object) -> SimpleNamespace:
+            def write_csv(
+                command: Sequence[str], **kwargs: object
+            ) -> SimpleNamespace:
                 path = Path(command[command.index("--csv") + 1])
                 self.assertNotEqual(path, final)
                 self.assertFalse(path.exists())
@@ -524,13 +357,19 @@ class BenchmarkFailureTests(unittest.TestCase):
                 )
                 return SimpleNamespace(returncode=0, stdout="done\n", stderr="")
 
-            with mock.patch.object(inmemory.subprocess, "run", side_effect=write_csv):
-                rows, error = inmemory.run_round(entry, "ssimu2", args, 0, directory)
+            with mock.patch.object(inmemory.subprocess, "run",
+                                   side_effect=write_csv):
+                rows, error = measurements.run_round(
+                    entry, "ssimu2", args, 0, directory
+                )
             self.assertIsNone(error)
             self.assertEqual(rows[0]["score"], 42.0)
             self.assertEqual(rows[0]["core_ms"], 1.5)
             self.assertIn("a,b,8,8,1.5,42", final.read_text())
-            self.assertIn("done", Path(directory, "ssimu2-fake-round0.log").read_text())
+            self.assertIn(
+                "done",
+                Path(directory, "ssimu2-fake-round0.log").read_text()
+            )
             self.assertEqual(len(list(Path(directory).iterdir())), 2)
 
     def test_logged_driver_failure_is_reported(self) -> None:
@@ -538,10 +377,10 @@ class BenchmarkFailureTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             log = Path(directory, "driver.log")
             with mock.patch.object(inmemory.subprocess, "run",
-                                   return_value=SimpleNamespace(returncode=7,
-                                                                stdout="out\n",
-                                                                stderr="bad\n")):
-                result, error = inmemory.run_logged(["driver"], log, 1.0)
+                                   return_value=SimpleNamespace(
+                                       returncode=7, stdout="out\n",
+                                       stderr="bad\n")):
+                result, error = measurements.run_logged(["driver"], log, 1.0)
             self.assertIsNone(result)
             self.assertIn("exit 7", error)
             self.assertIn("out\nbad\n", log.read_text())
@@ -550,11 +389,14 @@ class BenchmarkFailureTests(unittest.TestCase):
         """Report a timed-out throughput driver."""
         args = SimpleNamespace(throughput_seconds=1.0, timeout=0.1)
         with tempfile.TemporaryDirectory() as directory:
-            with mock.patch.object(inmemory.os.path, "isfile", return_value=True), \
-                 mock.patch.object(inmemory, "read_pairs", return_value=[("a", "b")]), \
-                 mock.patch.object(inmemory.subprocess, "run", side_effect=
-                                   subprocess.TimeoutExpired("driver", 0.1)):
-                result = inmemory.run_throughput(
+            with (mock.patch.object(inmemory.os.path, "isfile",
+                                    return_value=True),
+                  mock.patch.object(measurements, "read_pairs", return_value=[
+                      ("a", "b")
+                  ]), mock.patch.object(inmemory.subprocess, "run",
+                                        side_effect=subprocess.TimeoutExpired(
+                                            "driver", 0.1))):
+                result = measurements.run_throughput(
                     {
                         "name": "fake",
                         "driver": "driver"
@@ -563,7 +405,8 @@ class BenchmarkFailureTests(unittest.TestCase):
             self.assertEqual(result, (None, "timeout after 0.1s"))
             self.assertIn(
                 "timeout after 0.1s",
-                Path(directory, "throughput-ssimulacra2-fake-4k-1-0.log").read_text()
+                Path(directory,
+                     "throughput-ssimulacra2-fake-4k-1-0.log").read_text()
             )
 
     def test_stage_failure_removes_private_pair_file(self) -> None:
@@ -576,8 +419,9 @@ class BenchmarkFailureTests(unittest.TestCase):
             self.assertEqual(path.read_text(), "original\tdistorted\n")
             return SimpleNamespace(returncode=42)
 
-        with tempfile.TemporaryDirectory() as directory, \
-             mock.patch.object(bench.subprocess, "run", side_effect=fail):
+        with (tempfile.TemporaryDirectory() as
+              directory, mock.patch.object(bench.subprocess, "run",
+                                           side_effect=fail)):
             output = os.path.join(directory, "out.csv")
             for _ in range(2):
                 self.assertEqual(
@@ -601,7 +445,9 @@ class BenchmarkFailureTests(unittest.TestCase):
             self.assertEqual(error, "stage profiler produced no CSV")
             self.assertFalse(output.exists())
 
-    def test_round_validation_rejects_missing_reordered_and_invalid_rows(self) -> None:
+    def test_round_validation_rejects_missing_reordered_and_invalid_rows(
+        self
+    ) -> None:
         """Reject incomplete, reordered and malformed benchmark results."""
         first = {
             "original": "a",
@@ -613,17 +459,20 @@ class BenchmarkFailureTests(unittest.TestCase):
         }
         second = {**first, "distorted": "c"}
         expected = [("a", "b"), ("a", "c")]
-        self.assertIsNone(inmemory.validate_round([first, second], "ssimu2", expected))
-        self.assertIn(
-            "do not match", inmemory.validate_round([first], "ssimu2", expected)
+        self.assertIsNone(
+            measurements.validate_round([first, second], "ssimu2", expected)
         )
         self.assertIn(
             "do not match",
-            inmemory.validate_round([second, first], "ssimu2", expected)
+            measurements.validate_round([first], "ssimu2", expected)
+        )
+        self.assertIn(
+            "do not match",
+            measurements.validate_round([second, first], "ssimu2", expected)
         )
         self.assertIn(
             "core time",
-            inmemory.validate_round(
+            measurements.validate_round(
                 [{
                     **first, "core_ms": float("nan")
                 }], "ssimu2", None
@@ -631,12 +480,14 @@ class BenchmarkFailureTests(unittest.TestCase):
         )
         self.assertIn(
             "invalid score",
-            inmemory.validate_round([{
-                **first, "score": float("nan")
-            }], "ssimu2", None)
+            measurements.validate_round(
+                [{
+                    **first, "score": float("nan")
+                }], "ssimu2", None
+            )
         )
         self.assertIsNone(
-            inmemory.validate_round(
+            measurements.validate_round(
                 [{
                     **first, "score": float("-inf")
                 }], "ssimu2", None
@@ -644,15 +495,19 @@ class BenchmarkFailureTests(unittest.TestCase):
         )
         self.assertIn(
             "invalid score",
-            inmemory.validate_round([{
-                **first, "score": -1.0
-            }], "butteraugli", None)
+            measurements.validate_round(
+                [{
+                    **first, "score": -1.0
+                }], "butteraugli", None
+            )
         )
         self.assertIn(
             "changed the score",
-            inmemory.validate_repeated_round([{
-                **first, "score": 41.0
-            }], [first])
+            measurements.validate_repeated_round(
+                [{
+                    **first, "score": 41.0
+                }], [first]
+            )
         )
 
     def test_duplicate_pairs_keep_their_weight(self) -> None:
@@ -666,13 +521,18 @@ class BenchmarkFailureTests(unittest.TestCase):
             "score": 42.0
         }
         second = {**first, "core_ms": 3.0}
-        row = inmemory.aggregate("ssimu2", "ours", [[first, second]], None)[0]
+        row = reports.aggregate("ssimu2", "ours", [[first, second]], None)[0]
         self.assertEqual(row["pairs"], 2)
         self.assertEqual(row["median_ms"], 2.0)
 
     def test_nonfinite_score_is_encoded_as_valid_json(self) -> None:
         """Serialize infinite scores as strings in valid JSON."""
-        payload = inmemory.json_safe({"score": float("-inf"), "values": [float("inf")]})
+        payload = reports.json_safe(
+            {
+                "score": float("-inf"),
+                "values": [float("inf")]
+            }
+        )
         self.assertEqual(
             json.loads(json.dumps(payload, allow_nan=False)), {
                 "score": "-inf",
@@ -680,44 +540,50 @@ class BenchmarkFailureTests(unittest.TestCase):
             }
         )
 
-    def test_throughput_line_checks_size_metric_threads_and_finite_times(self) -> None:
-        """Reject throughput results with inconsistent counts, timings or metadata."""
+    def test_throughput_line_checks_size_metric_threads_and_finite_times(
+        self
+    ) -> None:
+        """Reject throughput with inconsistent counts, timing or metadata."""
         line = (
             "throughput metric=ssimulacra2 size=8x8 threads=2 calls=10 "
             "seconds=1 fps=10 busy=1 checksum=20"
         )
-        fields, error = inmemory.parse_throughput_line(line, "8x8", "ssimu2", 2)
+        fields, error = measurements.parse_throughput_line(
+            line, "8x8", "ssimu2", 2
+        )
         self.assertIsNone(error)
         self.assertEqual(fields["calls"], 10)
         self.assertIn(
             "metric",
-            inmemory.parse_throughput_line(line, "8x8", "butteraugli", 2)[1]
+            measurements.parse_throughput_line(line, "8x8", "butteraugli", 2)[1]
         )
         self.assertIn(
             "threads",
-            inmemory.parse_throughput_line(line, "8x8", "ssimu2", 3)[1]
+            measurements.parse_throughput_line(line, "8x8", "ssimu2", 3)[1]
         )
         self.assertIn(
             "non-finite",
-            inmemory.parse_throughput_line(
+            measurements.parse_throughput_line(
                 line.replace("fps=10", "fps=nan"), "8x8", "ssimu2", 2
             )[1]
         )
         self.assertIn(
             "non-positive",
-            inmemory.parse_throughput_line(
+            measurements.parse_throughput_line(
                 line.replace("calls=10", "calls=0"), "8x8", "ssimu2", 2
             )[1]
         )
         self.assertIn(
             "calls / seconds",
-            inmemory.parse_throughput_line(
+            measurements.parse_throughput_line(
                 line.replace("fps=10", "fps=12"), "8x8", "ssimu2", 2
             )[1]
         )
         self.assertIn(
             "expected one",
-            inmemory.parse_throughput_line(line + "\n" + line, "8x8", "ssimu2", 2)[1]
+            measurements.parse_throughput_line(
+                line + "\n" + line, "8x8", "ssimu2", 2
+            )[1]
         )
 
     def test_throughput_checksum_accounts_for_print_rounding_and_accumulation(
@@ -726,7 +592,7 @@ class BenchmarkFailureTests(unittest.TestCase):
         """Allow checksum rounding while rejecting a changed per-call score."""
         first = {"calls": 1, "checksum": 1.234568}
         self.assertIsNone(
-            inmemory.validate_throughput_checksum(
+            measurements.validate_throughput_checksum(
                 {
                     "calls": 3,
                     "checksum": 3.703703
@@ -735,7 +601,7 @@ class BenchmarkFailureTests(unittest.TestCase):
         )
         self.assertIn(
             "checksum / calls changed",
-            inmemory.validate_throughput_checksum(
+            measurements.validate_throughput_checksum(
                 {
                     "calls": 3,
                     "checksum": 3.703730
@@ -743,7 +609,7 @@ class BenchmarkFailureTests(unittest.TestCase):
             )
         )
         self.assertIsNone(
-            inmemory.validate_throughput_checksum(
+            measurements.validate_throughput_checksum(
                 {
                     "calls": 1000000,
                     "checksum": 42000000.0001
@@ -754,7 +620,7 @@ class BenchmarkFailureTests(unittest.TestCase):
             )
         )
         self.assertIsNone(
-            inmemory.validate_throughput_checksum(
+            measurements.validate_throughput_checksum(
                 {
                     "calls": 10,
                     "checksum": float("-inf")
@@ -766,7 +632,7 @@ class BenchmarkFailureTests(unittest.TestCase):
         )
         self.assertIn(
             "checksum / calls changed",
-            inmemory.validate_throughput_checksum(
+            measurements.validate_throughput_checksum(
                 {
                     "calls": 10,
                     "checksum": float("-inf")
@@ -780,9 +646,10 @@ class BenchmarkFailureTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             pairs = Path(directory, "synthetic-8x8.txt")
             pairs.write_text("a\tb\nc\td\n")
-            with mock.patch.object(inmemory, "throughput_pairs_path", return_value=str(pairs)), \
-                 mock.patch.object(inmemory, "run_logged") as run:
-                _, error = inmemory.run_throughput(
+            with (mock.patch.object(measurements, "throughput_pairs_path",
+                                    return_value=str(pairs)),
+                  mock.patch.object(measurements, "run_logged") as run):
+                _, error = measurements.run_throughput(
                     {
                         "name": "fake",
                         "driver": "driver"
@@ -825,9 +692,10 @@ class BenchmarkFailureTests(unittest.TestCase):
                 "seconds": 1.0
             }, None
 
-        with mock.patch.object(inmemory.os.path, "isfile", return_value=True), \
-             mock.patch.object(inmemory, "run_throughput", side_effect=run), \
-             contextlib.redirect_stdout(io.StringIO()):
+        with (mock.patch.object(inmemory.os.path, "isfile", return_value=True),
+              mock.patch.object(measurements, "run_throughput",
+                                side_effect=run),
+              contextlib.redirect_stdout(io.StringIO())):
             failures = []
             rows, _ = inmemory.run_throughput_mode(
                 args, ["ssimu2"], manifest, None, failures
@@ -844,10 +712,18 @@ class BenchmarkFailureTests(unittest.TestCase):
             rows[0]["sizes"]["8x8"]["measurements_one"][0]["checksum"], 20.0
         )
 
-    def test_throughput_rejects_checksum_changes_in_workers_and_repeats(self) -> None:
+    def test_throughput_rejects_checksum_changes_in_workers_and_repeats(
+        self
+    ) -> None:
         """Reject checksum changes across worker counts and repeated runs."""
         args = SimpleNamespace(sizes="8x8", throughput_runs=2, out_dir="out")
-        manifest = {"ssimu2": [{"name": "a", "driver": "a", "throughput_threads": 3}]}
+        manifest = {
+            "ssimu2": [{
+                "name": "a",
+                "driver": "a",
+                "throughput_threads": 3
+            }]
+        }
         for changed in ((3, 0), (1, 1)):
             with self.subTest(changed=changed):
                 self._check_throughput_checksum_change(changed, args, manifest)
@@ -864,8 +740,8 @@ class BenchmarkFailureTests(unittest.TestCase):
         """
 
         def run(
-            _entry: dict[str, str | int], _metric: str, _size: str, threads: int,
-            _args: SimpleNamespace, repeat: int, _out: str
+            _entry: dict[str, str | int], _metric: str, _size: str,
+            threads: int, _args: SimpleNamespace, repeat: int, _out: str
         ) -> tuple[dict[str, int | float], None]:
             score = 43.0 if (threads, repeat) == changed else 42.0
             return {
@@ -876,18 +752,23 @@ class BenchmarkFailureTests(unittest.TestCase):
                 "checksum": score * 10 * threads
             }, None
 
-        with mock.patch.object(inmemory.os.path, "isfile", return_value=True), \
-             mock.patch.object(inmemory, "run_throughput", side_effect=run), \
-             contextlib.redirect_stdout(io.StringIO()), \
-             contextlib.redirect_stderr(io.StringIO()):
+        with (mock.patch.object(inmemory.os.path, "isfile", return_value=True),
+              mock.patch.object(measurements, "run_throughput",
+                                side_effect=run),
+              contextlib.redirect_stdout(io.StringIO()),
+              contextlib.redirect_stderr(io.StringIO())):
             failures = []
             rows, _ = inmemory.run_throughput_mode(
                 args, ["ssimu2"], manifest, None, failures
             )
         self.assertEqual(failures, ["ssimu2/a/8x8"])
-        self.assertIn("checksum / calls changed", rows[0]["sizes"]["8x8"]["error"])
+        self.assertIn(
+            "checksum / calls changed", rows[0]["sizes"]["8x8"]["error"]
+        )
 
-    def test_cli_benchmark_alternates_arms_and_detects_warmup_failures(self) -> None:
+    def test_cli_benchmark_alternates_arms_and_detects_warmup_failures(
+        self
+    ) -> None:
         """Alternate CLI arms and fail on bad warmup results."""
         calls = []
         clock = itertools.count()
@@ -896,24 +777,26 @@ class BenchmarkFailureTests(unittest.TestCase):
             calls.append(command[0])
             return SimpleNamespace(returncode=0, stdout="42\n")
 
-        with mock.patch.object(bench, "run_score", return_value=(42.0, None)), \
-             mock.patch.object(bench.subprocess, "run", side_effect=run), \
-             mock.patch.object(bench.time, "perf_counter", side_effect=lambda: next(clock)):
+        with (mock.patch.object(bench, "run_score", return_value=(42.0, None)),
+              mock.patch.object(bench.subprocess, "run", side_effect=run),
+              mock.patch.object(bench.time, "perf_counter",
+                                side_effect=lambda: next(clock))):
             rows = bench.measure_pair(
                 ("a", "b"), [("x", "x", []), ("y", "y", [])], 2, 1
             )
         self.assertEqual(calls, ["x", "y", "x", "y", "x", "y"])
         self.assertTrue(all("error" not in row for row in rows))
 
-        with mock.patch.object(bench, "run_score", return_value=(42.0, None)), \
-             mock.patch.object(bench.subprocess, "run", return_value=
-                               SimpleNamespace(returncode=7)):
+        with (mock.patch.object(bench, "run_score", return_value=(42.0, None)),
+              mock.patch.object(bench.subprocess, "run",
+                                return_value=SimpleNamespace(returncode=7))):
             rows = bench.measure_pair(("a", "b"), [("x", "x", [])], 1, 1)
         self.assertEqual(rows[0]["error"], "exit 7")
 
-        with mock.patch.object(bench, "run_score", return_value=(42.0, None)), \
-             mock.patch.object(bench.subprocess, "run", return_value=
-                               SimpleNamespace(returncode=0, stdout="43\n")):
+        with (mock.patch.object(bench, "run_score", return_value=(42.0, None)),
+              mock.patch.object(bench.subprocess, "run",
+                                return_value=SimpleNamespace(returncode=0,
+                                                             stdout="43\n"))):
             rows = bench.measure_pair(("a", "b"), [("x", "x", [])], 1, 1)
         self.assertIn("score changed", rows[0]["error"])
 
@@ -922,11 +805,13 @@ class BenchmarkFailureTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory, "pairs.txt")
             path.write_text("# comment\na\tb\na\tb\n")
-            self.assertEqual(inmemory.read_pairs(path), [("a", "b"), ("a", "b")])
+            self.assertEqual(
+                measurements.read_pairs(path), [("a", "b"), ("a", "b")]
+            )
             self.assertEqual(bench.read_pairs(path), [("a", "b"), ("a", "b")])
             path.write_text("broken\n")
             with self.assertRaisesRegex(ValueError, "expected original"):
-                inmemory.read_pairs(path)
+                measurements.read_pairs(path)
             with self.assertRaisesRegex(ValueError, "expected original"):
                 bench.read_pairs(path)
 
@@ -934,9 +819,8 @@ class BenchmarkFailureTests(unittest.TestCase):
         """Exercise the in-memory workflow with executable stand-ins."""
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            latency_images, throughput_images, pairs, synthetic = _write_pair_lists(
-                root
-            )
+            (latency_images, throughput_images, pairs,
+             synthetic) = _write_pair_lists(root)
             calls = root / "calls.txt"
             driver = _write_benchmark_driver(root, calls)
             manifest = {
@@ -955,19 +839,25 @@ class BenchmarkFailureTests(unittest.TestCase):
                 ]
             }
             args = SimpleNamespace(
-                pairs_file=str(pairs), metric="ssimu2", mode="all", only=None, rounds=2,
-                iterations=2, warmup=1, throughput_seconds=1.0, throughput_runs=2,
-                sizes="8x8", out_dir=str(root / "report"), timeout=3.0, list=False
+                pairs_file=str(pairs), metric="ssimu2", mode="all", only=None,
+                rounds=2, iterations=2, warmup=1, throughput_seconds=1.0,
+                throughput_runs=2, sizes="8x8", out_dir=str(root / "report"),
+                timeout=3.0, list=False
             )
-            with mock.patch.object(inmemory, "REPO_ROOT", str(root)), \
-                 mock.patch.object(inmemory, "parse_args", return_value=args), \
-                 mock.patch.object(inmemory, "load_manifest", return_value=manifest), \
-                 contextlib.redirect_stdout(io.StringIO()):
+            with (mock.patch.object(probes, "REPO_ROOT", str(root)),
+                  mock.patch.object(measurements, "REPO_ROOT",
+                                    str(root)), mock.patch.object(inmemory,
+                                                                  "REPO_ROOT",
+                                                                  str(root)),
+                  mock.patch.object(inmemory, "parse_args", return_value=args),
+                  mock.patch.object(inmemory, "load_manifest",
+                                    return_value=manifest),
+                  contextlib.redirect_stdout(io.StringIO())):
                 self.assertEqual(inmemory.main(), 0)
             self.assertEqual(
                 calls.read_text().splitlines(), [
-                    "a:latency", "b:latency", "a:latency", "b:latency", "a:1", "a:3",
-                    "b:1", "b:2", "a:1", "a:3", "b:1", "b:2"
+                    "a:latency", "b:latency", "a:latency", "b:latency", "a:1",
+                    "a:3", "b:1", "b:2", "a:1", "a:3", "b:1", "b:2"
                 ]
             )
             latency = json.loads((root / "report/summary.json").read_text())
@@ -980,7 +870,8 @@ class BenchmarkFailureTests(unittest.TestCase):
             self.assertEqual(latency["protocol"]["rounds"], 2)
             self.assertEqual(len(latency["protocol"]["pairs_file_sha256"]), 64)
             self.assertEqual(
-                set(latency["environment"]["inputs"]), set(map(str, latency_images))
+                set(latency["environment"]["inputs"]),
+                set(map(str, latency_images))
             )
             throughput = self._check_throughput_report(
                 root, throughput_images, synthetic
@@ -990,14 +881,22 @@ class BenchmarkFailureTests(unittest.TestCase):
             args.mode = "throughput"
             args.pairs_file = str(root / "missing-latency.txt")
             args.out_dir = str(root / "throughput-only")
-            with mock.patch.object(inmemory, "REPO_ROOT", str(root)), \
-                 mock.patch.object(inmemory, "parse_args", return_value=args), \
-                 mock.patch.object(inmemory, "load_manifest", return_value=manifest), \
-                 contextlib.redirect_stdout(io.StringIO()):
+            with (mock.patch.object(probes, "REPO_ROOT", str(root)),
+                  mock.patch.object(measurements, "REPO_ROOT",
+                                    str(root)), mock.patch.object(inmemory,
+                                                                  "REPO_ROOT",
+                                                                  str(root)),
+                  mock.patch.object(inmemory, "parse_args", return_value=args),
+                  mock.patch.object(inmemory, "load_manifest",
+                                    return_value=manifest),
+                  contextlib.redirect_stdout(io.StringIO())):
                 self.assertEqual(inmemory.main(), 0)
-            only = json.loads((root / "throughput-only/throughput.json").read_text())
+            only = json.loads(
+                (root / "throughput-only/throughput.json").read_text()
+            )
             self.assertEqual(
-                only["environment"]["inputs"], throughput["environment"]["inputs"]
+                only["environment"]["inputs"],
+                throughput["environment"]["inputs"]
             )
             self.assertEqual(
                 only["environment"]["pair_lists"],
@@ -1016,16 +915,17 @@ class BenchmarkFailureTests(unittest.TestCase):
         """
         throughput = json.loads((root / "report/throughput.json").read_text())
         self.assertEqual(
-            set(throughput["environment"]["inputs"]), set(map(str, throughput_images))
+            set(throughput["environment"]["inputs"]),
+            set(map(str, throughput_images))
         )
         self.assertNotIn("pairs_file_sha256", throughput["protocol"])
         selected = throughput["environment"]["pair_lists"]["8x8"]
         self.assertEqual(selected["path"], str(synthetic))
-        self.assertEqual(selected["sha256"], inmemory.file_sha256(synthetic))
+        self.assertEqual(selected["sha256"], probes.file_sha256(synthetic))
         for image in throughput_images:
             self.assertEqual(
                 throughput["environment"]["inputs"][str(image)]["sha256"],
-                inmemory.file_sha256(image)
+                probes.file_sha256(image)
             )
         self.assertEqual(
             len(throughput["rows"][0]["sizes"]["8x8"]["measurements_one"]), 2
@@ -1046,7 +946,8 @@ class BenchmarkFailureTests(unittest.TestCase):
                 path.write_text(
                     "#!/usr/bin/env python3\n"
                     "from pathlib import Path\n"
-                    f"with Path({str(calls)!r}).open('a') as f: f.write({name!r} + '\\n')\n"
+                    f"with Path({str(calls)!r}).open('a') as f: "
+                    f"f.write({name!r} + '\\n')\n"
                     "print('42')\n"
                 )
                 path.chmod(0o755)
@@ -1064,34 +965,18 @@ class BenchmarkFailureTests(unittest.TestCase):
                 ], cwd=root, capture_output=True, text=True, timeout=10
             )
             self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertEqual(calls.read_text().splitlines(), ["ours", "peer"] * 8)
+            self.assertEqual(
+                calls.read_text().splitlines(), ["ours", "peer"] * 8
+            )
             self.assertEqual(len(out.read_text().splitlines()), 5)
             self.assertIn("jobs: 1", result.stdout)
-
-    def test_fssimu2_build_uses_reference_copy(self) -> None:
-        """Build fssimu2 using a copied reference checkout."""
-        calls = []
-        with mock.patch.object(references, "require_reference"), \
-             mock.patch.object(references, "need_build", return_value=True), \
-             mock.patch.object(references, "zig_version", return_value=(0, 16)), \
-             mock.patch.object(references, "copy_reference") as copy, \
-             mock.patch.object(references.os, "makedirs"), \
-             mock.patch.object(references, "run", side_effect=
-                               lambda argv, cwd=None: calls.append((argv, cwd))):
-            references.build_fssimu2(1, False)
-        copy.assert_called_once_with(".reference/fssimu2", "build/fssimu2-src")
-        self.assertEqual(calls[0][1], "build/fssimu2-src")
-        self.assertIn(
-            "-I" + os.path.join(references.REPO_ROOT, "build/fssimu2-src/src/include"),
-            calls[1][0]
-        )
 
 
 class FetchCid22ArgumentTests(unittest.TestCase):
     """Exercise argument handling for the CID22 downloader."""
 
     def test_help_and_unknown_arguments_do_not_start_work(self) -> None:
-        """Return help and unknown-option errors without touching the archive."""
+        """Return help and option errors without touching the archive."""
         for option, status in (("--help", 0), ("--unknown", 2)):
             with self.subTest(option=option):
                 self._check_fetch_argument(option, status)
@@ -1105,8 +990,8 @@ class FetchCid22ArgumentTests(unittest.TestCase):
         with (mock.patch.object(sys, "argv", ["fetch_cid22.py", option]),
               mock.patch.object(fetch_cid22, "ensure_archive") as
               ensure_archive, contextlib.redirect_stdout(io.StringIO()),
-              contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit)
-              as exit_code,
+              contextlib.redirect_stderr(io.StringIO()),
+              self.assertRaises(SystemExit) as exit_code,
               ):
             fetch_cid22.main()
         self.assertEqual(exit_code.exception.code, status)

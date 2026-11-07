@@ -4,7 +4,8 @@
 """Dev-only generator for the CLI fixtures and the golden scores.
 
 Writes synthetic PNG pairs to build/fixtures and, when --ref-binary is given,
-prints the reference scores to copy into tests/metrics/ssimulacra2/pipeline_test.cc. Not run by
+prints the reference scores to copy into
+tests/metrics/ssimulacra2/pipeline_test.cc. Not run by
 ctest: the C++ test builds the same pixel data in memory.
 """
 
@@ -179,8 +180,8 @@ def main() -> None:
 
     if args.ref_binary:
         pairs = [
-            ("gradient.png", "gradient_B.png"), ("gradient.png", "gradient_C.png"),
-            ("alpha_A.png", "alpha_B.png")
+            ("gradient.png", "gradient_B.png"),
+            ("gradient.png", "gradient_C.png"), ("alpha_A.png", "alpha_B.png")
         ]
         for orig, dist in pairs:
             result = subprocess.run(

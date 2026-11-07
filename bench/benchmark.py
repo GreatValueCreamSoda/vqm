@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # Derived from Cloudinary SSIMULACRA 2 (Copyright (c) Jon Sneyers, Cloudinary).
 # BSD-3-Clause; see LICENSE.
-"""Benchmark hosted videos by default; --suite images selects still-image peers."""
+"""Benchmark videos by default; select image peers with --suite images."""
 
 import argparse
 import os
@@ -68,10 +68,13 @@ def _image_parser() -> argparse.ArgumentParser:
         "--size", default="1920x1080", metavar="WxH",
         help="synthetic pair size (default: 1920x1080)"
     )
+    parser.add_argument("--build-dir", type=Path, default=Path("build"))
     parser.add_argument("--rounds", type=positive, default=5)
     parser.add_argument("--iterations", type=positive, default=20)
     parser.add_argument("--warmup", type=int, default=3)
-    parser.add_argument("--jobs", type=positive, default=min(os.cpu_count() or 1, 8))
+    parser.add_argument(
+        "--jobs", type=positive, default=min(os.cpu_count() or 1, 8)
+    )
     parser.add_argument(
         "--out-dir", default=str(ROOT / "artifacts/reports/quick-benchmark")
     )
@@ -82,7 +85,8 @@ def _image_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _references(parser: argparse.ArgumentParser, args: argparse.Namespace) -> list[str]:
+def _references(parser: argparse.ArgumentParser,
+                args: argparse.Namespace) -> list[str]:
     """Check selected reference implementations and repetition settings."""
     references = list(
         dict.fromkeys(
@@ -92,11 +96,15 @@ def _references(parser: argparse.ArgumentParser, args: argparse.Namespace) -> li
     unknown = set(references) - CHECKOUTS.keys()
     if not references or unknown:
         parser.error(
-            "--references must contain known implementations: " + ", ".join(CHECKOUTS)
+            "--references must contain known implementations: " +
+            ", ".join(CHECKOUTS)
         )
     if args.metric == "cvvdp" and references != ["vship-vulkan"]:
-        parser.error("CVVDP currently supports the vship-vulkan comparison arm only")
-    if args.metric == "butteraugli" and ({"cloudinary", "fssimu2"} & set(references)):
+        parser.error(
+            "CVVDP currently supports the vship-vulkan comparison arm only"
+        )
+    if args.metric == "butteraugli" and ({"cloudinary", "fssimu2"}
+                                         & set(references)):
         parser.error("cloudinary and fssimu2 benchmark SSIMULACRA 2 only")
     if args.warmup < 0:
         parser.error("--warmup must be non-negative")
@@ -107,8 +115,11 @@ def _input_pair(parser: argparse.ArgumentParser,
                 args: argparse.Namespace) -> list[Path] | None:
     """Resolve custom inputs or validate the requested synthetic geometry."""
     if not re.fullmatch(r"[1-9]\d*x[1-9]\d*", args.size):
-        parser.error("--size must be a positive WxH geometry, for example 1920x1080")
-    if not args.pair and any(int(dimension) % 2 for dimension in args.size.split("x")):
+        parser.error(
+            "--size must be a positive WxH geometry, for example 1920x1080"
+        )
+    if not args.pair and any(int(dimension) % 2
+                             for dimension in args.size.split("x")):
         parser.error(
             "synthetic --size dimensions must be even (FFmpeg testsrc2 "
             "rounds odd sizes down)"
@@ -123,8 +134,16 @@ def _input_pair(parser: argparse.ArgumentParser,
     return pair
 
 
-def _build_references(references: list[str], jobs: int) -> None:
-    """Fetch pinned sources and build the selected comparison binaries."""
+def _build_references(
+    references: list[str], jobs: int, build_dir: Path
+) -> None:
+    """Fetch pinned sources and build the selected comparison binaries.
+
+    :param references: Known comparison implementation names.
+    :param jobs: Parallel build job limit.
+    :param build_dir: Repository-relative or absolute build directory.
+    :raises subprocess.CalledProcessError: If a setup or build command fails.
+    """
     run(
         [
             sys.executable, "tools/fetch_references.py", "--only",
@@ -132,13 +151,25 @@ def _build_references(references: list[str], jobs: int) -> None:
                              for name in references}))
         ]
     )
-    run(["cmake", "--preset", "release"])
-    run(["cmake", "--build", "build", "--target", "vqm_bench", "--parallel", str(jobs)])
     run(
         [
-            sys.executable, "tools/build_references.py", "--only", ",".join(references),
-            "--jobs",
+            "cmake", "--preset", "release", "-B",
+            str(build_dir), "-DVQM_BUILD_CLI=ON", "-DVQM_BUILD_BENCH=ON"
+        ]
+    )
+    run(
+        [
+            "cmake", "--build",
+            str(build_dir), "--target", "vqm_bench", "--parallel",
             str(jobs)
+        ]
+    )
+    run(
+        [
+            sys.executable, "tools/build_references.py", "--only",
+            ",".join(references), "--jobs",
+            str(jobs), "--build-dir",
+            str(build_dir)
         ]
     )
 
@@ -173,18 +204,19 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(argv)
     references = _references(parser, args)
     pair = _input_pair(parser, args)
-    _build_references(references, args.jobs)
+    _build_references(references, args.jobs, args.build_dir)
     pairs_file = _pairs_file(args.size, pair)
     out_dir = Path(args.out_dir).resolve()
     benchmark = [
-        sys.executable, "bench/run_inmemory.py", "--mode", "latency", "--metric",
-        args.metric, "--pairs-file",
+        sys.executable, "bench/run_inmemory.py", "--mode", "latency",
+        "--metric", args.metric, "--pairs-file",
         str(pairs_file), "--only",
         ",".join(["ours-resident", "ours-streaming", *references]), "--rounds",
         str(args.rounds), "--iterations",
         str(args.iterations), "--warmup",
         str(args.warmup), "--out-dir",
-        str(out_dir)
+        str(out_dir), "--build-dir",
+        str(args.build_dir)
     ]
     if args.allow_unverified_devices:
         benchmark.append("--allow-unverified-devices")

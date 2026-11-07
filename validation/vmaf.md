@@ -92,8 +92,8 @@ for a shorter run, with the same limit on both commands.
 
 ```sh
 python3 tools/fetch_references.py --only cid22
-.venv/bin/python validation/vmaf_cid22.py --jobs 8
-.venv/bin/python validation/vmaf_cid22.py --jobs 8 --vqm-v0 --vqm-v1 \
+.venv/bin/python -m validation.vmaf_cid22 --jobs 8
+.venv/bin/python -m validation.vmaf_cid22 --jobs 8 --vqm-v0 --vqm-v1 \
   --reference-scores artifacts/reports/vmaf-cid22/scores.csv \
   --out-dir artifacts/reports/vmaf-cid22-vqm
 ```

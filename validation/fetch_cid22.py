@@ -19,7 +19,8 @@ import urllib.error
 import urllib.request
 import zipfile
 import zlib
-from pathlib import Path, PurePosixPath
+from pathlib import Path
+from pathlib import PurePosixPath
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 URL = (
@@ -30,7 +31,9 @@ ARCHIVE = REPO_ROOT / "validation/download/CID22_validation_set.zip"
 DATA_ROOT = REPO_ROOT / "validation/data"
 DATASET_NAME = "CID22_validation_set"
 EXPECTED_SIZE = 1467356735
-EXPECTED_SHA256 = "ab358e9b3589002d51f27e9d89475af445fd2edf545ec58312c99da9433d1381"
+EXPECTED_SHA256 = (
+    "ab358e9b3589002d51f27e9d89475af445fd2edf545ec58312c99da9433d1381"
+)
 EXPECTED_ORIGINALS = 49
 EXPECTED_DISTORTED = 4292
 
@@ -56,8 +59,8 @@ def verify_archive(path: Path) -> None:
 
 
 def _download_archive(temporary: Path) -> None:
-    with urllib.request.urlopen(URL,
-                                timeout=60) as response, temporary.open("wb") as out:
+    with urllib.request.urlopen(
+            URL, timeout=60) as response, temporary.open("wb") as out:
         for chunk in iter(lambda: response.read(1 << 20), b""):
             out.write(chunk)
 
@@ -92,7 +95,8 @@ def archive_manifest(archive: zipfile.ZipFile) -> dict[str, zipfile.ZipInfo]:
 
     :param archive: Verified CID22 ZIP archive.
     :returns: Dataset-relative files and their ZIP metadata.
-    :raises ValueError: If an archive member is unsafe or the license is missing.
+    :raises ValueError: If an archive member is unsafe or the license is
+        missing.
     """
     files = {}
     seen = set()
@@ -133,7 +137,9 @@ def verify_file(path: Path, info: zipfile.ZipInfo) -> None:
             crc = zlib.crc32(chunk, crc)
             size += len(chunk)
     if size != info.file_size or crc != info.CRC:
-        raise ValueError(f"CID22 file does not match the verified archive: {path}")
+        raise ValueError(
+            f"CID22 file does not match the verified archive: {path}"
+        )
 
 
 def verify_dataset(dataset: Path, files: dict[str, zipfile.ZipInfo]) -> None:
@@ -141,21 +147,26 @@ def verify_dataset(dataset: Path, files: dict[str, zipfile.ZipInfo]) -> None:
 
     :param dataset: Extracted dataset directory.
     :param files: Verified archive member metadata keyed by relative path.
-    :raises ValueError: If layout, extracted files or annotation coverage differ.
+    :raises ValueError: If layout, extracted files or annotation coverage
+        differ.
     """
     if dataset.is_symlink() or not dataset.is_dir():
-        raise ValueError(f"CID22 dataset is missing or not a directory: {dataset}")
+        raise ValueError(
+            f"CID22 dataset is missing or not a directory: {dataset}"
+        )
     csv_name = f"{DATASET_NAME}.csv"
     originals = {
         p
-        for p in files if p.startswith("original/") and p.lower().endswith(".png")
+        for p in files
+        if p.startswith("original/") and p.lower().endswith(".png")
     }
     distorted = {
         p
         for p in files
         if p.startswith("compressed/") and p.lower().endswith((".png", ".jpg"))
     }
-    if (len(originals) != EXPECTED_ORIGINALS or len(distorted) != EXPECTED_DISTORTED
+    if (len(originals) != EXPECTED_ORIGINALS
+            or len(distorted) != EXPECTED_DISTORTED
             or set(files) != originals | distorted | {csv_name}):
         raise ValueError("CID22 archive has an unexpected dataset layout")
     root = dataset.resolve()
@@ -185,14 +196,14 @@ def _finite_mcos(value: str | None) -> bool:
 def _verify_csv_pairs(
     reader: csv.DictReader, originals: set[str], distorted: set[str]
 ) -> None:
-    if not reader.fieldnames or not {"reference_img", "distorted_img", "MCOS"} <= set(
-            reader.fieldnames):
+    if not reader.fieldnames or not {"reference_img", "distorted_img", "MCOS"
+                                     } <= set(reader.fieldnames):
         raise ValueError("CID22 CSV is missing required columns")
     pairs, identities, seen_distorted = set(), set(), set()
     for row in reader:
         ref, dist = row["reference_img"], row["distorted_img"]
-        if ref not in originals or dist not in originals | distorted or not _finite_mcos(
-                row["MCOS"]) or (ref, dist) in pairs:
+        if (ref not in originals or dist not in originals | distorted
+                or not _finite_mcos(row["MCOS"]) or (ref, dist) in pairs):
             raise ValueError("CID22 CSV contains an invalid or duplicate pair")
         pairs.add((ref, dist))
         if dist == ref:
@@ -206,10 +217,14 @@ def _verify_csv_pairs(
                 "CID22 CSV has an unexpected reference or duplicate distortion"
             )
     if identities != originals or seen_distorted != distorted:
-        raise ValueError("CID22 CSV does not cover every original and distortion")
+        raise ValueError(
+            "CID22 CSV does not cover every original and distortion"
+        )
 
 
-def _publish_license(staged: Path, license_path: Path, info: zipfile.ZipInfo) -> None:
+def _publish_license(
+    staged: Path, license_path: Path, info: zipfile.ZipInfo
+) -> None:
     if os.path.lexists(license_path):
         verify_file(license_path, info)
         return
@@ -232,7 +247,8 @@ def _remove_reservation(dataset: Path, reservation: os.stat_result) -> None:
     # Leave a failed install retryable if the directory is still ours and empty.
     try:
         current = dataset.stat()
-        if (current.st_dev, current.st_ino) == (reservation.st_dev, reservation.st_ino):
+        if (current.st_dev, current.st_ino) == (reservation.st_dev,
+                                                reservation.st_ino):
             dataset.rmdir()
     except OSError:
         pass
@@ -261,7 +277,8 @@ def _ensure_dataset(archive: zipfile.ZipFile, check: bool) -> Path:
         raise ValueError(f"CID22 dataset is missing: {dataset}")
     DATA_ROOT.mkdir(parents=True, exist_ok=True)
     print(f"extracting {ARCHIVE}")
-    with tempfile.TemporaryDirectory(prefix="cid22-extract-", dir=DATA_ROOT) as temp:
+    with tempfile.TemporaryDirectory(prefix="cid22-extract-",
+                                     dir=DATA_ROOT) as temp:
         archive.extractall(temp)
         staged = Path(temp) / DATASET_NAME
         staged_license = Path(temp) / "LICENSE"

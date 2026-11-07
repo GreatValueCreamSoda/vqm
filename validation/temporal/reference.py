@@ -1,4 +1,4 @@
-"""Evaluate prepared clips with pinned independent CPU reference implementations."""
+"""Score prepared clips with pinned independent CPU references."""
 
 from __future__ import annotations
 
@@ -13,9 +13,12 @@ from pathlib import Path
 
 import numpy as np
 
-from .corpus import ROOT, digest, json_digest
+from .corpus import ROOT
+from .corpus import digest
+from .corpus import json_digest
 from .spatial_reference import PINS as SPATIAL_PINS
-from .spatial_reference import spatial_provenance, spatial_score
+from .spatial_reference import spatial_provenance
+from .spatial_reference import spatial_score
 
 PINS = {
     **SPATIAL_PINS, "vmaf-v0": "4611e47a7330cd342498dcc130e1008efbeab6e4",
@@ -24,7 +27,8 @@ PINS = {
 }
 MODELS = {
     "vmaf-v0": ROOT / ".reference/vmaf/model/vmaf_float_v0.6.1.json",
-    "vmaf-v1": ROOT / ".reference/vmaf/model/vmaf_v1.0.16/vmaf_v1.0.16_3d0h.json",
+    "vmaf-v1":
+    ROOT / ".reference/vmaf/model/vmaf_v1.0.16/vmaf_v1.0.16_3d0h.json",
 }
 VMAF = ROOT / "build/vmaf-build/tools/vmaf"
 _CVVDP: dict[str, object] = {}
@@ -70,7 +74,8 @@ def provenance(metric: str) -> dict[str, object]:
     }
     if metric in SPATIAL_PINS:
         return dict(
-            info, dispatcher_sha256=info["runner_sha256"], **spatial_provenance(metric)
+            info, dispatcher_sha256=info["runner_sha256"],
+            **spatial_provenance(metric)
         )
     if metric != "cvvdp":
         info.update(
@@ -134,9 +139,10 @@ def vmaf_score(row: dict[str, object], metric: str,
         str(Path(str(row["original"])).with_suffix(".yuv")), "--distorted",
         str(Path(str(row["distorted"])).with_suffix(".yuv")), "--width",
         str(row["width"]), "--height",
-        str(row["height"]), "--pixel_format", "444", "--bitdepth", "8", "--frame_cnt",
-        str(row["frames"]), "--model", f"path={MODELS[metric]}:name=original", "--json",
-        "--output",
+        str(row["height"]), "--pixel_format", "444", "--bitdepth", "8",
+        "--frame_cnt",
+        str(row["frames"]), "--model", f"path={MODELS[metric]}:name=original",
+        "--json", "--output",
         str(target), "--threads", "1", "--quiet"
     ]
     result = subprocess.run(
@@ -164,9 +170,13 @@ def cvvdp_score(row: dict[str, object]) -> dict[str, object]:
     """
     torch, metric = cvvdp_runtime()
     shape = (int(row["frames"]), 3, int(row["height"]), int(row["width"]))
-    original = np.fromfile(str(row["original"]) + ".rgb", dtype="<f4").reshape(shape)
-    distorted = np.fromfile(str(row["distorted"]) + ".rgb", dtype="<f4").reshape(shape)
-    numerator, denominator = (int(value) for value in str(row["fps"]).split(":"))
+    original = np.fromfile(str(row["original"]) + ".rgb",
+                           dtype="<f4").reshape(shape)
+    distorted = np.fromfile(str(row["distorted"]) + ".rgb",
+                            dtype="<f4").reshape(shape)
+    numerator, denominator = (
+        int(value) for value in str(row["fps"]).split(":")
+    )
     with torch.inference_mode():
         score, stats = metric.predict(
             torch.from_numpy(distorted.transpose(1, 0, 2, 3)[None]),
@@ -182,22 +192,30 @@ def cvvdp_score(row: dict[str, object]) -> dict[str, object]:
 
 
 def score_reference(
-    row: dict[str, object], metric: str, cache: Path, identity: dict[str, object]
+    row: dict[str, object], metric: str, cache: Path, identity: dict[str,
+                                                                     object]
 ) -> dict[str, object]:
-    """Cache a reference result only under complete input and runtime fingerprints.
+    """Cache results under complete input and runtime fingerprints.
 
     :param row: Prepared clip pair with representation hashes.
     :param metric: Temporal metric/model name.
     :param cache: Disposable reference-result cache.
     :param identity: Pinned executable/assets/runtime fingerprint.
     :returns: Original score and complete numerical evidence.
-    :raises ValueError: If an original produces a nonfinite or incomplete result.
+    :raises ValueError: If an original produces a nonfinite or incomplete
+        result.
     """
     inputs = {
         key: value
         for key, value in row.items() if key not in ("original", "distorted")
     }
-    fingerprint = json_digest({"inputs": inputs, "reference": identity, "protocol": 1})
+    fingerprint = json_digest(
+        {
+            "inputs": inputs,
+            "reference": identity,
+            "protocol": 1
+        }
+    )
     directory = cache / metric / fingerprint
     directory.mkdir(parents=True, exist_ok=True)
     path = directory / "result.json"
@@ -213,8 +231,11 @@ def score_reference(
         return result
     started = time.perf_counter()
     result = _score_uncached(row, metric, directory)
-    if not math.isfinite(float(result["score"])) or result["frames"] != row["frames"]:
-        raise ValueError("original returned a nonfinite or incomplete clip result")
+    if not math.isfinite(float(result["score"])
+                         ) or result["frames"] != row["frames"]:
+        raise ValueError(
+            "original returned a nonfinite or incomplete clip result"
+        )
     result.update(
         {
             "fingerprint": fingerprint,

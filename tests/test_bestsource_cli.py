@@ -10,11 +10,14 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from test_video_cli import _binary, _require_gpu
+from test_video_cli import _binary
+from test_video_cli import _require_gpu
 
 _START = 174
 _COUNT = 24
-_METRICS = ("ssimulacra2", "butteraugli", "vmaf-v0", "vmaf-v1", "cvvdp", "psnr-hvs")
+_METRICS = (
+    "ssimulacra2", "butteraugli", "vmaf-v0", "vmaf-v1", "cvvdp", "psnr-hvs"
+)
 _UNSUPPORTED = (
     "GPU decoding unavailable:", "GPU can't decode this track",
     "BestSource requires Vulkan opaque FD memory and semaphore sharing"
@@ -33,31 +36,40 @@ class BestSourceCliGpu(unittest.TestCase):
             raise unittest.SkipTest("FFmpeg is required to generate fixtures")
         cls.ffmpeg = ffmpeg
         if "libx264" not in cls._ffmpeg("-encoders").split():
-            raise unittest.SkipTest("FFmpeg with libx264 is required for this test")
+            raise unittest.SkipTest(
+                "FFmpeg with libx264 is required for this test"
+            )
 
     @classmethod
     def _ffmpeg(cls, *args: str | Path) -> str:
         result = subprocess.run(
-            [cls.ffmpeg, "-hide_banner", "-nostdin", *(str(arg) for arg in args)],
-            capture_output=True, text=True, timeout=120, check=False
+            [
+                cls.ffmpeg, "-hide_banner", "-nostdin",
+                *(str(arg) for arg in args)
+            ], capture_output=True, text=True, timeout=120, check=False
         )
         if result.returncode:
             raise RuntimeError(result.stderr)
         return result.stdout
 
-    def _fixture(self, path: Path, *, distortion: str = "", frames: int = 216) -> None:
+    def _fixture(
+        self, path: Path, *, distortion: str = "", frames: int = 216
+    ) -> None:
         self._ffmpeg(
-            "-loglevel", "error", "-f", "lavfi", "-i", "testsrc2=size=320x192:rate=30",
-            "-vf", f"format=yuv420p{distortion}", "-frames:v", str(frames), "-c:v",
-            "libx264", "-threads", "2", "-g", "24", "-sc_threshold", "0", "-bf", "3",
-            "-x264-params", "open-gop=1", "-color_range", "tv", "-colorspace",
-            "bt470bg", "-color_trc", "bt709", "-color_primaries", "bt709",
-            "-chroma_sample_location", "left", path
+            "-loglevel", "error", "-f", "lavfi", "-i",
+            "testsrc2=size=320x192:rate=30", "-vf",
+            f"format=yuv420p{distortion}", "-frames:v", str(frames), "-c:v",
+            "libx264", "-threads", "2", "-g", "24", "-sc_threshold", "0", "-bf",
+            "3", "-x264-params", "open-gop=1", "-color_range", "tv",
+            "-colorspace", "bt470bg", "-color_trc", "bt709", "-color_primaries",
+            "bt709", "-chroma_sample_location", "left", path
         )
 
     def _software_decode(self, path: Path, *args: str) -> Path:
         raw = path.with_suffix(".y4m")
-        self._ffmpeg("-loglevel", "error", "-hwaccel", "none", "-i", path, *args, raw)
+        self._ffmpeg(
+            "-loglevel", "error", "-hwaccel", "none", "-i", path, *args, raw
+        )
         return raw
 
     def _run(self, directory: Path, *args:
@@ -72,7 +84,8 @@ class BestSourceCliGpu(unittest.TestCase):
             self.skipTest(result.stderr.strip())
         return result
 
-    def _reports(self, directory: Path, *args: str | Path) -> list[dict[str, object]]:
+    def _reports(self, directory: Path, *args:
+                 str | Path) -> list[dict[str, object]]:
         result = self._run(directory, "--json", *args)
         self.assertEqual(result.returncode, 0, result.stderr)
         return [json.loads(line) for line in result.stdout.splitlines()]
@@ -80,18 +93,21 @@ class BestSourceCliGpu(unittest.TestCase):
     def test_indexed_range_matches_software_decode(self) -> None:
         """Check frame order, both chroma planes and fresh temporal history."""
         directory = Path(self.enterContext(tempfile.TemporaryDirectory()))
-        original, distorted = directory / "original.mp4", directory / "distorted.mp4"
+        original, distorted = (
+            directory / "original.mp4", directory / "distorted.mp4"
+        )
         self._fixture(original)
         self._fixture(distorted, distortion=",gblur=sigma=1.2")
         # This range crosses an open GOP boundary and has a usable seek point
         # after BestSource's 100-frame linear threshold.
         actual = self._reports(
-            directory, "--metric", "all", "--start-frame", str(_START), "--frame-count",
-            str(_COUNT), original, distorted
+            directory, "--metric", "all", "--start-frame", str(_START),
+            "--frame-count", str(_COUNT), original, distorted
         )
         trim = ("-vf", f"trim=start_frame={_START}:end_frame={_START + _COUNT}")
         expected = self._reports(
-            directory, "--metric", "all", self._software_decode(original, *trim),
+            directory, "--metric", "all",
+            self._software_decode(original, *trim),
             self._software_decode(distorted, *trim)
         )
         self.assertEqual(tuple(report["metric"] for report in actual), _METRICS)
@@ -102,9 +118,11 @@ class BestSourceCliGpu(unittest.TestCase):
             self.assertEqual(got["frame_results"], want["frame_results"])
 
     def test_default_command_detects_video_by_content(self) -> None:
-        """Score a whole compressed clip automatically with the default metric."""
+        """Score complete compressed clips with the default metric."""
         directory = Path(self.enterContext(tempfile.TemporaryDirectory()))
-        original, distorted = directory / "original.mp4", directory / "distorted.mp4"
+        original, distorted = (
+            directory / "original.mp4", directory / "distorted.mp4"
+        )
         self._fixture(original, frames=8)
         self._fixture(distorted, frames=8, distortion=",gblur=sigma=1.2")
         renamed = original.rename(original.with_suffix(".data"))
@@ -112,10 +130,12 @@ class BestSourceCliGpu(unittest.TestCase):
         result = self._run(directory, renamed, distorted)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(expected["frames"], 8)
-        self.assertAlmostEqual(float(result.stdout), expected["score"], delta=1e-8)
+        self.assertAlmostEqual(
+            float(result.stdout), expected["score"], delta=1e-8
+        )
 
     def test_mixed_batch_keeps_temporal_history_separate(self) -> None:
-        """Run compressed and Y4M pairs on the same explicitly selected device."""
+        """Score compressed and Y4M pairs on the selected device."""
         directory = Path(self.enterContext(tempfile.TemporaryDirectory()))
         listing = self._run(directory, "--list-devices")
         self.assertEqual(listing.returncode, 0, listing.stderr)
@@ -127,21 +147,27 @@ class BestSourceCliGpu(unittest.TestCase):
         )
         if device is None:
             self.skipTest("no Vulkan GPU listed for hardware decoding")
-        original, distorted = directory / "original.mp4", directory / "distorted.mp4"
+        original, distorted = (
+            directory / "original.mp4", directory / "distorted.mp4"
+        )
         self._fixture(original, frames=8)
         self._fixture(distorted, frames=8, distortion=",gblur=sigma=1.2")
         raw_original = self._software_decode(original)
         raw_distorted = self._software_decode(distorted)
         pairs = directory / "pairs.tsv"
         pairs.write_text(
-            f"encoded\t{original}\t{distorted}\nraw\t{raw_original}\t{raw_distorted}\n",
-            encoding="utf-8"
+            (
+                f"encoded\t{original}\t{distorted}\nraw\t{raw_original}\t"
+                f"{raw_distorted}\n"
+            ), encoding="utf-8"
         )
         encoded, raw = self._reports(
-            directory, "--device", device, "--metric", "vmaf-v0", "--pairs-file", pairs,
-            "--iterations", "2", "--warmup", "1"
+            directory, "--device", device, "--metric", "vmaf-v0",
+            "--pairs-file", pairs, "--iterations", "2", "--warmup", "1"
         )
-        self.assertEqual((encoded["sample_id"], raw["sample_id"]), ("encoded", "raw"))
+        self.assertEqual(
+            (encoded["sample_id"], raw["sample_id"]), ("encoded", "raw")
+        )
         self.assertEqual(encoded["frames"], 8)
         self.assertEqual(encoded["score"], raw["score"])
         self.assertEqual(encoded["frame_results"], raw["frame_results"])

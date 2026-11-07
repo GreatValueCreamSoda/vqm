@@ -13,7 +13,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-SOURCE_DIRS = ("src", "include", "cli", "tests", "bench", "tools")
+SOURCE_DIRS = ("src", "include", "cli", "tests", "bench", "tools", "validation")
 FORMAT_SUFFIXES = {".cc", ".h", ".cu", ".comp", ".glsl"}
 FORMAT_MAJOR = 23
 
@@ -24,15 +24,18 @@ def maintained(path: Path) -> bool:
     :param path: Absolute source path.
     :returns: Whether the path is under a maintained source directory.
     """
-    return any(path.is_relative_to(ROOT / directory) for directory in SOURCE_DIRS)
+    return any(
+        path.is_relative_to(ROOT / directory) for directory in SOURCE_DIRS
+    )
 
 
 def check_format(executable: str) -> None:
-    """Check all maintained C++, headers and shaders with the pinned formatter.
+    """Check maintained C++, headers and shaders with the pinned formatter.
 
     :param executable: clang-format executable name or path.
     :raises ValueError: If the executable has the wrong major version.
-    :raises subprocess.CalledProcessError: If any maintained file is unformatted.
+    :raises subprocess.CalledProcessError: If any maintained file is
+        unformatted.
     """
     version = subprocess.check_output([executable, "--version"], text=True)
     if not re.search(rf"clang-format version {FORMAT_MAJOR}\.", version):
@@ -40,7 +43,8 @@ def check_format(executable: str) -> None:
             f"clang-format {FORMAT_MAJOR} is required; found {version.strip()}"
         )
     sources = sorted(
-        path for directory in SOURCE_DIRS for path in (ROOT / directory).rglob("*")
+        path for directory in SOURCE_DIRS
+        for path in (ROOT / directory).rglob("*")
         if path.suffix in FORMAT_SUFFIXES and path.is_file()
     )
     # Bound the command length on platforms with smaller process limits.
@@ -70,7 +74,8 @@ def compiled_sources(database: Path, include_tests: bool) -> set[Path]:
             path = Path(entry["directory"]) / path
         path = path.resolve()
         is_test = path.is_relative_to(ROOT / "tests")
-        if maintained(path) and path.suffix == ".cc" and (include_tests or not is_test):
+        if maintained(path) and path.suffix == ".cc" and (include_tests
+                                                          or not is_test):
             sources.add(path)
     if not sources:
         raise ValueError(f"no maintained C++ files in {database}")
@@ -101,14 +106,17 @@ def check_lint(
     :param include_tests: Whether to include test and oracle translation units.
     :raises ValueError: If source selection is empty or linting fails.
     """
-    sources = compiled_sources(build_dir / "compile_commands.json", include_tests)
+    sources = compiled_sources(
+        build_dir / "compile_commands.json", include_tests
+    )
 
     def run(path: Path) -> tuple[Path, subprocess.CompletedProcess[str]]:
         result = subprocess.run(
             [
                 executable, "-p",
                 str(build_dir),
-                str(path), "--quiet", "--warnings-as-errors=readability-function-size"
+                str(path), "--quiet",
+                "--warnings-as-errors=readability-function-size"
             ], cwd=ROOT, capture_output=True, text=True,
         )
         return path, result
@@ -160,7 +168,8 @@ def main() -> int:
             check_format(args.format_tool)
         if args.lint or args.lint_only:
             check_lint(
-                args.lint_tool, args.build_dir.resolve(), args.jobs, args.include_tests
+                args.lint_tool, args.build_dir.resolve(), args.jobs,
+                args.include_tests
             )
     except (OSError, ValueError, subprocess.CalledProcessError) as error:
         parser.exit(1, f"quality check failed: {error}\n")

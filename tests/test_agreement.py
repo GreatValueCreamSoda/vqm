@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Copyright (c) 2026 VQM contributors. BSD-3-Clause; see LICENSE.
-"""Exercise ranking qualification with harmless remappings and known failures."""
+"""Test ranking with harmless remappings and known failures."""
 
 import csv
 import hashlib
@@ -12,7 +12,9 @@ import unittest
 from collections.abc import Callable
 from pathlib import Path
 
-from validation.agreement import evaluate_agreement, load_report, report_from_rows
+from validation.agreement import evaluate_agreement
+from validation.agreement import load_report
+from validation.agreement import report_from_rows
 
 
 def _digest(text: str) -> str:
@@ -72,7 +74,7 @@ def _evaluate(
 
 
 class AgreementInvarianceTests(unittest.TestCase):
-    """Accept common monotonic recalibrations while recording numerical drift."""
+    """Accept common monotonic recalibrations and record numerical drift."""
 
     def test_offset_passes_ranking_and_fails_old_numerical_gate(self) -> None:
         """The requested uniform three-point shift preserves every decision."""
@@ -86,7 +88,8 @@ class AgreementInvarianceTests(unittest.TestCase):
     def test_positive_scales_and_nonlinear_maps_preserve_rank(self) -> None:
         """Exact output distinctions survive even a very small score scale."""
         transforms = (
-            lambda value: value * 1e-12, lambda value: value * 5, lambda value: value**3
+            lambda value: value * 1e-12, lambda value: value * 5,
+            lambda value: value**3
         )
         for transform in transforms:
             with self.subTest(transform=transform):
@@ -126,13 +129,16 @@ class AgreementInvarianceTests(unittest.TestCase):
 class AgreementFailureTests(unittest.TestCase):
     """Expose local failures that can disappear in aggregate correlations."""
 
-    def test_catastrophic_source_cannot_hide_in_global_correlation(self) -> None:
-        """The per-source cap catches one inverted source among 200 originals."""
+    def test_catastrophic_source_cannot_hide_in_global_correlation(
+        self
+    ) -> None:
+        """Catch one inverted source among 200 with per-source caps."""
         rows = _rows(200)
         candidate = [
             {
                 **row, "score": 10 - row["score"]
-            } if row["source_id"] == "source-0000" else dict(row) for row in rows
+            } if row["source_id"] == "source-0000" else dict(row)
+            for row in rows
         ]
         result = evaluate_agreement(
             _report(rows, original=True), _report(candidate), _policy()
@@ -143,7 +149,7 @@ class AgreementFailureTests(unittest.TestCase):
         self.assertEqual(result["ranking"]["status"], "fail")
 
     def test_required_stratum_has_its_own_correlation_gate(self) -> None:
-        """A rare broken input path cannot borrow the dominant path's agreement."""
+        """Reject rare broken paths despite agreement on dominant paths."""
         rows = [
             {
                 **row, "stratum":
@@ -180,7 +186,7 @@ class AgreementFailureTests(unittest.TestCase):
         self.assertEqual(result["ranking"]["status"], "fail")
 
     def test_frozen_reference_margin_does_not_move_with_candidate(self) -> None:
-        """Changing calibration cannot change which original pairs are eligible."""
+        """Preserve eligible original pairs across calibration changes."""
         first = _evaluate(_rows(), lambda value: value)
         shifted = _evaluate(_rows(), lambda value: value * .0001 + 100)
         key = "standard"
@@ -192,13 +198,14 @@ class AgreementFailureTests(unittest.TestCase):
 
 
 class AgreementSchemaTests(unittest.TestCase):
-    """Reject incomplete evidence and provenance mismatch before qualification."""
+    """Reject incomplete evidence and mismatched provenance."""
 
     def test_mismatched_sample_sets_and_duplicates_are_rejected(self) -> None:
-        """Dropped, renamed or duplicate samples cannot silently shrink the corpus."""
+        """Reject dropped, renamed or duplicate samples."""
         original = _report(_rows(), original=True)
         for samples in (_rows()[:-1], _rows() + [_rows()[0]]):
-            with self.subTest(samples=len(samples)), self.assertRaises(ValueError):
+            with self.subTest(samples=len(samples)
+                              ), self.assertRaises(ValueError):
                 evaluate_agreement(
                     original, {
                         **_report(_rows()), "samples": samples
@@ -208,7 +215,8 @@ class AgreementSchemaTests(unittest.TestCase):
     def test_nonfinite_boolean_and_absent_scores_are_rejected(self) -> None:
         """All compared scores must be present, real and finite."""
         original = _report(_rows(), original=True)
-        for value in (float("nan"), float("inf"), -float("inf"), True, None, 10**1000):
+        for value in (float("nan"), float("inf"), -float("inf"), True, None,
+                      10**1000):
             with self.subTest(score=value), self.assertRaises(ValueError):
                 rows = _rows()
                 rows[0]["score"] = value
@@ -227,7 +235,7 @@ class AgreementSchemaTests(unittest.TestCase):
             )
 
     def test_input_metadata_mismatch_is_rejected(self) -> None:
-        """Matching sample names are insufficient without matching inputs and domains."""
+        """Require matching inputs and domains as well as sample names."""
         replacements = {
             "input_hash": _digest("wrong pixels"),
             "source_id": "other-source",
@@ -245,7 +253,7 @@ class AgreementSchemaTests(unittest.TestCase):
                 )
 
     def test_report_provenance_and_reference_pin_are_enforced(self) -> None:
-        """Different settings, manifests, metrics and original revisions are errors."""
+        """Reject mismatched settings, manifests, metrics and revisions."""
         original = _report(_rows(), original=True)
         for field in ("configuration_hash", "input_manifest_hash", "metric"):
             with self.subTest(field=field), self.assertRaises(ValueError):
@@ -265,10 +273,10 @@ class AgreementSchemaTests(unittest.TestCase):
             )
 
     def test_required_domains_cannot_be_dropped(self) -> None:
-        """Every frozen configuration and required input stratum must be present."""
-        for field, value in (("margins", {"standard": .01, "other":
-                                          .01}), ("required_strata", {"native": {},
-                                                                      "missing": {}})):
+        """Require all frozen configurations and input strata."""
+        for field, value in (("margins", {"standard": .01, "other": .01}),
+                             ("required_strata", {"native": {}, "missing":
+                                                  {}})):
             with self.subTest(field=field), self.assertRaises(ValueError):
                 policy = {**_policy(), field: value}
                 _evaluate(_rows(), lambda score: score, policy)
@@ -276,16 +284,22 @@ class AgreementSchemaTests(unittest.TestCase):
     def test_expected_manifest_and_settings_are_policy_pins(self) -> None:
         """Matching reports cannot bypass frozen input provenance."""
         for field in ("configuration_hash", "input_manifest_hash"):
-            with self.subTest(field=field), self.assertRaisesRegex(ValueError,
-                                                                   "policy pin"):
-                policy = {**_policy(), field: _digest("frozen different inputs")}
+            with self.subTest(field=field
+                              ), self.assertRaisesRegex(ValueError,
+                                                        "policy pin"):
+                policy = {
+                    **_policy(), field: _digest("frozen different inputs")
+                }
                 _evaluate(_rows(), lambda value: value, policy)
 
     def test_global_source_coverage_is_distinct_from_configuration_coverage(
         self
     ) -> None:
-        """A small corpus cannot qualify by satisfying small per-domain minima."""
-        policy = {**_policy(), "min_total_sources": 30, "min_total_samples": 150}
+        """Enforce corpus coverage beyond per-domain minima."""
+        policy = {
+            **_policy(), "min_total_sources": 30,
+            "min_total_samples": 150
+        }
         result = _evaluate(_rows(), lambda value: value, policy)
         self.assertEqual(
             result["ranking"]["configurations"]["standard"]["status"], "pass"
@@ -302,7 +316,7 @@ class AgreementSchemaTests(unittest.TestCase):
                 evaluate_agreement(original, _report(_rows()), _policy())
 
     def test_policy_schema_and_margin_values_are_validated(self) -> None:
-        """Misspellings or invalid thresholds cannot silently select defaults."""
+        """Reject misspelled fields and invalid thresholds."""
         invalid = (
             {
                 "unknown": 1
@@ -323,12 +337,18 @@ class AgreementSchemaTests(unittest.TestCase):
             }
         )
         for replacement in invalid:
-            with self.subTest(replacement=replacement), self.assertRaises(ValueError):
-                _evaluate(_rows(), lambda score: score, {**_policy(), **replacement})
+            with self.subTest(replacement=replacement
+                              ), self.assertRaises(ValueError):
+                _evaluate(
+                    _rows(), lambda score: score, {
+                        **_policy(),
+                        **replacement
+                    }
+                )
 
 
 class AgreementSubjectiveTests(unittest.TestCase):
-    """Keep paired subjective noninferiority separate from original agreement."""
+    """Keep subjective noninferiority separate from original agreement."""
 
     def _subjective_policy(self) -> dict[str, object]:
         policy = _policy()
@@ -338,15 +358,19 @@ class AgreementSubjectiveTests(unittest.TestCase):
     def test_offset_has_identical_subjective_agreement(self) -> None:
         """A paired bootstrap preserves the zero delta under an offset."""
         rows = [{**row, "mos": row["score"]} for row in _rows(30)]
-        first = _evaluate(rows, lambda value: value + 3, self._subjective_policy())
-        second = _evaluate(rows, lambda value: value + 3, self._subjective_policy())
+        first = _evaluate(
+            rows, lambda value: value + 3, self._subjective_policy()
+        )
+        second = _evaluate(
+            rows, lambda value: value + 3, self._subjective_policy()
+        )
         self.assertEqual(first["subjective"], second["subjective"])
         result = first["subjective"]["configurations"]["standard"]
         self.assertEqual(result["status"], "pass")
         self.assertEqual(result["lower_one_sided_95"], 0)
 
     def test_lower_is_better_direction_is_applied(self) -> None:
-        """Distance metrics are oriented consistently with higher-is-better MOS."""
+        """Orient distance metrics consistently with higher MOS."""
         rows = [
             {
                 **row, "mos": row["score"],
@@ -362,26 +386,36 @@ class AgreementSubjectiveTests(unittest.TestCase):
     def test_subjective_regression_fails(self) -> None:
         """A large paired loss cannot be accepted as nonsignificant change."""
         rows = [{**row, "mos": row["score"]} for row in _rows(30)]
-        result = _evaluate(rows, lambda value: -value, self._subjective_policy())
+        result = _evaluate(
+            rows, lambda value: -value, self._subjective_policy()
+        )
         self.assertEqual(result["subjective"]["status"], "fail")
 
     def test_too_few_sources_or_missing_mos_is_inconclusive(self) -> None:
-        """Frame or derivative counts cannot replace independent source coverage."""
-        variants = ([{**row, "mos": row["score"]} for row in _rows()], _rows(30))
+        """Require source coverage beyond frame or derivative counts."""
+        variants = (
+            [{
+                **row, "mos": row["score"]
+            } for row in _rows()], _rows(30)
+        )
         for rows in variants:
             with self.subTest(samples=len(rows)):
-                result = _evaluate(rows, lambda value: value, self._subjective_policy())
+                result = _evaluate(
+                    rows, lambda value: value, self._subjective_policy()
+                )
                 self.assertEqual(result["subjective"]["status"], "inconclusive")
                 self.assertEqual(result["proposed_status"], "inconclusive")
 
     def test_undefined_resamples_are_not_silently_discarded(self) -> None:
-        """Whole-source resampling exposes uncertainty hidden by one unique source."""
+        """Expose single-source uncertainty through source resampling."""
         rows = [
             {
                 **row, "mos": float(row["source_id"] == "source-0029")
             } for row in _rows(30)
         ]
-        result = _evaluate(rows, lambda value: value + 3, self._subjective_policy())
+        result = _evaluate(
+            rows, lambda value: value + 3, self._subjective_policy()
+        )
         subjective = result["subjective"]["configurations"]["standard"]
         self.assertGreater(subjective["undefined_resamples"], 0)
         self.assertEqual(subjective["status"], "inconclusive")
@@ -389,7 +423,7 @@ class AgreementSubjectiveTests(unittest.TestCase):
 
 
 class AgreementCommandTests(unittest.TestCase):
-    """Exercise canonical JSON/CSV loading and direct/package command execution."""
+    """Test JSON/CSV loading and direct/package command execution."""
 
     def test_canonical_csv_round_trip(self) -> None:
         """CSV reports retain exact sample identity and constant provenance."""
@@ -409,16 +443,21 @@ class AgreementCommandTests(unittest.TestCase):
             self.assertEqual(load_report(path), report)
 
     def test_cli_reports_old_and_new_gates(self) -> None:
-        """Shadow qualification keeps raw parity failure visible beside rank success."""
+        """Show raw parity failures beside successful shadow rankings."""
         with tempfile.TemporaryDirectory() as directory:
             paths = {
                 name: Path(directory) / f"{name}.json"
                 for name in ("original", "candidate", "policy", "result")
             }
             original = _report(_rows(), original=True)
-            candidate = _report([{**row, "score": row["score"] + 3} for row in _rows()])
-            for name, value in (("original", original), ("candidate", candidate),
-                                ("policy", _policy())):
+            candidate = _report(
+                [{
+                    **row, "score": row["score"] + 3
+                } for row in _rows()]
+            )
+            for name, value in (("original", original),
+                                ("candidate", candidate), ("policy",
+                                                           _policy())):
                 paths[name].write_text(json.dumps(value), encoding="utf-8")
             command = [
                 sys.executable, "-m", "validation.agreement",
@@ -428,8 +467,8 @@ class AgreementCommandTests(unittest.TestCase):
                 str(paths["result"])
             ]
             result = subprocess.run(
-                command + ["--require", "ranking"], capture_output=True, text=True,
-                check=False
+                command + ["--require", "ranking"], capture_output=True,
+                text=True, check=False
             )
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn("reference ranking agreement: PASS", result.stdout)
@@ -444,7 +483,8 @@ class AgreementCommandTests(unittest.TestCase):
             )
             self.assertEqual(strict.returncode, 1, strict.stderr)
             self.assertEqual(
-                json.loads(paths["result"].read_text())["proposed_status"], "pass"
+                json.loads(paths["result"].read_text())["proposed_status"],
+                "pass"
             )
 
 

@@ -132,6 +132,24 @@ Formatting always covers tests as well as production code.
 `--lint-only` runs the production nesting check without the formatter, for local
 environments that provision those tools separately.
 
-Use Ruff for Python linting and YAPF for formatting. Check the files you edited
-with `uvx ruff check path/to/file.py` and `uvx yapf --diff path/to/file.py`.
-Apply formatting with `uvx yapf -i path/to/file.py`, then repeat both checks.
+Use Ruff for Python linting and YAPF for formatting. The repository's
+[`ruff.toml`](ruff.toml) and [`.style.yapf`](.style.yapf) carry the project settings;
+both tools discover them automatically. They use 80 columns, four-space
+indentation, double quotes, type annotations, and PEP 257 docstrings. Write
+docstring fields in Sphinx/reStructuredText style (`:param name:`, `:returns:`,
+and `:raises ExceptionType:` as applicable). Functions are limited to complexity
+7, 30 statements, and two nested control-flow blocks. YAPF packs arguments
+that fit on a continuation line, including calls with trailing commas.
+Ruff enforces the 80-column limit. Wrap comments, docstrings, and string literals
+explicitly when YAPF cannot split them automatically.
+
+Check all maintained Python scripts from the repository root:
+
+```sh
+uvx ruff check .
+uvx yapf --diff --recursive bench tools validation tests
+```
+
+For scoped changes, use `uvx ruff check path/to/file.py` and
+`uvx yapf --diff path/to/file.py`. Apply formatting with
+`uvx yapf -i path/to/file.py`, then repeat both checks.

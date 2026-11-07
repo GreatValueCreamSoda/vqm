@@ -38,7 +38,8 @@ class ProfileScriptTests(unittest.TestCase):
         build = root / "custom build"
         bin_dir.mkdir()
         build.mkdir()
-        for name in ("basename", "find", "mkdir", "mktemp", "rm", "sed", "sort"):
+        for name in ("basename", "find", "mkdir", "mktemp", "rm", "sed",
+                     "sort"):
             (bin_dir / name).symlink_to(shutil.which(name))
         self.make_command(build, "vqm_bench", 'printf "STAGES %s\\n" "$*"')
         return bin_dir, build
@@ -63,7 +64,8 @@ class ProfileScriptTests(unittest.TestCase):
             [
                 "/bin/bash",
                 str(ROOT / "bench/profile.sh"), "--build-dir",
-                str(build), "--tool", tool, "--iterations", "7", *pair_options, *extra
+                str(build), "--tool", tool, "--iterations", "7", *pair_options,
+                *extra
             ], cwd=root, env={
                 **os.environ, "PATH": str(bin_dir)
             }, capture_output=True, text=True, check=True
@@ -78,7 +80,8 @@ class ProfileScriptTests(unittest.TestCase):
             result = self.run_profile(root, bin_dir, build, "auto")
             self.assertIn("built-in stage timing", result.stdout)
             self.assertIn(
-                "STAGES --iterations 7 --pair original.png distorted.png", result.stdout
+                "STAGES --iterations 7 --pair original.png distorted.png",
+                result.stdout
             )
             self.assertFalse((root / "artifacts").exists())
             self.assertFalse((build / "bench").exists())
@@ -106,8 +109,10 @@ class ProfileScriptTests(unittest.TestCase):
         complete = self.run_profile(root, bin_dir, build, "stages", pair=None)
         self.assertIn(f"--pair {original} {distorted}", complete.stdout)
 
-    def test_profiler_outputs_have_independent_default_and_override(self) -> None:
-        """Put profiler output in the requested or documented default directory."""
+    def test_profiler_outputs_have_independent_default_and_override(
+        self
+    ) -> None:
+        """Use requested or documented default profiler directories."""
         fake_perf = r"""printf "PERF %s\n" "$*"
 if [ "$1" = record ]; then
   shift
@@ -162,7 +167,8 @@ done"""
             result = self.run_profile(root, bin_dir, build, tool, *extra)
             self.assertTrue((root / output / filename).is_file())
             self.assertIn(
-                "--iterations 7 --pair original.png distorted.png", result.stdout
+                "--iterations 7 --pair original.png distorted.png",
+                result.stdout
             )
             self.assertIn(str(build / "vqm_bench"), result.stdout)
             report = (
@@ -196,14 +202,14 @@ done"""
         self.assertEqual(
             result.stdout.splitlines(), [
                 "ssimu2 resident", "ssimu2 streaming", "ssimu2 half-planes",
-                "ssimu2 workers", "butteraugli resident", "butteraugli streaming",
-                "butteraugli workers"
+                "ssimu2 workers", "butteraugli resident",
+                "butteraugli streaming", "butteraugli workers"
             ]
         )
         result = subprocess.run(
             [
-                "/bin/bash", script, "--metric", "butteraugli", "--mode", "workers",
-                "--list"
+                "/bin/bash", script, "--metric", "butteraugli", "--mode",
+                "workers", "--list"
             ], cwd=ROOT, capture_output=True, text=True, check=True
         )
         self.assertEqual(result.stdout.strip(), "butteraugli workers")
@@ -213,7 +219,8 @@ done"""
         result = subprocess.run(
             [
                 "/bin/bash",
-                str(ROOT / "bench/profile_nsys.sh"), "--iterations", "0", "--list"
+                str(ROOT / "bench/profile_nsys.sh"), "--iterations", "0",
+                "--list"
             ], cwd=ROOT, capture_output=True, text=True
         )
         self.assertNotEqual(result.returncode, 0)

@@ -19,8 +19,10 @@ from unittest import mock
 import numpy as np
 
 from validation.agreement import evaluate_agreement
-from validation.temporal import corpus, reference, spatial_inputs
+from validation.temporal import corpus
+from validation.temporal import reference
 from validation.temporal import run as workflow
+from validation.temporal import spatial_inputs
 from validation.temporal.fetch import Source
 
 METRICS = ("ssimulacra2", "butteraugli", "vmaf-v0", "vmaf-v1", "cvvdp")
@@ -84,7 +86,8 @@ def _values(rows: list[dict[str, object]],
     ]
 
 
-def _cli_values(rows: list[dict[str, object]], metric: str) -> list[dict[str, object]]:
+def _cli_values(rows: list[dict[str, object]],
+                metric: str) -> list[dict[str, object]]:
     """Build complete per-metric CLI evidence for routing subprocess mocks.
 
     :param rows: Expected complete-clip identities and frame counts.
@@ -108,7 +111,7 @@ def _cli_values(rows: list[dict[str, object]], metric: str) -> list[dict[str, ob
 
 def _mislabelled_values(rows: list[dict[str, object]],
                         label: str | None) -> list[dict[str, object]]:
-    """Corrupt only metric identity in otherwise complete SSIMULACRA 2 output.
+    """Corrupt only metric identity in complete SSIMULACRA 2 output.
 
     :param rows: Expected clip identities and frame counts.
     :param label: Incorrect metric name, or None to omit the field.
@@ -125,7 +128,8 @@ def _mislabelled_values(rows: list[dict[str, object]],
 def _locked_revisions() -> dict[str, str]:
     fields = [
         line.split()
-        for line in (workflow.ROOT / "tools/references.lock").read_text().splitlines()
+        for line in (workflow.ROOT /
+                     "tools/references.lock").read_text().splitlines()
     ]
     return {
         row[0]: row[2]
@@ -170,27 +174,31 @@ def _media(root: Path) -> tuple[Source, dict[str, object]]:
 
 
 class AllMetricRoutingTests(unittest.TestCase):
-    """Require all metric defaults, independent pins and the normal CLI batch path."""
+    """Require all defaults, independent pins and the CLI batch path."""
 
     def test_default_and_explicit_metric_selection_cover_all_five(self) -> None:
-        """Adding spatial metrics cannot leave them outside ordinary validation."""
+        """Include added spatial metrics in ordinary validation."""
         with mock.patch.object(sys, "argv", ["temporal.run"]):
             default = workflow.arguments()
         self.assertEqual(set(default.metrics.split(",")), set(METRICS))
         self.assertIsNone(default.gate_mode)
-        with mock.patch.object(sys, "argv",
-                               ["temporal.run", "--metrics", ",".join(METRICS)]):
+        with mock.patch.object(
+                sys, "argv", ["temporal.run", "--metrics", ",".join(METRICS)]):
             selected = workflow.arguments()
         self.assertEqual(selected.metrics.split(","), list(METRICS))
 
     def test_unknown_metric_cannot_select_an_unpinned_reference(self) -> None:
-        """Unsupported names fail before fetching media or scoring any candidate."""
-        with mock.patch.object(sys, "argv", ["temporal.run", "--metrics", "ssimulacra2,unknown"]), \
-                redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+        """Reject unsupported names before fetching or scoring inputs."""
+        with (mock.patch.object(
+                sys, "argv",
+            ["temporal.run", "--metrics", "ssimulacra2,unknown"]),
+              redirect_stderr(io.StringIO()), self.assertRaises(SystemExit)):
             workflow.arguments()
 
-    def test_every_metric_reference_revision_matches_the_repository_lock(self) -> None:
-        """Cloudinary, libjxl, libvmaf and original CVVDP retain independent pins."""
+    def test_every_metric_reference_revision_matches_the_repository_lock(
+        self
+    ) -> None:
+        """Retain independent Cloudinary, libjxl, libvmaf and CVVDP pins."""
         locked = _locked_revisions()
         for metric in METRICS:
             with self.subTest(metric=metric):
@@ -202,38 +210,43 @@ class AllMetricRoutingTests(unittest.TestCase):
         """A spatial metric must not accidentally verify libvmaf instead."""
         completed = subprocess.CompletedProcess([], 0, stdout="", stderr="")
         for metric in METRICS:
-            with self.subTest(metric=metric
-                              ), mock.patch.object(reference.subprocess, "run",
-                                                   return_value=completed) as called:
+            with self.subTest(metric=metric), mock.patch.object(
+                    reference.subprocess, "run",
+                    return_value=completed) as called:
                 reference.verify_references([metric])
                 command = called.call_args.args[0]
                 self.assertIn("--check", command)
                 self.assertEqual(
-                    command[command.index("--only") + 1], REFERENCE_NAMES[metric]
+                    command[command.index("--only") + 1],
+                    REFERENCE_NAMES[metric]
                 )
 
     def test_reference_verification_failure_is_not_a_skip(self) -> None:
-        """A missing, dirty or wrong-pinned original cannot become qualification."""
+        """Reject missing, dirty or wrongly pinned qualification inputs."""
         completed = subprocess.CompletedProcess(
             [], 1, stdout="wrong revision", stderr="dirty original"
         )
-        with mock.patch.object(reference.subprocess, "run", return_value=completed), \
-                self.assertRaises(RuntimeError):
+        with (mock.patch.object(reference.subprocess, "run",
+                                return_value=completed),
+              self.assertRaises(RuntimeError)):
             reference.verify_references(list(METRICS))
 
-    def test_each_metric_routes_batch_scoring_through_the_public_cli(self) -> None:
-        """Every arm consumes complete clips using JSON and stable sample IDs."""
+    def test_each_metric_routes_batch_scoring_through_the_public_cli(
+        self
+    ) -> None:
+        """Score complete clips using JSON and stable sample IDs."""
         rows = _rows()
         with tempfile.TemporaryDirectory() as directory:
             args = argparse.Namespace(
-                out_dir=Path(directory), binary=Path(directory) / "vqm", iterations=2,
-                warmup=1
+                out_dir=Path(directory), binary=Path(directory) / "vqm",
+                iterations=2, warmup=1
             )
             for metric in METRICS:
                 self._check_cli_route(rows, metric, args)
 
     def _check_cli_route(
-        self, rows: list[dict[str, object]], metric: str, args: argparse.Namespace
+        self, rows: list[dict[str, object]], metric: str,
+        args: argparse.Namespace
     ) -> None:
         output = "".join(
             json.dumps(value) + "\n" for value in _cli_values(rows, metric)
@@ -253,22 +266,27 @@ class AllMetricRoutingTests(unittest.TestCase):
         pair_file = Path(command[command.index("--pairs-file") + 1])
         first = pair_file.read_text().splitlines()[0].split("\t")
         self.assertEqual(
-            first[1:], [rows[0][prefix + "original"], rows[0][prefix + "distorted"]]
+            first[1:],
+            [rows[0][prefix + "original"], rows[0][prefix + "distorted"]]
         )
         if spatial:
-            self.assertEqual(command[command.index("--input-transfer") + 1], "srgb")
+            self.assertEqual(
+                command[command.index("--input-transfer") + 1], "srgb"
+            )
 
     def test_wrong_or_absent_metric_label_cannot_be_rebound_to_requested_metric(
         self
     ) -> None:
-        """Matching sample counts and scores cannot conceal a wrong algorithm arm."""
+        """Reject wrong algorithms despite matching counts and scores."""
         for label in ("butteraugli", None):
-            with self.subTest(label=label), tempfile.TemporaryDirectory() as temporary:
+            with self.subTest(label=label
+                              ), tempfile.TemporaryDirectory() as temporary:
                 rows = _rows()
                 values = _mislabelled_values(rows, label)
                 completed = subprocess.CompletedProcess(
-                    [], 0, stdout="".join(json.dumps(value) + "\n" for value in values),
-                    stderr=""
+                    [], 0, stdout="".join(
+                        json.dumps(value) + "\n" for value in values
+                    ), stderr=""
                 )
                 args = argparse.Namespace(
                     out_dir=Path(temporary), binary=Path(temporary) / "vqm",
@@ -280,16 +298,19 @@ class AllMetricRoutingTests(unittest.TestCase):
         self, rows: list[dict[str, object]], args: argparse.Namespace,
         completed: subprocess.CompletedProcess[str]
     ) -> None:
-        with mock.patch.object(workflow.subprocess, "run", return_value=completed), \
-                self.assertRaisesRegex(RuntimeError, "mismatched|metric"):
+        with (mock.patch.object(workflow.subprocess, "run",
+                                return_value=completed),
+              self.assertRaisesRegex(RuntimeError, "mismatched|metric")):
             workflow.candidate_scores(rows, "ssimulacra2", args)
 
 
 class AllMetricFrozenReportTests(unittest.TestCase):
-    """Check profile/report binding using temporary evidence, never online runtimes."""
+    """Check report bindings offline using temporary evidence."""
 
-    def test_configuration_identity_separates_metrics_and_video_timing(self) -> None:
-        """Only metrics with a frame-rate parameter create distinct timing domains."""
+    def test_configuration_identity_separates_metrics_and_video_timing(
+        self
+    ) -> None:
+        """Vary timing domains only for metrics with frame-rate inputs."""
         row = _rows()[0]
         reports = [
             workflow.report(
@@ -307,21 +328,27 @@ class AllMetricFrozenReportTests(unittest.TestCase):
                 second = workflow.configuration_id(changed, metric)
                 self.assertEqual(first == second, metric != "cvvdp")
 
-    def test_frozen_policies_bind_each_original_and_score_direction(self) -> None:
-        """Lower-is-better Butteraugli remains correctly oriented for future MOS."""
+    def test_frozen_policies_bind_each_original_and_score_direction(
+        self
+    ) -> None:
+        """Orient Butteraugli consistently for future MOS comparisons."""
         rows = _rows()
         for metric in METRICS:
             with self.subTest(metric=metric):
                 original = workflow.report(
-                    rows, _values(rows), metric, "original", reference.PINS[metric]
+                    rows, _values(rows), metric, "original",
+                    reference.PINS[metric]
                 )
                 policy = workflow.frozen_policy(original, "smoke")
-                self.assertEqual(policy["reference_revision"], reference.PINS[metric])
+                self.assertEqual(
+                    policy["reference_revision"], reference.PINS[metric]
+                )
                 self.assertEqual(
                     policy["configuration_hash"], original["configuration_hash"]
                 )
                 self.assertEqual(
-                    policy["input_manifest_hash"], original["input_manifest_hash"]
+                    policy["input_manifest_hash"],
+                    original["input_manifest_hash"]
                 )
                 self.assertEqual(
                     policy.get("direction", "higher"),
@@ -331,37 +358,45 @@ class AllMetricFrozenReportTests(unittest.TestCase):
                 self.assertEqual(result["proposed_status"], "pass")
                 self.assertEqual(result["numerical"]["status"], "pass")
 
-    def test_spatial_inputs_do_not_rebind_existing_temporal_oracles(self) -> None:
-        """Separate spatial byte representations cannot silently change the other arms."""
+    def test_spatial_inputs_do_not_rebind_existing_temporal_oracles(
+        self
+    ) -> None:
+        """Preserve other arms when adding spatial byte representations."""
         rows = _rows()
         changed = copy.deepcopy(rows)
         changed[0]["spatial_distorted_hashes"]["rgb"] = "0" * 64
         for metric in METRICS:
             with self.subTest(metric=metric):
                 first = workflow.report(
-                    rows, _values(rows), metric, "original", reference.PINS[metric]
+                    rows, _values(rows), metric, "original",
+                    reference.PINS[metric]
                 )
                 second = workflow.report(
                     changed, _values(changed), metric, "original",
                     reference.PINS[metric]
                 )
                 self.assertEqual(
-                    first["input_manifest_hash"] == second["input_manifest_hash"],
-                    metric not in ("ssimulacra2", "butteraugli")
+                    first["input_manifest_hash"] ==
+                    second["input_manifest_hash"], metric
+                    not in ("ssimulacra2", "butteraugli")
                 )
 
-    def test_spatial_reports_require_their_own_decoded_input_hashes(self) -> None:
-        """Spatial arms cannot fall back to hashes for differently decoded inputs."""
+    def test_spatial_reports_require_their_own_decoded_input_hashes(
+        self
+    ) -> None:
+        """Reject spatial hashes from differently decoded inputs."""
         rows = _rows()
         del rows[0]["spatial_original_hashes"]
         for metric in ("ssimulacra2", "butteraugli"):
-            with self.subTest(metric=metric), self.assertRaises((KeyError, ValueError)):
+            with self.subTest(metric=metric), self.assertRaises(
+                (KeyError, ValueError)):
                 workflow.report(
-                    rows, _values(rows), metric, "original", reference.PINS[metric]
+                    rows, _values(rows), metric, "original",
+                    reference.PINS[metric]
                 )
 
     def test_checked_profile_selection_is_metric_specific(self) -> None:
-        """Smoke and qualification read the requested metric's own frozen evidence."""
+        """Use each requested metric's own frozen profile evidence."""
         cases = product(("smoke", "qualification"), METRICS)
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -386,12 +421,15 @@ class AllMetricFrozenReportTests(unittest.TestCase):
         self.assertEqual(actual, original)
         self.assertEqual(actual_policy, policy)
 
-    def test_absent_checked_original_never_falls_back_to_candidate(self) -> None:
+    def test_absent_checked_original_never_falls_back_to_candidate(
+        self
+    ) -> None:
         """Every selected metric needs its own independent original report."""
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             args = argparse.Namespace(
-                reference="checked", profile="smoke", oracle_dir=root, out_dir=root
+                reference="checked", profile="smoke", oracle_dir=root,
+                out_dir=root
             )
             for metric in METRICS:
                 self.assertRaises(
@@ -401,36 +439,41 @@ class AllMetricFrozenReportTests(unittest.TestCase):
     def test_checked_original_cannot_redefine_the_pinned_reference_revision(
         self
     ) -> None:
-        """A matching stale oracle and policy cannot replace the repository's original pin."""
+        """Reject stale matching evidence with obsolete original pins."""
         for metric in METRICS:
             with self.subTest(metric=metric
                               ), tempfile.TemporaryDirectory() as temporary:
                 root = Path(temporary)
                 rows = _rows()
                 original = workflow.report(
-                    rows, _values(rows), metric, "original", "wrong-original-revision"
+                    rows, _values(rows), metric, "original",
+                    "wrong-original-revision"
                 )
                 policy = workflow.frozen_policy(original, "smoke")
                 directory = root / "smoke"
                 directory.mkdir()
                 (directory / f"{metric}.json").write_text(json.dumps(original))
-                (directory / f"{metric}-policy.json").write_text(json.dumps(policy))
+                (directory /
+                 f"{metric}-policy.json").write_text(json.dumps(policy))
                 args = argparse.Namespace(
-                    reference="checked", profile="smoke", oracle_dir=root, out_dir=root
+                    reference="checked", profile="smoke", oracle_dir=root,
+                    out_dir=root
                 )
                 self.assertRaisesRegex(
-                    ValueError, "pin|revision", workflow.original_and_policy, rows,
-                    metric, args
+                    ValueError, "pin|revision", workflow.original_and_policy,
+                    rows, metric, args
                 )
 
 
 class SharedSpatialInputTests(unittest.TestCase):
-    """Protect the decoded sample contract for the two added spatial reference arms."""
+    """Protect decoded samples for the two spatial reference arms."""
 
-    def test_encoded_rgb_corners_retain_headroom_after_integer_yuv(self) -> None:
-        """Quantization of extreme colors cannot force different reference clipping."""
-        rgb = np.array(list(product((0.0, 1.0), repeat=3)), dtype=np.float32).T[:,
-                                                                                None, :]
+    def test_encoded_rgb_corners_retain_headroom_after_integer_yuv(
+        self
+    ) -> None:
+        """Preserve reference clipping when quantizing extreme colors."""
+        rgb = np.array(list(product((0.0, 1.0), repeat=3)),
+                       dtype=np.float32).T[:, None, :]
         encoded = spatial_inputs.encode_frame(rgb)
         decoded = corpus.rgb_frame(encoded.reshape(-1), 8, 1)
         self.assertEqual(encoded.dtype, np.uint8)
@@ -439,20 +482,20 @@ class SharedSpatialInputTests(unittest.TestCase):
         np.testing.assert_allclose(decoded, rgb * .96 + .02, atol=.01, rtol=0)
 
     def test_invalid_rgb_is_rejected_before_serialization(self) -> None:
-        """Nonfinite, unnormalized and wrongly shaped pixels are not valid inputs."""
+        """Reject nonfinite, unnormalized or wrongly shaped pixels."""
         cases = (
-            np.full((3, 2, 2),
-                    np.nan), np.full((3, 2, 2),
-                                     -0.1), np.full((3, 2, 2),
-                                                    1.1), np.zeros((2, 2, 2))
+            np.full((3, 2, 2), np.nan), np.full((3, 2, 2), -0.1),
+            np.full((3, 2, 2), 1.1), np.zeros((2, 2, 2))
         )
         for rgb in cases:
             with self.subTest(shape=rgb.shape,
                               value=rgb.flat[0]), self.assertRaises(ValueError):
                 spatial_inputs.encode_frame(rgb)
 
-    def test_spatial_files_preserve_original_media_and_bind_actual_bytes(self) -> None:
-        """New representations stay separate and report their real serialized hashes."""
+    def test_spatial_files_preserve_original_media_and_bind_actual_bytes(
+        self
+    ) -> None:
+        """Separate representations and report their serialized hashes."""
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             source, row = _media(root)
@@ -463,7 +506,8 @@ class SharedSpatialInputTests(unittest.TestCase):
             target = Path(prepared["spatial_distorted"])
             self.assertNotEqual(target, Path(row["distorted"]))
             self.assertEqual(
-                prepared["spatial_distorted_hashes"]["y4m"], corpus.digest(target)
+                prepared["spatial_distorted_hashes"]["y4m"],
+                corpus.digest(target)
             )
             self.assertEqual(
                 prepared["spatial_distorted_hashes"]["rgb"],
@@ -487,7 +531,7 @@ class SharedSpatialInputTests(unittest.TestCase):
                 spatial_inputs.ensure_spatial([row], [source])
 
     def test_invalid_derived_cache_is_rebuilt_from_verified_rgb(self) -> None:
-        """Disposable conversions are regenerated when their content hash changes."""
+        """Regenerate disposable conversions after content changes."""
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             source, row = _media(root)
@@ -496,7 +540,8 @@ class SharedSpatialInputTests(unittest.TestCase):
             target.write_bytes(b"corrupt derived media")
             rebuilt = spatial_inputs.ensure_spatial([row], [source])[0]
             self.assertEqual(
-                first["spatial_distorted_hashes"], rebuilt["spatial_distorted_hashes"]
+                first["spatial_distorted_hashes"],
+                rebuilt["spatial_distorted_hashes"]
             )
             self.assertEqual(
                 corpus.digest(target), first["spatial_distorted_hashes"]["y4m"]

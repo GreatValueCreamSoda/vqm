@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # Copyright (c) 2024 Graphics and Displays group.
 # MIT; see licenses/COLORVIDEOVDP-LICENSE.
-"""Generate ColorVideoVDP base calibration and CSF tables from pinned originals.
+"""Generate ColorVideoVDP calibration and CSF tables from pinned inputs.
 
 Use the reference-only environment described in validation/cvvdp.md.
 The generated tables are checked in; normal builds do not need Python/Torch or
@@ -72,7 +72,9 @@ def emit_array(name: str, values: list[float]) -> list[str]:
     """
     lines = [f"inline constexpr std::array<float, {len(values)}> {name} = {{"]
     for begin in range(0, len(values), 4):
-        lines.append("    " + ", ".join(map(number, values[begin:begin + 4])) + ",")
+        lines.append(
+            "    " + ", ".join(map(number, values[begin:begin + 4])) + ","
+        )
     return [*lines, "};"]
 
 
@@ -151,11 +153,9 @@ def display_lines() -> list[str]:
     import torch
 
     sys.path.insert(0, str(ROOT / ".reference/ColorVideoVDP"))
-    from pycvvdp.display_model import (  # noqa: N811
-        LMS2006_to_DKLd65,
-        XYZ_to_LMS2006,
-        vvdp_display_geometry,
-    )
+    from pycvvdp.display_model import LMS2006_to_DKLd65  # noqa: N811
+    from pycvvdp.display_model import XYZ_to_LMS2006  # noqa: N811
+    from pycvvdp.display_model import vvdp_display_geometry  # noqa: N811
 
     colors = load_asset("color_spaces.json")
     lms = torch.tensor(XYZ_to_LMS2006, dtype=torch.float32)
@@ -168,9 +168,13 @@ def display_lines() -> list[str]:
     ]
     for name, key in (("rgb709", "sRGB"), ("rgb2020", "BT.2020-PQ"),
                       ("p3", "Display P3 Apple")):
-        xyz = torch.tensor([colors[key][axis] for axis in ("RGB2X", "RGB2Y", "RGB2Z")])
+        xyz = torch.tensor(
+            [colors[key][axis] for axis in ("RGB2X", "RGB2Y", "RGB2Z")]
+        )
         lines.extend(emit_array(name + "_to_xyz", xyz.flatten().tolist()))
-        lines.extend(emit_array(name + "_to_dkl", (dkl @ lms @ xyz).flatten().tolist()))
+        lines.extend(
+            emit_array(name + "_to_dkl", (dkl @ lms @ xyz).flatten().tolist())
+        )
     for name in ("standard_4k", "standard_fhd"):
         ppd = vvdp_display_geometry.load(name).get_ppd()
         lines.append(f"inline constexpr double {name}_ppd = {ppd:.17g};")

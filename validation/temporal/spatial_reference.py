@@ -22,7 +22,8 @@ from typing import BinaryIO
 import numpy as np
 from numpy.typing import NDArray
 
-from .corpus import ROOT, digest
+from .corpus import ROOT
+from .corpus import digest
 
 PINS = {
     "ssimulacra2": "81feacf6a5b0bbd7ec11b4a881a4615033ab0b10",
@@ -52,7 +53,10 @@ def _check_metric(metric: str) -> None:
 
 
 def _reference_sources(metric: str) -> list[str]:
-    prefix = ".reference/ssimulacra2/src" if metric == "ssimulacra2" else ".reference/libjxl"
+    prefix = (
+        ".reference/ssimulacra2/src"
+        if metric == "ssimulacra2" else ".reference/libjxl"
+    )
     kernels = (
         [prefix + "/ssimulacra2.cc"] if metric == "ssimulacra2" else [
             prefix + "/lib/jxl/enc_butteraugli_comparator.cc", prefix +
@@ -66,11 +70,12 @@ def _reference_sources(metric: str) -> list[str]:
 
 
 def spatial_provenance(metric: str) -> dict[str, object]:
-    """Fingerprint the invoked original, its adapter and fixed scoring settings.
+    """Fingerprint the original, its adapter and fixed scoring settings.
 
     :param metric: SSIMULACRA 2 or Butteraugli metric name.
     :returns: Source revision, executable/build/source hashes and input policy.
-    :raises RuntimeError: If a required pinned original build is missing or stale.
+    :raises RuntimeError: If a required pinned original build is missing or
+        stale.
     :raises ValueError: If the selected metric is unsupported.
     """
     _check_metric(metric)
@@ -78,7 +83,8 @@ def spatial_provenance(metric: str) -> dict[str, object]:
     binary = ROOT / BINARIES[metric]
     if not stamp.is_file() or not binary.is_file():
         raise RuntimeError(
-            f"build pinned spatial reference with tools/build_references.py --only {STEPS[metric]}"
+            f"build pinned spatial reference with "
+            f"tools/build_references.py --only {STEPS[metric]}"
         )
     fingerprint = json.loads(stamp.read_text())
     if fingerprint.get("revision") != PINS[metric]:
@@ -134,7 +140,8 @@ def write_pfm(path: Path, encoded_rgb: FloatImage) -> str:
     if (values.ndim != 3 or values.shape[0] != 3 or min(values.shape) < 1
             or values.dtype.kind != "f" or values.dtype.itemsize != 4):
         raise ValueError("PFM requires three nonempty planar float32 channels")
-    if not np.isfinite(values).all() or np.any(values < 0) or np.any(values > 1):
+    if not np.isfinite(values).all() or np.any(values < 0) or np.any(values > 1
+                                                                     ):
         raise ValueError("PFM requires finite encoded RGB samples in [0, 1]")
     height, width = values.shape[1:]
     header = f"PF\n{width} {height}\n-1.0\n".encode("ascii")
@@ -162,8 +169,11 @@ def _rgb_input(row: dict[str, object], side: str) -> tuple[Path, str]:
             "spatial reference input paths and hash metadata are incomplete"
         )
     expected = hashes.get("rgb")
-    if not isinstance(expected, str) or re.fullmatch(r"[0-9a-f]{64}", expected) is None:
-        raise ValueError("spatial reference requires a pinned RGB sidecar SHA-256")
+    if not isinstance(expected, str) or re.fullmatch(r"[0-9a-f]{64}",
+                                                     expected) is None:
+        raise ValueError(
+            "spatial reference requires a pinned RGB sidecar SHA-256"
+        )
     return Path(str(row[name]) + ".rgb"), expected
 
 
@@ -189,7 +199,9 @@ def _prepare_frames(row: dict[str, object],
             dist = _read_rgb(test, height, width)
             hashes[0].update(ref.tobytes())
             hashes[1].update(dist.tobytes())
-            first, second = directory / f"{index}-reference.pfm", directory / f"{index}-distorted.pfm"
+            first, second = directory / (
+                f"{index}-reference.pfm"
+            ), directory / (f"{index}-distorted.pfm")
             frames.append(
                 {
                     "index": index,
@@ -200,9 +212,14 @@ def _prepare_frames(row: dict[str, object],
             pair_lines.append(f"{first}\t{second}\n")
         extra = reference.read(1) or test.read(1)
     if extra:
-        raise ValueError("spatial RGB sidecar contains extra frames or trailing bytes")
-    if [checksum.hexdigest() for checksum in hashes] != [original_hash, distorted_hash]:
-        raise ValueError("spatial RGB sidecar does not match its pinned input hash")
+        raise ValueError(
+            "spatial RGB sidecar contains extra frames or trailing bytes"
+        )
+    if [checksum.hexdigest() for checksum in hashes] != [original_hash,
+                                                         distorted_hash]:
+        raise ValueError(
+            "spatial RGB sidecar does not match its pinned input hash"
+        )
     pairs = directory / "pairs.tsv"
     pairs.write_text("".join(pair_lines))
     return pairs, frames
@@ -212,7 +229,8 @@ def _scores(stdout: str, count: int) -> list[float]:
     lines = stdout.splitlines()
     if len(lines) != count:
         raise ValueError(
-            f"original spatial reference returned {len(lines)} scores for {count} frames"
+            f"original spatial reference returned {len(lines)} scores for "
+            f"{count} frames"
         )
     try:
         values = [float(line) for line in lines]
@@ -221,13 +239,15 @@ def _scores(stdout: str, count: int) -> list[float]:
             "original spatial reference returned an invalid frame score"
         ) from error
     if not all(math.isfinite(value) for value in values):
-        raise ValueError("original spatial reference returned a nonfinite frame score")
+        raise ValueError(
+            "original spatial reference returned a nonfinite frame score"
+        )
     return values
 
 
 def spatial_score(row: dict[str, object], metric: str,
                   directory: Path) -> dict[str, object]:
-    """Evaluate every clip frame through a pinned original spatial batch harness.
+    """Score all clip frames with a pinned original spatial batch harness.
 
     Spatial-specific input paths and hashes take precedence over generic rows.
     Temporary PFM files are removed after the original returns; their ordered
@@ -236,7 +256,8 @@ def spatial_score(row: dict[str, object], metric: str,
     :param row: Prepared clip geometry and independently decoded RGB sidecars.
     :param metric: SSIMULACRA 2 or Butteraugli metric name.
     :param directory: Raw reference evidence/cache destination.
-    :returns: Arithmetic-mean clip score, frame scores and exact input provenance.
+    :returns: Arithmetic-mean clip score, frame scores and exact input
+        provenance.
     :raises ValueError: If clip inputs or returned frame scores are invalid.
     :raises RuntimeError: If the original executable fails.
     """
@@ -248,9 +269,10 @@ def spatial_score(row: dict[str, object], metric: str,
         pairs, frame_inputs = _prepare_frames(row, Path(temporary).resolve())
         command = [
             str(ROOT / BINARIES[metric]), "--metric",
-            "ssimu2" if metric == "ssimulacra2" else "butteraugli", "--pairs-file",
-            str(pairs), "--score-only", "--threads", "1", "--decode-threads", "1",
-            "--iterations", "1", "--warmup", "0"
+            "ssimu2" if metric == "ssimulacra2" else "butteraugli",
+            "--pairs-file",
+            str(pairs), "--score-only", "--threads", "1", "--decode-threads",
+            "1", "--iterations", "1", "--warmup", "0"
         ]
         result = subprocess.run(
             command, capture_output=True, text=True, timeout=300, check=False
@@ -259,7 +281,8 @@ def spatial_score(row: dict[str, object], metric: str,
         (directory / "spatial.stderr").write_text(result.stderr)
         if result.returncode:
             raise RuntimeError(
-                result.stderr or result.stdout or "original spatial reference failed"
+                result.stderr or result.stdout
+                or "original spatial reference failed"
             )
         values = _scores(result.stdout, count)
     return {
@@ -267,11 +290,12 @@ def spatial_score(row: dict[str, object], metric: str,
         math.fsum(values) / count,
         "frames":
         count,
-        "frame_results":
-        [{
-            "index": index,
-            "score": value
-        } for index, value in enumerate(values)],
+        "frame_results": [
+            {
+                "index": index,
+                "score": value
+            } for index, value in enumerate(values)
+        ],
         "command":
         command,
         "frame_inputs":
