@@ -70,7 +70,7 @@ public:
         const VulkanSubmitSync& sync, float background = 0.5f
     );
 
-    // Actual single shared allocation, counted once, and optional staging.
+    // Shared arena counted once, optional staging, and private table storage.
     [[nodiscard]] PipelineMemoryUsage GetMemoryUsage() const;
 
 private:

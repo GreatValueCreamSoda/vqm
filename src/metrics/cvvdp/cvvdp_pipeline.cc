@@ -23,6 +23,7 @@
 #include "input.h"
 #include "vqm_views.h"
 #include "vqm_vulkan.h"
+#include "vulkan/vulkan_shared_storage.h"
 
 namespace vqm {
 namespace {
@@ -79,6 +80,11 @@ struct Layout {
         results = Reserve(cursor, 4 * levels + 1);
         status = results + static_cast<std::uint32_t>(4 * levels);
         memory.arena_bytes = Bytes(cursor);
+        memory.persistent_ranges = {{Bytes(tables), Bytes(table_words), true}};
+        if (taps != 0)
+            memory.persistent_ranges.push_back(
+                {Bytes(filters), Bytes(4 * taps), true}
+            );
         staging = PlanStagingSources(
             pixels, config.streaming_inputs, config.gpu_resident_images
         );
@@ -136,11 +142,17 @@ BufferMemoryPlan PlanCvvdpMemory(
 }  // namespace internal
 
 struct CvvdpPipeline::Impl {
-    Impl(CvvdpConfig c, const VulkanDevice* device)
+    Impl(
+        CvvdpConfig c, const VulkanDevice* device,
+        std::shared_ptr<SharedMetricStorage> shared = {}
+    )
         : config(std::move(c)),
-          context(RequireVulkanContext(device)),
+          context(
+              shared ? shared->backing().shared_context()
+                     : RequireVulkanContext(device)
+          ),
           layout(config, *context),
-          runtime(context, RuntimeConfig()) {
+          runtime(context, RuntimeConfig(), std::move(shared)) {
         runtime.CreateArena(layout.memory.arena_bytes);
         runtime.CreateAuxiliaryStorage();
         if (!runtime.arena_visible())
@@ -151,6 +163,7 @@ struct CvvdpPipeline::Impl {
         spatial.emplace(runtime);
         resident.Resize(config.gpu_resident_images);
         InitializeTables();
+        runtime.InitializeSharedState();
         // Raw pipeline ownership starts after table publication and host
         // allocations, so constructor failure cannot leak this handle.
         if (config.temporal) temporal = runtime.CreatePipeline("cvvdp_temporal");
@@ -170,6 +183,7 @@ struct CvvdpPipeline::Impl {
         out.memory_policy = config.memory_policy;
         out.chroma_filter = config.chroma_filter;
         out.push_constant_size = 128;
+        out.persistent_ranges = layout.memory.persistent_ranges;
         out.auxiliary_bytes.assign(
             layout.memory.auxiliary_bytes.begin(),
             layout.memory.auxiliary_bytes.end()
@@ -272,6 +286,26 @@ struct CvvdpPipeline::Impl {
             vkCmdCopyBuffer(
                 runtime.command_buffer(), runtime.arena_buffer(),
                 runtime.auxiliary_buffer(side), 1, &copy
+            );
+        }
+        runtime.Barrier(
+            VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT
+        );
+    }
+    void RestoreFirstVideoFrame() {
+        runtime.Barrier(
+            VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_ACCESS_MEMORY_WRITE_BIT,
+            VK_PIPELINE_STAGE_TRANSFER_BIT,
+            VK_ACCESS_TRANSFER_READ_BIT | VK_ACCESS_TRANSFER_WRITE_BIT
+        );
+        for (std::size_t side = 0; side < 2; ++side) {
+            const VkBufferCopy copy{0, Bytes(layout.current[side]),
+                                    Bytes(3 * layout.pixels)};
+            vkCmdCopyBuffer(
+                runtime.command_buffer(), runtime.auxiliary_buffer(side),
+                runtime.arena_buffer(), 1, &copy
             );
         }
         runtime.Barrier(
@@ -426,6 +460,7 @@ struct CvvdpPipeline::Impl {
                 runtime.BeginCommandBuffer();
                 runtime.BindDescriptorSet();
                 runtime.HostToComputeBarrier();
+                RestoreFirstVideoFrame();
                 RecordSpatial(3);
                 RecordReadback();
                 Finish(token, nullptr);
@@ -482,6 +517,11 @@ CvvdpPipeline::CvvdpPipeline(CvvdpConfig config)
 CvvdpPipeline::CvvdpPipeline(CvvdpConfig config, const VulkanDevice& device)
     : impl_(std::make_unique<Impl>(std::move(config), &device)) {}
 CvvdpPipeline::~CvvdpPipeline() = default;
+CvvdpPipeline::CvvdpPipeline(
+    CvvdpConfig config, const VulkanDevice* device,
+    std::shared_ptr<internal::SharedMetricStorage> scratch
+)
+    : impl_(std::make_unique<Impl>(config, device, std::move(scratch))) {}
 CvvdpPipeline::CvvdpPipeline(CvvdpPipeline&&) noexcept = default;
 CvvdpPipeline& CvvdpPipeline::operator=(CvvdpPipeline&&) noexcept = default;
 UploadedImage CvvdpPipeline::Upload(const Image& image) {

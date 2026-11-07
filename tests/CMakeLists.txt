@@ -17,6 +17,7 @@ add_executable(vqm_test
   core/memory_test.cc
   core/memory_plan_test.cc
   core/shared_metrics_test.cc
+  core/metric_scratch_test.cc
   core/metrics_test.cc
   core/alpha_test.cc
   core/pool_test.cc

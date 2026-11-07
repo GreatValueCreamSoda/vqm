@@ -15,7 +15,8 @@ namespace vqm::internal {
 class PsnrHvsGpuPipeline {
 public:
     explicit PsnrHvsGpuPipeline(
-        const PsnrHvsConfig& config, const VulkanDevice* device = nullptr
+        const PsnrHvsConfig& config, const VulkanDevice* device = nullptr,
+        std::shared_ptr<SharedMetricStorage> scratch = {}
     );
     ~PsnrHvsGpuPipeline();
     PsnrHvsGpuPipeline(const PsnrHvsGpuPipeline&) = delete;

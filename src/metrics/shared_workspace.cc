@@ -7,7 +7,6 @@
 #include <array>
 #include <cmath>
 #include <memory>
-#include <optional>
 #include <stdexcept>
 #include <utility>
 
@@ -15,6 +14,7 @@
 #include "metrics/ssimulacra2/ssimulacra2_internal.h"
 #include "metrics/butteraugli/vulkan.h"
 #include "metrics/shared_workspace_internal.h"
+#include "metrics/metric_scratch.h"
 #include "metrics/ssimulacra2/layout.h"
 #include "metrics/butteraugli/layout.h"
 #include "metrics/ssimulacra2/vulkan.h"
@@ -58,14 +58,19 @@ BufferMemoryPlan PlanSharedMetricMemory(
     const auto configs = MakeSharedConfigs(config);
     const auto a = PlanSsimulacra2Memory(configs.ssimu, context);
     const auto b = PlanButteraugliMemory(configs.butter, context);
-    return {std::max(a.arena_bytes, b.arena_bytes),
-            std::max(a.fallback_staging_bytes, b.fallback_staging_bytes)};
+    BufferMemoryPlan result{
+        std::max(a.arena_bytes, b.arena_bytes),
+        std::max(a.fallback_staging_bytes, b.fallback_staging_bytes)};
+    for (const auto* plan : {&a, &b}) {
+        std::uint64_t bytes = 0;
+        for (const auto& range : plan->persistent_ranges) bytes += range.bytes;
+        if (bytes != 0) result.auxiliary_bytes.push_back(bytes);
+    }
+    return result;
 }
 }  // namespace internal
 
 struct SharedMetricWorkspace::Impl {
-    enum class ActiveMetric { Ssimulacra2, Butteraugli };
-
     explicit Impl(const SharedMetricConfig& config, const VulkanDevice* device) {
         if (config.size.width < kSsimulacra2MinDimension ||
             config.size.height < kSsimulacra2MinDimension)
@@ -98,28 +103,13 @@ struct SharedMetricWorkspace::Impl {
         );
     }
 
-    void Activate(ActiveMetric selected) {
-        ssimu->RequireIdle();
-        butter->RequireIdle();
-        if (active == selected) return;
-        // Both metrics publish overlapping tables. A failed activation must
-        // leave neither metric cached as active, so a retry republishes them.
-        active.reset();
-        if (selected == ActiveMetric::Ssimulacra2)
-            ssimu->ActivateShared();
-        else
-            butter->ActivateShared();
-        active = selected;
-    }
     template <class... Args>
     Ssimulacra2Result ComputeSsimu(Args&&... args) {
-        Activate(ActiveMetric::Ssimulacra2);
         const auto token = ssimu->Submit(std::forward<Args>(args)...);
         return ssimu->Finish(token);
     }
     template <class... Args>
     ButteraugliScore ComputeButter(Args&&... args) {
-        Activate(ActiveMetric::Butteraugli);
         const auto token = butter->Submit(std::forward<Args>(args)...);
         const auto result = butter->Finish(token);
         return {result.score, result.distance_p3};
@@ -129,7 +119,6 @@ struct SharedMetricWorkspace::Impl {
     std::shared_ptr<SharedMetricStorage> storage;
     std::unique_ptr<Ssimulacra2GpuPipeline> ssimu;
     std::unique_ptr<ButteraugliGpuPipeline> butter;
-    std::optional<ActiveMetric> active;
 };
 
 SharedMetricWorkspace::SharedMetricWorkspace(SharedMetricConfig config)
@@ -188,6 +177,9 @@ ButteraugliScore SharedMetricWorkspace::ComputeButteraugli(
     return impl_->ComputeButter(a, b, sync, background);
 }
 PipelineMemoryUsage SharedMetricWorkspace::GetMemoryUsage() const {
-    return impl_->storage->backing().GetMemoryUsage();
+    auto result = impl_->storage->backing().GetMemoryUsage();
+    internal::AppendPrivateMemory(result, impl_->ssimu->GetMemoryUsage());
+    internal::AppendPrivateMemory(result, impl_->butter->GetMemoryUsage());
+    return result;
 }
 }  // namespace vqm

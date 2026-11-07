@@ -103,7 +103,6 @@ class Ssimulacra2GpuPipeline {
 public:
     virtual ~Ssimulacra2GpuPipeline() = default;
     virtual void RequireIdle() const = 0;
-    virtual void ActivateShared() = 0;
     // Uploads one image and returns its resident slot index, or std::nullopt
     // when the resident pool is exhausted. The slot keeps the image's format,
     // so Submit needs nothing else. `capacity` is the facade's

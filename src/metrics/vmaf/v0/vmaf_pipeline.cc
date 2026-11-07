@@ -26,6 +26,7 @@
 #include "vqm_views.h"
 #include "vqm_vulkan.h"
 #include "vulkan/vulkan_runtime.h"
+#include "vulkan/vulkan_shared_storage.h"
 #include "vulkan/vulkan_support.h"
 
 // Copyright 2016-2020 Netflix, Inc.
@@ -333,7 +334,14 @@ struct Layout {
                 "vmaf: image geometry exceeds device storage buffer range"
             );
         }
-        return {arena_bytes, Bytes(readback + ReadbackLayout::kWords)};
+        BufferMemoryPlan result{arena_bytes,
+                                Bytes(readback + ReadbackLayout::kWords)};
+        if (temporal_weighting)
+            result.persistent_ranges.push_back(
+                {Bytes(motion.previous),
+                 Bytes(2 * target_size.width * target_size.height), false}
+            );
+        return result;
     }
 };
 
@@ -355,11 +363,17 @@ BufferMemoryPlan PlanVmafMemory(
 }  // namespace internal
 
 struct VmafPipeline::Impl {
-    explicit Impl(VmafConfig pipeline_config, const VulkanDevice* device)
+    explicit Impl(
+        VmafConfig pipeline_config, const VulkanDevice* device,
+        std::shared_ptr<SharedMetricStorage> shared = {}
+    )
         : config(pipeline_config),
-          context(RequireVulkanContext(device)),
+          context(
+              shared ? shared->backing().shared_context()
+                     : RequireVulkanContext(device)
+          ),
           layout(pipeline_config, context->limits.maxComputeSharedMemorySize),
-          runtime(context, RuntimeConfig()),
+          runtime(context, RuntimeConfig(), std::move(shared)),
           sequence(
               pipeline_config.transform, pipeline_config.clip,
               pipeline_config.model, pipeline_config.temporal_weighting
@@ -379,9 +393,11 @@ struct VmafPipeline::Impl {
             pipeline_config.neg ? 1.0f : 100.0f
         );
         adm.emplace(runtime, pipeline_config.neg);
-        if (pipeline_config.temporal_weighting) motion.emplace(runtime);
         if (layout.resize) resizer.emplace(runtime);
         resident.Resize(pipeline_config.gpu_resident_images);
+        runtime.InitializeSharedState();
+        if (pipeline_config.temporal_weighting)
+            motion.emplace(runtime, runtime.BindPersistentPlanes());
     }
 
     VulkanRuntime::Config RuntimeConfig() {
@@ -396,6 +412,7 @@ struct VmafPipeline::Impl {
         out.base_size = config.size;
         out.streaming = config.streaming_inputs;
         out.memory_policy = config.memory_policy;
+        out.persistent_ranges = layout.MemoryPlan(*context).persistent_ranges;
         out.push_constant_size = std::max(
             {VmafAdm::PushBytes(), VmafSdrConverter::PushBytes(),
              VmafResizer::PushBytes()}
@@ -579,6 +596,11 @@ VmafPipeline::VmafPipeline(VmafConfig config)
 VmafPipeline::VmafPipeline(VmafConfig config, const VulkanDevice& device)
     : impl_(std::make_unique<Impl>(config, &device)) {}
 VmafPipeline::~VmafPipeline() = default;
+VmafPipeline::VmafPipeline(
+    VmafConfig config, const VulkanDevice* device,
+    std::shared_ptr<internal::SharedMetricStorage> scratch
+)
+    : impl_(std::make_unique<Impl>(config, device, std::move(scratch))) {}
 VmafPipeline::VmafPipeline(VmafPipeline&&) noexcept = default;
 VmafPipeline& VmafPipeline::operator=(VmafPipeline&&) noexcept = default;
 PipelineMemoryUsage VmafPipeline::GetMemoryUsage() const {

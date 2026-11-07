@@ -145,11 +145,6 @@ public:
     [[nodiscard]] PipelineMemoryUsage GetMemoryUsage() const override {
         return runtime_->GetMemoryUsage();
     }
-    void ActivateShared() override {
-        runtime_->RequireIdle();
-        reference_valid_ = false;
-        PublishTables(MakeButterTables());
-    }
     [[nodiscard]] std::uint64_t Submit(
         const Image& original, const Image& distorted, float background
     ) override;
@@ -280,6 +275,7 @@ VulkanButteraugliPipeline::VulkanButteraugliPipeline(
         config.memory_policy = memory_policy;
         config.chroma_filter = chroma_filter_;
         config.push_constant_size = sizeof(ButterPush);
+        config.persistent_ranges = plan.persistent_ranges;
         runtime_ =
             std::make_unique<VulkanRuntime>(ctx_, config, std::move(shared));
 
@@ -295,6 +291,7 @@ VulkanButteraugliPipeline::VulkanButteraugliPipeline(
         runtime_->CreateDescriptors(0, layout_.bytes);
         CreatePipelines();
         PublishTables(MakeButterTables());
+        runtime_->InitializeSharedState();
     } catch (...) {
         Destroy();
         throw;

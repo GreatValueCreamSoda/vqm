@@ -12,7 +12,7 @@ namespace vqm::internal {
 
 // Backing storage for a serial metric workspace. Pipeline command objects and
 // descriptors remain private. A pipeline may access the storage only while its
-// owning workspace is executing it; no inputs or metric state persist here.
+// owning workspace is executing it; retained state belongs to each runtime.
 class SharedMetricStorage {
 public:
     SharedMetricStorage(
@@ -21,9 +21,13 @@ public:
     );
     VulkanRuntime& backing() noexcept { return backing_; }
     const VulkanRuntime& backing() const noexcept { return backing_; }
+    void RequireIdle(const VulkanRuntime* caller) const;
+    void Submitted(VulkanRuntime* caller) noexcept;
+    void Release(const VulkanRuntime* caller) noexcept;
 
 private:
     VulkanRuntime backing_;
+    VulkanRuntime* borrower_ = nullptr;
 };
 
 }  // namespace vqm::internal

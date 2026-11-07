@@ -259,6 +259,115 @@ class VideoCliGpu(unittest.TestCase):
                     report["frame_results"], expected["frame_results"]
                 )
 
+    def test_shared_scratch_order_and_hfr_history(self) -> None:
+        """Preserve temporal scores when all metrics run in reverse order."""
+        _require_gpu()
+        root = Path(self.enterContext(tempfile.TemporaryDirectory()))
+        original, distorted = root / "a.y4m", root / "b.y4m"
+        _write_y4m(original, frames=7, width=216, height=80, fps="60:1")
+        _write_y4m(
+            distorted, frames=7, width=216, height=80, fps="60:1",
+            distorted=True
+        )
+        metrics = "psnr-hvs,cvvdp,vmaf-v1,vmaf-v0,butteraugli,ssimulacra2"
+        flags = (
+            "--json", "--vmaf-v1-hfr", "--iterations", "2", "--warmup", "1",
+            original, distorted
+        )
+        forward = _run("--metric", "all", *flags)
+        reverse = _run("--metric", metrics, *flags)
+        self.assertEqual(forward.returncode, 0, forward.stderr)
+        self.assertEqual(reverse.returncode, 0, reverse.stderr)
+        expected = {
+            report["metric"]: report
+            for report in map(json.loads, forward.stdout.splitlines())
+        }
+        actual = list(map(json.loads, reverse.stdout.splitlines()))
+        self.assertEqual(
+            [report["metric"] for report in actual], metrics.split(",")
+        )
+        for report in actual:
+            self.assertEqual(
+                report["score"], expected[report["metric"]]["score"]
+            )
+            self.assertEqual(
+                report["frame_results"],
+                expected[report["metric"]]["frame_results"]
+            )
+
+    def test_shared_spatial_options_and_cache_match_independent(self) -> None:
+        """Preserve spatial options across repetitions and geometry changes."""
+        _require_gpu()
+        root = Path(self.enterContext(tempfile.TemporaryDirectory()))
+        rows = []
+        for index, (width, height) in enumerate(((32, 32), (33, 35))):
+            original, distorted = root / f"a{index}.y4m", root / f"b{index}.y4m"
+            _write_y4m(original, width=width, height=height)
+            _write_y4m(distorted, width=width, height=height, distorted=True)
+            rows.append(f"{original}\t{distorted}\n")
+        pairs = root / "pairs.tsv"
+        pairs.write_text(
+            "".join(
+                f"pair{index}\t{paths}" for index, paths in
+                enumerate((rows[0], rows[0], rows[1], rows[0]))
+            )
+        )
+        metrics = "butteraugli,vmaf-v0,ssimulacra2"
+        flags = (
+            "--json", "--chroma-filter", "bicubic", "--hf-asymmetry", "1.5",
+            "--intensity-target", "100", "--pairs-file", pairs, "--iterations",
+            "2", "--warmup", "1"
+        )
+        combined = _run("--metric", metrics, *flags)
+        self.assertEqual(combined.returncode, 0, combined.stderr)
+        reports = [json.loads(line) for line in combined.stdout.splitlines()]
+        self.assertEqual(len(reports), 12)
+        for metric in metrics.split(","):
+            independent = _run("--metric", metric, *flags)
+            self.assertEqual(independent.returncode, 0, independent.stderr)
+            expected = [
+                json.loads(line) for line in independent.stdout.splitlines()
+            ]
+            actual = [
+                report for report in reports if report["metric"] == metric
+            ]
+            self.assertEqual(
+                [report["score"] for report in actual],
+                [report["score"] for report in expected]
+            )
+            self.assertEqual(
+                [report["frame_results"] for report in actual],
+                [report["frame_results"] for report in expected]
+            )
+
+    def test_shared_spatial_alpha_matches_independent(self) -> None:
+        """Keep both worst-background policies when sharing spatial scratch."""
+        _require_gpu()
+        root = Path(self.enterContext(tempfile.TemporaryDirectory()))
+        opaque, transparent = root / "opaque.png", root / "transparent.png"
+        make_goldens.write_png(opaque, 32, 32, 3, make_goldens.gradient())
+        make_goldens.write_png(
+            transparent, 32, 32, 4, [[96, 128, 160, 64] * 32] * 32
+        )
+        for original, distorted in ((opaque, transparent),
+                                    (transparent, opaque), (transparent,
+                                                            transparent)):
+            flags = (
+                "--json", "--iterations", "2", "--warmup", "1", original,
+                distorted
+            )
+            combined = _run("--metric", "butteraugli,ssimulacra2", *flags)
+            self.assertEqual(combined.returncode, 0, combined.stderr)
+            for line in combined.stdout.splitlines():
+                report = json.loads(line)
+                independent = _run("--metric", report["metric"], *flags)
+                self.assertEqual(independent.returncode, 0, independent.stderr)
+                expected = json.loads(independent.stdout)
+                self.assertEqual(report["score"], expected["score"])
+                self.assertEqual(
+                    report["frame_results"], expected["frame_results"]
+                )
+
     def test_vmaf_pools_the_final_distorted_frame(self) -> None:
         """Let the last frame change the pool without changing the first."""
         _require_gpu()

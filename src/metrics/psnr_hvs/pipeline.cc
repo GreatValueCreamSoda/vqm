@@ -11,9 +11,14 @@
 namespace vqm {
 
 struct PsnrHvsPipeline::Impl {
-    explicit Impl(const PsnrHvsConfig& config, const VulkanDevice* device)
+    explicit Impl(
+        const PsnrHvsConfig& config, const VulkanDevice* device,
+        std::shared_ptr<internal::SharedMetricStorage> scratch = {}
+    )
         : size(config.size),
-          gpu(std::make_unique<internal::PsnrHvsGpuPipeline>(config, device)) {
+          gpu(std::make_unique<internal::PsnrHvsGpuPipeline>(
+              config, device, std::move(scratch)
+          )) {
         resident.Resize(config.gpu_resident_images);
     }
 
@@ -31,6 +36,11 @@ PsnrHvsPipeline::PsnrHvsPipeline(
     : impl_(std::make_unique<Impl>(config, &device)) {}
 
 PsnrHvsPipeline::~PsnrHvsPipeline() = default;
+PsnrHvsPipeline::PsnrHvsPipeline(
+    PsnrHvsConfig config, const VulkanDevice* device,
+    std::shared_ptr<internal::SharedMetricStorage> scratch
+)
+    : impl_(std::make_unique<Impl>(config, device, std::move(scratch))) {}
 PsnrHvsPipeline::PsnrHvsPipeline(PsnrHvsPipeline&&) noexcept = default;
 PsnrHvsPipeline& PsnrHvsPipeline::operator=(PsnrHvsPipeline&&) noexcept =
     default;

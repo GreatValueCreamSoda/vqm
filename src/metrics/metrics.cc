@@ -18,10 +18,10 @@
 #include "metrics/psnr_hvs/layout.h"
 #include "metrics/vmaf/features/vmaf_preprocess.h"
 #include "metrics/vmaf/features/vmaf_hdr.h"
-#include "vqm_shared.h"
 #include "vqm_views.h"
 #include "vqm_vulkan.h"
 #include "vulkan/vulkan_runtime.h"
+#include "metrics/metric_scratch.h"
 
 namespace vqm {
 namespace {
@@ -33,7 +33,6 @@ struct SelectedConfigs {
     std::optional<VmafV1Config> vmaf_v1;
     std::optional<CvvdpConfig> cvvdp;
     std::optional<PsnrHvsConfig> psnr_hvs;
-    std::optional<SharedMetricConfig> spatial_shared;
 };
 
 SelectedConfigs SelectConfigs(const MetricsConfig& config) {
@@ -128,19 +127,6 @@ SelectedConfigs SelectConfigs(const MetricsConfig& config) {
         configure_inputs(*result.psnr_hvs);
         result.psnr_hvs->input_bytes = 0;
     }
-    if (result.ssimulacra2 && result.butteraugli) {
-        SharedMetricConfig c;
-        c.size = config.size;
-        c.streaming_inputs = config.streaming_inputs;
-        c.memory_policy = config.memory_policy;
-        c.half_planes = result.ssimulacra2->half_planes;
-        c.chroma_filter = result.ssimulacra2->chroma_filter;
-        c.butter_chroma_filter = result.butteraugli->chroma_filter;
-        c.hf_asymmetry = result.butteraugli->hf_asymmetry;
-        c.xmul = result.butteraugli->xmul;
-        c.intensity_target = result.butteraugli->intensity_target;
-        result.spatial_shared = c;
-    }
     return result;
 }
 
@@ -152,33 +138,56 @@ MetricMemoryRequirements Requirements(
                   : GetMemoryRequirements(config);
 }
 
-MetricsMemoryRequirements PlanMemory(
-    const MetricsConfig& config, const VulkanDevice* device
+struct PlannedMetrics {
+    MetricsMemoryRequirements requirements;
+    internal::MetricScratchBuilder scratch;
+};
+
+PlannedMetrics PlanMemory(
+    const SelectedConfigs& selected, MemoryPolicy policy,
+    const VulkanDevice* device
 ) {
-    const auto selected = SelectConfigs(config);
-    MetricsMemoryRequirements result;
-    if (selected.spatial_shared)
-        result.spatial = Requirements(*selected.spatial_shared, device);
-    else if (selected.ssimulacra2)
-        result.spatial = Requirements(*selected.ssimulacra2, device);
-    else if (selected.butteraugli)
-        result.spatial = Requirements(*selected.butteraugli, device);
-    if (selected.vmaf_v0)
-        result.vmaf_v0 = Requirements(*selected.vmaf_v0, device);
-    if (selected.vmaf_v1)
-        result.vmaf_v1 = Requirements(*selected.vmaf_v1, device);
-    if (selected.cvvdp) result.cvvdp = Requirements(*selected.cvvdp, device);
-    if (selected.psnr_hvs)
-        result.psnr_hvs = Requirements(*selected.psnr_hvs, device);
+    PlannedMetrics result;
+    internal::BufferMemoryPlan spatial;
+    const auto add_spatial = [&](const auto& config) {
+        if (!config) return;
+        const auto memory = Requirements(*config, device);
+        result.scratch.Add(memory);
+        spatial.auxiliary_bytes.insert(
+            spatial.auxiliary_bytes.end(),
+            memory.scratch.persistent_bytes.begin(),
+            memory.scratch.persistent_bytes.end()
+        );
+    };
+    add_spatial(selected.ssimulacra2);
+    add_spatial(selected.butteraugli);
+    if (selected.ssimulacra2 || selected.butteraugli)
+        result.requirements.spatial =
+            internal::QueryMemoryPlan(spatial, policy, device);
+    const auto add = [&](const auto& config, auto& destination) {
+        if (!config) return;
+        const auto memory = Requirements(*config, device);
+        result.scratch.Add(memory);
+        destination =
+            internal::PrivateMemoryRequirements(memory, policy, device);
+    };
+    add(selected.vmaf_v0, result.requirements.vmaf_v0);
+    add(selected.vmaf_v1, result.requirements.vmaf_v1);
+    add(selected.cvvdp, result.requirements.cvvdp);
+    add(selected.psnr_hvs, result.requirements.psnr_hvs);
+    result.requirements.scratch =
+        internal::QueryMemoryPlan(result.scratch.MemoryPlan(), policy, device);
     return result;
 }
 
 template <class Pipeline, class Config>
 std::unique_ptr<Pipeline> MakePipeline(
-    const Config& config, const VulkanDevice* device
+    const Config& config, const VulkanDevice* device,
+    const std::shared_ptr<internal::SharedMetricStorage>& scratch
 ) {
-    return device ? std::make_unique<Pipeline>(config, *device)
-                  : std::make_unique<Pipeline>(config);
+    return internal::MetricScratchAccess::Create<Pipeline>(
+        config, device, scratch
+    );
 }
 
 void ValidatePairFormat(
@@ -235,19 +244,22 @@ ImageView PackedView(
 }  // namespace
 
 MetricsMemoryRequirements GetMemoryRequirements(const MetricsConfig& config) {
-    return PlanMemory(config, nullptr);
+    return PlanMemory(SelectConfigs(config), config.memory_policy, nullptr)
+        .requirements;
 }
 MetricsMemoryRequirements GetMemoryRequirements(
     const MetricsConfig& config, const VulkanDevice& device
 ) {
-    return PlanMemory(config, &device);
+    return PlanMemory(SelectConfigs(config), config.memory_policy, &device)
+        .requirements;
 }
 std::size_t MaxWorkersForBudgetWorstCase(
     const MetricsMemoryRequirements& requirements,
     std::span<const std::uint64_t> heap_budgets
 ) {
     std::vector<MetricMemoryRequirements> components;
-    components.reserve(5);
+    components.reserve(6);
+    if (requirements.scratch) components.push_back(*requirements.scratch);
     if (requirements.spatial) components.push_back(*requirements.spatial);
     if (requirements.vmaf_v0) components.push_back(*requirements.vmaf_v0);
     if (requirements.vmaf_v1) components.push_back(*requirements.vmaf_v1);
@@ -261,24 +273,28 @@ std::size_t MaxWorkersForBudgetWorstCase(
 struct Metrics::Impl {
     Impl(MetricsConfig c, const VulkanDevice* device) : config(std::move(c)) {
         const auto selected = SelectConfigs(config);
-        if (selected.spatial_shared)
-            spatial = MakePipeline<SharedMetricWorkspace>(
-                *selected.spatial_shared, device
+        const auto memory = PlanMemory(selected, config.memory_policy, device);
+        scratch = memory.scratch.Build(device, config.memory_policy);
+        if (selected.ssimulacra2)
+            ssimu = MakePipeline<Ssimulacra2Pipeline>(
+                *selected.ssimulacra2, device, scratch
             );
-        else if (selected.ssimulacra2)
-            ssimu =
-                MakePipeline<Ssimulacra2Pipeline>(*selected.ssimulacra2, device);
-        else if (selected.butteraugli)
-            butter =
-                MakePipeline<ButteraugliPipeline>(*selected.butteraugli, device);
+        if (selected.butteraugli)
+            butter = MakePipeline<ButteraugliPipeline>(
+                *selected.butteraugli, device, scratch
+            );
         if (selected.vmaf_v0)
-            v0 = MakePipeline<VmafPipeline>(*selected.vmaf_v0, device);
+            v0 = MakePipeline<VmafPipeline>(*selected.vmaf_v0, device, scratch);
         if (selected.vmaf_v1)
-            v1 = MakePipeline<VmafV1Pipeline>(*selected.vmaf_v1, device);
+            v1 =
+                MakePipeline<VmafV1Pipeline>(*selected.vmaf_v1, device, scratch);
         if (selected.cvvdp)
-            cvvdp = MakePipeline<CvvdpPipeline>(*selected.cvvdp, device);
+            cvvdp =
+                MakePipeline<CvvdpPipeline>(*selected.cvvdp, device, scratch);
         if (selected.psnr_hvs)
-            psnr_hvs = MakePipeline<PsnrHvsPipeline>(*selected.psnr_hvs, device);
+            psnr_hvs = MakePipeline<PsnrHvsPipeline>(
+                *selected.psnr_hvs, device, scratch
+            );
     }
 
     void RequireOpen() const {
@@ -324,26 +340,14 @@ struct Metrics::Impl {
         const VulkanSubmitSync& submission
     ) {
         if constexpr (std::is_same_v<Input, VulkanBufferView>) {
-            if (spatial)
-                return spatial
-                    ->ComputeSsimulacra2(
-                        original, distorted, submission, config.background
-                    )
-                    .Score();
-            else
-                return ssimu
-                    ->Finish(ssimu->Submit(
-                        original, distorted, submission, config.background
-                    ))
-                    .Score();
+            return ssimu
+                ->Finish(ssimu->Submit(
+                    original, distorted, submission, config.background
+                ))
+                .Score();
         } else {
-            if (spatial)
-                return spatial
-                    ->ComputeSsimulacra2(original, distorted, config.background)
-                    .Score();
-            else
-                return ssimu->Compute(original, distorted, config.background)
-                    .Score();
+            return ssimu->Compute(original, distorted, config.background)
+                .Score();
         }
     }
 
@@ -353,26 +357,13 @@ struct Metrics::Impl {
         const VulkanSubmitSync& submission
     ) {
         if constexpr (std::is_same_v<Input, VulkanBufferView>) {
-            if (spatial)
-                return spatial
-                    ->ComputeButteraugli(
-                        original, distorted, submission, config.background
-                    )
-                    .score;
-            else
-                return butter
-                    ->Finish(butter->Submit(
-                        original, distorted, submission, config.background
-                    ))
-                    .score;
+            return butter
+                ->Finish(butter->Submit(
+                    original, distorted, submission, config.background
+                ))
+                .score;
         } else {
-            if (spatial)
-                return spatial
-                    ->ComputeButteraugli(original, distorted, config.background)
-                    .score;
-            else
-                return butter->Compute(original, distorted, config.background)
-                    .score;
+            return butter->Compute(original, distorted, config.background).score;
         }
     }
 
@@ -533,7 +524,7 @@ struct Metrics::Impl {
     }
 
     MetricsConfig config;
-    std::unique_ptr<SharedMetricWorkspace> spatial;
+    std::shared_ptr<internal::SharedMetricStorage> scratch;
     std::unique_ptr<Ssimulacra2Pipeline> ssimu;
     std::unique_ptr<ButteraugliPipeline> butter;
     std::unique_ptr<VmafPipeline> v0;
@@ -628,12 +619,14 @@ MetricsFinalResult Metrics::Finalize() {
 void Metrics::Reset() { impl_->Reset(); }
 MetricsMemoryUsage Metrics::GetMemoryUsage() const {
     MetricsMemoryUsage result;
-    if (impl_->spatial)
-        result.spatial = impl_->spatial->GetMemoryUsage();
-    else if (impl_->ssimu)
-        result.spatial = impl_->ssimu->GetMemoryUsage();
-    else if (impl_->butter)
-        result.spatial = impl_->butter->GetMemoryUsage();
+    result.scratch = impl_->scratch->backing().GetMemoryUsage();
+    if (impl_->ssimu) result.spatial = impl_->ssimu->GetMemoryUsage();
+    if (impl_->butter) {
+        if (!result.spatial) result.spatial.emplace();
+        internal::AppendPrivateMemory(
+            *result.spatial, impl_->butter->GetMemoryUsage()
+        );
+    }
     if (impl_->v0) result.vmaf_v0 = impl_->v0->GetMemoryUsage();
     if (impl_->v1) result.vmaf_v1 = impl_->v1->GetMemoryUsage();
     if (impl_->cvvdp) result.cvvdp = impl_->cvvdp->GetMemoryUsage();

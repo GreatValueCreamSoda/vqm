@@ -146,11 +146,6 @@ public:
     [[nodiscard]] PipelineMemoryUsage GetMemoryUsage() const override {
         return runtime_->GetMemoryUsage();
     }
-    void ActivateShared() override {
-        runtime_->RequireIdle();
-        reference_valid_ = false;
-        PublishLevels();
-    }
     [[nodiscard]] std::uint64_t Submit(
         const Image& original, const Image& distorted, float background
     ) override;
@@ -305,6 +300,7 @@ VulkanSsimulacra2Pipeline::VulkanSsimulacra2Pipeline(
         runtime_config.memory_policy = memory_policy;
         runtime_config.chroma_filter = chroma_filter_;
         runtime_config.push_constant_size = sizeof(PushParams);
+        runtime_config.persistent_ranges = plan.persistent_ranges;
         runtime_ = std::make_unique<VulkanRuntime>(
             ctx_, runtime_config, std::move(shared)
         );
@@ -323,6 +319,7 @@ VulkanSsimulacra2Pipeline::VulkanSsimulacra2Pipeline(
         );
         CreatePipelines();
         PublishLevels();
+        runtime_->InitializeSharedState();
     } catch (...) {
         Destroy();
         throw;

@@ -60,19 +60,20 @@ struct MetricsResult {
     std::optional<double> psnr_hvs;
 };
 
-// Actual Vulkan allocations. The first entry is one shared spatial workspace
-// when both SSIMULACRA 2 and Butteraugli are enabled, or the single selected
-// spatial pipeline. VMAF, CVVDP and PSNR-HVS own separate allocations.
+// Actual Vulkan allocations. Metric entries contain only private retained
+// storage; spatial combines SSIMULACRA 2 and Butteraugli private storage.
+// Scratch contains the one shared arena and optional staging allocation.
 struct MetricsMemoryUsage {
     std::optional<PipelineMemoryUsage> spatial;
     std::optional<PipelineMemoryUsage> vmaf_v0;
     std::optional<PipelineMemoryUsage> vmaf_v1;
     std::optional<PipelineMemoryUsage> cvvdp;
     std::optional<PipelineMemoryUsage> psnr_hvs;
+    std::optional<PipelineMemoryUsage> scratch;
 };
 
 // Device requirements for the independently allocated components of one
-// worker. The spatial requirement counts shared scratch once. Use the
+// worker. The scratch requirement counts the shared arena once. Use the
 // scenarios with the budget helpers in vqm_memory.h.
 struct MetricsMemoryRequirements {
     std::optional<MetricMemoryRequirements> spatial;
@@ -80,6 +81,7 @@ struct MetricsMemoryRequirements {
     std::optional<MetricMemoryRequirements> vmaf_v1;
     std::optional<MetricMemoryRequirements> cvvdp;
     std::optional<MetricMemoryRequirements> psnr_hvs;
+    std::optional<MetricMemoryRequirements> scratch;
 };
 
 [[nodiscard]] MetricsMemoryRequirements GetMemoryRequirements(
@@ -89,7 +91,7 @@ struct MetricsMemoryRequirements {
     const MetricsConfig& config, const VulkanDevice& device
 );
 // Conservative number of such workers fitting the provided per-heap budgets.
-// Spatial shared scratch is counted once; every independent metric is counted.
+// Shared scratch is counted once; every metric's private storage is counted.
 [[nodiscard]] std::size_t MaxWorkersForBudgetWorstCase(
     const MetricsMemoryRequirements& requirements,
     std::span<const std::uint64_t> heap_budgets

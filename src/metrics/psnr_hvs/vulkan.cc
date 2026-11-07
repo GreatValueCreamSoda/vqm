@@ -21,6 +21,7 @@
 #include "vqm_views.h"
 #include "vqm_vulkan.h"
 #include "vulkan/vulkan_runtime.h"
+#include "vulkan/vulkan_shared_storage.h"
 
 namespace vqm::internal {
 namespace {
@@ -52,9 +53,15 @@ struct PsnrHvsGpuPipeline::Impl {
     std::array<std::uint32_t, 3> block_counts{};
     std::uint32_t peak = 255;
 
-    Impl(const PsnrHvsConfig& value, const VulkanDevice* device)
+    Impl(
+        const PsnrHvsConfig& value, const VulkanDevice* device,
+        std::shared_ptr<SharedMetricStorage> scratch
+    )
         : config(value),
-          context(RequireVulkanContext(device)),
+          context(
+              scratch ? scratch->backing().shared_context()
+                      : RequireVulkanContext(device)
+          ),
           layout(psnr_hvs_layout::BuildLayout(config, *context)),
           resident_formats(config.gpu_resident_images) {
         VulkanRuntime::Config runtime_config;
@@ -70,13 +77,17 @@ struct PsnrHvsGpuPipeline::Impl {
         runtime_config.streaming = config.streaming_inputs;
         runtime_config.memory_policy = config.memory_policy;
         runtime_config.push_constant_size = sizeof(Push);
-        runtime = std::make_unique<VulkanRuntime>(context, runtime_config);
+        runtime_config.persistent_ranges = layout.persistent_ranges;
+        runtime = std::make_unique<VulkanRuntime>(
+            context, runtime_config, std::move(scratch)
+        );
         runtime->CreateArena(layout.bytes);
         if (!runtime->arena_visible())
             runtime->CreateStaging(Bytes(layout.staging_words));
         runtime->CreateCommandObjects();
         runtime->CreateDescriptors(0, layout.bytes);
         InitializeTables();
+        runtime->InitializeSharedState();
         pipelines = runtime->CreatePipelines(
             std::array{"psnr_hvs_prepare", "psnr_hvs_blocks", "psnr_hvs_reduce"}
         );
@@ -252,9 +263,10 @@ struct PsnrHvsGpuPipeline::Impl {
 };
 
 PsnrHvsGpuPipeline::PsnrHvsGpuPipeline(
-    const PsnrHvsConfig& config, const VulkanDevice* device
+    const PsnrHvsConfig& config, const VulkanDevice* device,
+    std::shared_ptr<SharedMetricStorage> scratch
 )
-    : impl_(std::make_unique<Impl>(config, device)) {}
+    : impl_(std::make_unique<Impl>(config, device, std::move(scratch))) {}
 
 PsnrHvsGpuPipeline::~PsnrHvsGpuPipeline() = default;
 

@@ -48,9 +48,9 @@ void main() {
                                              gl_LocalInvocationID.x + uint(k)];
         }
         const uint index = pos.y * pc.width + pos.x;
-        arena[pc.blurred + index] = value;
+        motion_history[pc.blurred + index] = value;
         if (pc.has_previous != 0u)
-            difference = abs(value - arena[pc.previous + index]);
+            difference = abs(value - motion_history[pc.previous + index]);
     }
     partial[lane] = difference;
     barrier();

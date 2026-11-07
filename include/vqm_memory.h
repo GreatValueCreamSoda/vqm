@@ -49,6 +49,7 @@ struct MetricMemoryRequirements {
     MemoryScenario direct;
     MemoryScenario staged;
     std::vector<MemoryHeapInfo> heaps;
+    MetricScratchRequirements scratch{};
 };
 
 // Estimated remaining bytes per heap from the device's budget snapshot, or

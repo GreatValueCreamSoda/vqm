@@ -7,13 +7,16 @@
 #include <cstddef>
 #include <cstdint>
 #include <limits>
+#include <memory>
 #include <span>
 #include <stdexcept>
+#include <utility>
 #include <vector>
 
 #include "support.h"
 #include "metrics/vmaf/features/vmaf_preprocess.h"
 #include "vulkan/vulkan_runtime.h"
+#include "vulkan/vulkan_shared_storage.h"
 #include "vulkan/vulkan_support.h"
 
 namespace {
@@ -71,11 +74,16 @@ double ReferenceDifference(
 
 class MotionDevice {
 public:
-    explicit MotionDevice(Size size)
+    explicit MotionDevice(Size size, bool private_history = false)
         : size_(size),
           pixels_(size.width * size.height),
           partials_(VmafMotion::PartialCount(size)),
-          runtime_(vqm::internal::AcquireVulkanContext(), Config(size)),
+          scratch_(Scratch(size, private_history)),
+          runtime_(
+              scratch_ ? scratch_->backing().shared_context()
+                       : vqm::internal::AcquireVulkanContext(),
+              Config(size, private_history), scratch_
+          ),
           buffers_{0, static_cast<std::uint32_t>(pixels_),
                    static_cast<std::uint32_t>(2 * pixels_),
                    static_cast<std::uint32_t>(3 * pixels_),
@@ -85,7 +93,8 @@ public:
         runtime_.CreateStaging(vqm::internal::Bytes(pixels_ + 1));
         runtime_.CreateCommandObjects();
         runtime_.CreateDescriptors(0, vqm::internal::Bytes(arena_floats));
-        motion_.emplace(runtime_);
+        runtime_.InitializeSharedState();
+        motion_.emplace(runtime_, runtime_.BindPersistentPlanes());
     }
 
     double Push(const std::vector<float>& luma) {
@@ -93,6 +102,8 @@ public:
         std::copy(luma.begin(), luma.end(), runtime_.staging_map());
         runtime_.ResetCommandPool();
         runtime_.BeginCommandBuffer();
+        if (scratch_)
+            runtime_.FillZero(static_cast<std::uint32_t>(pixels_), 2 * pixels_);
         const std::array copies{
             VulkanRuntime::CopyRange{0, buffers_.luma, pixels_}};
         runtime_.RecordStagedCopies(copies);
@@ -108,18 +119,38 @@ public:
     }
 
 private:
-    static VulkanRuntime::Config Config(Size size) {
+    static VulkanRuntime::Config Config(Size size, bool private_history) {
         VulkanRuntime::Config config;
         config.base_size = size;
         config.base_pixels = size.width * size.height;
         config.push_constant_size = VmafMotion::PushBytes();
         config.streaming = false;
+        if (private_history) {
+            config.memory_policy = vqm::MemoryPolicy::Staged;
+            config.persistent_ranges.push_back(
+                {vqm::internal::Bytes(config.base_pixels),
+                 vqm::internal::Bytes(2 * config.base_pixels), false}
+            );
+        }
         return config;
+    }
+
+    static std::shared_ptr<vqm::internal::SharedMetricStorage> Scratch(
+        Size size, bool private_history
+    ) {
+        if (!private_history) return {};
+        const std::size_t pixels = size.width * size.height;
+        const auto words = 3 * pixels + VmafMotion::PartialCount(size) + 1;
+        return std::make_shared<vqm::internal::SharedMetricStorage>(
+            vqm::internal::AcquireVulkanContext(), vqm::internal::Bytes(words),
+            vqm::internal::Bytes(pixels + 1), vqm::MemoryPolicy::Staged
+        );
     }
 
     Size size_;
     std::size_t pixels_;
     std::size_t partials_;
+    std::shared_ptr<vqm::internal::SharedMetricStorage> scratch_;
     VulkanRuntime runtime_;
     VmafMotionBuffers buffers_;
     std::optional<VmafMotion> motion_;
@@ -219,6 +250,26 @@ VQM_TEST(TestVmafMotionPreservesHighBitDepthTransitions) {
             1e-4
         );
         CHECK_NEAR(device.Push(original), 0.0, 0.0);
+    }
+}
+
+VQM_TEST(TestVmafMotionPrivateHistorySurvivesScratchOverwrite) {
+    if (!vqm::test::GpuAvailable()) return;
+    constexpr Size size{17, 19};
+    MotionDevice device(size, true);
+    MotionDevice standalone(size);
+    std::vector<float> previous(size.width * size.height, 0.0f);
+    CHECK_NEAR(device.Push(previous), 0.0, 0.0);
+    CHECK_NEAR(standalone.Push(previous), 0.0, 0.0);
+    for (std::size_t frame = 1; frame < 6; ++frame) {
+        std::vector<float> current(previous.size());
+        for (std::size_t index = 0; index < current.size(); ++index)
+            current[index] =
+                static_cast<float>((index * 13 + frame * 29) % 192) - 96.0f;
+        const auto actual = device.Push(current);
+        CHECK_NEAR(actual, standalone.Push(current), 0.0);
+        CHECK_NEAR(actual, ReferenceDifference(previous, current, size), 1e-4);
+        previous = std::move(current);
     }
 }
 

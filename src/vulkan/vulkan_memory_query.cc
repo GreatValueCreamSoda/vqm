@@ -19,6 +19,7 @@
 #include "metrics/ssimulacra2/layout.h"
 #include "metrics/butteraugli/layout.h"
 #include "metrics/shared_workspace_internal.h"
+#include "metrics/metric_scratch.h"
 #include "vulkan_runtime.h"
 #include "vulkan_support.h"
 
@@ -149,9 +150,10 @@ MetricMemoryRequirements QueryAllocations(
 
     const auto direct =
         FindType(properties, arena.requirements.memoryTypeBits, kDirect);
-    if (direct) {
+    if (direct || arena_bytes == 0) {
         result.direct.supported = true;
-        result.direct.arena = MakeAllocation(properties, arena, *direct);
+        if (direct)
+            result.direct.arena = MakeAllocation(properties, arena, *direct);
     }
     const auto device_local = FindType(
         properties, arena.requirements.memoryTypeBits,
@@ -163,9 +165,12 @@ MetricMemoryRequirements QueryAllocations(
             : FindType(
                   properties, staging.requirements.memoryTypeBits, kStaging
               );
-    if (device_local && (staging_bytes == 0 || host_staging)) {
+    if ((device_local || arena_bytes == 0) &&
+        (staging_bytes == 0 || host_staging)) {
         result.staged.supported = true;
-        result.staged.arena = MakeAllocation(properties, arena, *device_local);
+        if (device_local)
+            result.staged.arena =
+                MakeAllocation(properties, arena, *device_local);
         if (host_staging) {
             result.staged.staging =
                 MakeAllocation(properties, staging, *host_staging);
@@ -204,6 +209,24 @@ MetricMemoryRequirements QueryMetric(
     );
     if (config.memory_policy == MemoryPolicy::Direct) result.staged = {};
     if (config.memory_policy == MemoryPolicy::Staged) result.direct = {};
+    result.scratch.arena_bytes = plan.arena_bytes;
+    result.scratch.fallback_staging_bytes = plan.fallback_staging_bytes;
+    result.scratch.persistent_bytes = plan.auxiliary_bytes;
+    std::uint64_t persistent = 0;
+    for (const auto& range : plan.persistent_ranges) {
+        if (range.bytes > std::numeric_limits<std::uint64_t>::max() - persistent)
+            throw std::overflow_error(
+                "memory: persistent allocation size overflow"
+            );
+        persistent += range.bytes;
+    }
+    if (persistent != 0) result.scratch.persistent_bytes.push_back(persistent);
+    result.scratch.reusable = true;
+    if constexpr (requires { config.gpu_resident_images; })
+        result.scratch.reusable = config.gpu_resident_images == 0;
+    if constexpr (requires { config.input_bytes; })
+        result.scratch.reusable =
+            result.scratch.reusable && config.input_bytes == 0;
     return result;
 }
 
@@ -217,7 +240,7 @@ void AddBytes(std::uint64_t& total, std::uint64_t value) {
 void AddScenario(
     std::vector<std::uint64_t>& charge, const MemoryScenario& scenario
 ) {
-    if (!scenario.supported || scenario.arena.allocation_bytes == 0) {
+    if (!scenario.supported) {
         throw std::invalid_argument("memory: unsupported or empty scenario");
     }
     std::vector<const MemoryAllocation*> allocations{&scenario.arena,
@@ -246,6 +269,31 @@ std::size_t CountWorkers(
 }
 
 }  // namespace
+
+namespace internal {
+MetricMemoryRequirements QueryMemoryPlan(
+    const BufferMemoryPlan& plan, MemoryPolicy policy, const VulkanDevice* device
+) {
+    ValidateMemoryPolicy(policy);
+    const auto context = RequireVulkanContext(device);
+    auto result = QueryAllocations(
+        *context, plan.arena_bytes, plan.fallback_staging_bytes,
+        plan.auxiliary_bytes
+    );
+    if (policy == MemoryPolicy::Direct) result.staged = {};
+    if (policy == MemoryPolicy::Staged) result.direct = {};
+    return result;
+}
+
+MetricMemoryRequirements PrivateMemoryRequirements(
+    const MetricMemoryRequirements& requirements, MemoryPolicy policy,
+    const VulkanDevice* device
+) {
+    return QueryMemoryPlan(
+        {0, 0, requirements.scratch.persistent_bytes}, policy, device
+    );
+}
+}  // namespace internal
 
 std::optional<std::vector<std::uint64_t>> AvailableHeapBudgets(
     const MetricMemoryRequirements& requirements

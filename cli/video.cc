@@ -22,10 +22,13 @@
 #include <unordered_set>
 #include <utility>
 #include <vector>
+#include <variant>
+#include <type_traits>
 
 #include "butteraugli.h"
 #include "cvvdp.h"
 #include "metrics/cvvdp/cvvdp_internal.h"
+#include "metrics/metric_scratch.h"
 #include "psnr_hvs.h"
 #include "vmaf.h"
 #include "vmaf_v1.h"
@@ -163,20 +166,48 @@ double PoolPsnrHvs(std::span<const Frame> frames) {
     return -10.0 * std::log10(sum / static_cast<double>(frames.size()));
 }
 
-template <typename Pipeline, typename Config>
-std::unique_ptr<Pipeline> MakePipeline(
-    Config config, const VulkanDevice* device
-) {
-    config.gpu_resident_images = 0;
-    config.streaming_inputs = device == nullptr;
-    if (device) return std::make_unique<Pipeline>(config, *device);
-    return std::make_unique<Pipeline>(config);
-}
-
 VmafFitMode VmafFit(const Options& options) {
     if (options.vmaf_scale)
         return options.vmaf_pad ? VmafFitMode::FitAndPad : VmafFitMode::Fit;
     return options.vmaf_pad ? VmafFitMode::Pad : VmafFitMode::Native;
+}
+
+using ScorerConfig = std::variant<
+    Ssimulacra2Config, ButteraugliConfig, VmafConfig, VmafV1Config, CvvdpConfig,
+    PsnrHvsConfig>;
+
+ScorerConfig MakeScorerConfig(
+    const Options& options, Metric metric, const InputKey& key
+) {
+    if (metric == Metric::Ssimulacra2)
+        return MakeSsimulacra2Config(options, key.size);
+    if (metric == Metric::Butteraugli)
+        return MakeButteraugliConfig(options, key.size);
+    if (metric == Metric::VmafV0) {
+        VmafConfig config{.size = key.size};
+        config.model = options.vmaf_v0_model.value_or(VmafModel::Standard1080);
+        config.fit = VmafFit(options);
+        config.neg = options.vmaf_v0_neg;
+        config.transform = options.vmaf_v0_transform;
+        return config;
+    }
+    if (metric == Metric::VmafV1) {
+        VmafV1Config config{.size = key.size, .input_format = key.original};
+        config.fit = VmafFit(options);
+        config.hfr = options.vmaf_v1_hfr;
+        config.model = options.vmaf_v1_model.value_or(VmafV1Model::Standard1080);
+        return config;
+    }
+    if (metric == Metric::PsnrHvs) return PsnrHvsConfig{.size = key.size};
+    CvvdpConfig config{.size = key.size};
+    config.display = options.cvvdp.ResolveDisplay(key.size);
+    config.temporal = key.video;
+    config.chroma_filter = options.input.chroma_filter;
+    if (key.video) {
+        config.fps_numerator = key.fps.numerator;
+        config.fps_denominator = key.fps.denominator;
+    }
+    return config;
 }
 
 // One geometry, format domain and frame rate per cached pipeline. Push consumes
@@ -184,48 +215,43 @@ VmafFitMode VmafFit(const Options& options) {
 class Scorer {
 public:
     Scorer(
-        const Options& options, Metric metric, const InputKey& key,
-        const VulkanDevice* device
+        const Options& options, const InputKey& key, const ScorerConfig& config,
+        const VulkanDevice* device,
+        const std::shared_ptr<internal::SharedMetricStorage>& scratch
     )
         : raw_(options.raw), verbose_(options.verbose), video_(key.video) {
-        if (metric == Metric::Ssimulacra2) {
-            const auto config = MakeSsimulacra2Config(options, key.size);
-            ssimu_ = MakePipeline<Ssimulacra2Pipeline>(config, device);
-        } else if (metric == Metric::Butteraugli) {
-            const auto config = MakeButteraugliConfig(options, key.size);
-            butter_ = MakePipeline<ButteraugliPipeline>(config, device);
-        } else if (metric == Metric::VmafV0) {
-            VmafConfig config{.size = key.size};
-            config.model =
-                options.vmaf_v0_model.value_or(VmafModel::Standard1080);
-            config.fit = VmafFit(options);
-            config.neg = options.vmaf_v0_neg;
-            config.transform = options.vmaf_v0_transform;
-            v0_ = MakePipeline<VmafPipeline>(config, device);
-        } else if (metric == Metric::VmafV1) {
-            VmafV1Config config{.size = key.size, .input_format = key.original};
-            config.fit = VmafFit(options);
-            config.hfr = options.vmaf_v1_hfr;
-            config.model =
-                options.vmaf_v1_model.value_or(VmafV1Model::Standard1080);
-            if (config.model == VmafV1Model::Hdr4K)
-                config.gpu_resident_images = 0;
-            v1_ = MakePipeline<VmafV1Pipeline>(config, device);
-        } else if (metric == Metric::PsnrHvs) {
-            PsnrHvsConfig config{.size = key.size};
-            psnr_hvs_ = MakePipeline<PsnrHvsPipeline>(config, device);
-        } else {
-            CvvdpConfig config{.size = key.size};
-            config.display = options.cvvdp.ResolveDisplay(key.size);
-            config.temporal = key.video;
-            config.chroma_filter = options.input.chroma_filter;
-            if (key.video) {
-                config.fps_numerator = key.fps.numerator;
-                config.fps_denominator = key.fps.denominator;
-            }
-            cvvdp_ = MakePipeline<CvvdpPipeline>(config, device);
-            if (verbose_ && video_) internal::CvvdpFrameAccess::Enable(*cvvdp_);
-        }
+        std::visit(
+            [&](const auto& value) {
+                using Config = std::decay_t<decltype(value)>;
+                if constexpr (std::is_same_v<Config, Ssimulacra2Config>)
+                    ssimu_ = internal::MetricScratchAccess::Create<
+                        Ssimulacra2Pipeline>(value, device, scratch);
+                else if constexpr (std::is_same_v<Config, ButteraugliConfig>)
+                    butter_ = internal::MetricScratchAccess::Create<
+                        ButteraugliPipeline>(value, device, scratch);
+                else if constexpr (std::is_same_v<Config, VmafConfig>)
+                    v0_ = internal::MetricScratchAccess::Create<VmafPipeline>(
+                        value, device, scratch
+                    );
+                else if constexpr (std::is_same_v<Config, VmafV1Config>)
+                    v1_ = internal::MetricScratchAccess::Create<VmafV1Pipeline>(
+                        value, device, scratch
+                    );
+                else if constexpr (std::is_same_v<Config, CvvdpConfig>)
+                    cvvdp_ =
+                        internal::MetricScratchAccess::Create<CvvdpPipeline>(
+                            value, device, scratch
+                        );
+                else if constexpr (std::is_same_v<Config, PsnrHvsConfig>)
+                    psnr_hvs_ =
+                        internal::MetricScratchAccess::Create<PsnrHvsPipeline>(
+                            value, device, scratch
+                        );
+            },
+            config
+        );
+        if (cvvdp_ && verbose_ && video_)
+            internal::CvvdpFrameAccess::Enable(*cvvdp_);
     }
 
     void Reset() {
@@ -322,8 +348,29 @@ public:
         if (scorers.empty() || key_ != key || device_ != device) {
             scorers.clear();
             scorers.reserve(options_.metrics.size());
-            for (const auto metric : options_.metrics)
-                scorers.emplace_back(options_, metric, key, device);
+            internal::MetricScratchBuilder planner;
+            std::vector<ScorerConfig> configs;
+            for (const auto metric : options_.metrics) {
+                auto config = MakeScorerConfig(options_, metric, key);
+                std::visit(
+                    [&](auto& value) {
+                        value.gpu_resident_images = 0;
+                        value.streaming_inputs = device == nullptr;
+                        planner.Add(
+                            device ? GetMemoryRequirements(value, *device)
+                                   : GetMemoryRequirements(value)
+                        );
+                    },
+                    config
+                );
+                configs.push_back(std::move(config));
+            }
+            const auto scratch =
+                configs.size() > 1
+                    ? planner.Build(device)
+                    : std::shared_ptr<internal::SharedMetricStorage>{};
+            for (const auto& config : configs)
+                scorers.emplace_back(options_, key, config, device, scratch);
             key_ = key;
             device_ = device;
         }

@@ -65,6 +65,7 @@ struct ArenaRegions {
 };
 
 struct Ssimulacra2LayoutPlan {
+    std::vector<PersistentRange> persistent_ranges;
     ArenaRegions regions;
     ScaleVariant scale_tile{};
     std::size_t base_pixels = 0;

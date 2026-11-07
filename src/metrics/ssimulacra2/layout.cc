@@ -294,6 +294,8 @@ Ssimulacra2LayoutPlan BuildSsimulacra2Layout(
         std::numeric_limits<std::size_t>::max() / sizeof(float))
         throw std::invalid_argument("vulkan: staging exceeds host addressing");
 
+    out.persistent_ranges = {
+        {Bytes(out.regions.levels), Bytes(kLevelWords), true}};
     return out;
 }
 
@@ -315,7 +317,9 @@ BufferMemoryPlan PlanSsimulacra2Memory(
     return {static_cast<std::size_t>(layout.regions.bytes),
             static_cast<std::size_t>(Bytes(
                 layout.staging_level_offset + ssimulacra2_layout::kLevelWords
-            ))};
+            )),
+            {},
+            layout.persistent_ranges};
 }
 
 }  // namespace vqm::internal

@@ -86,9 +86,10 @@ VulkanRuntime::~VulkanRuntime() { Destroy(); }
 
 PipelineMemoryUsage VulkanRuntime::GetMemoryUsage() const {
     PipelineMemoryUsage usage;
-    usage.uses_staging = staging_.buffer != VK_NULL_HANDLE;
-    usage.arena = MemoryAllocation{arena_bytes_, arena_.allocation_bytes,
-                                   arena_.memory_type, arena_.heap_index};
+    usage.uses_staging = !shared_ && staging_.buffer != VK_NULL_HANDLE;
+    if (!shared_)
+        usage.arena = MemoryAllocation{arena_bytes_, arena_.allocation_bytes,
+                                       arena_.memory_type, arena_.heap_index};
     if (usage.uses_staging) {
         usage.staging =
             MemoryAllocation{staging_bytes_, staging_.allocation_bytes,
@@ -101,10 +102,16 @@ PipelineMemoryUsage VulkanRuntime::GetMemoryUsage() const {
              allocation.memory_type, allocation.heap_index}
         );
     }
+    if (persistent_.buffer != VK_NULL_HANDLE)
+        usage.auxiliary.push_back(
+            {persistent_bytes_, persistent_.allocation_bytes,
+             persistent_.memory_type, persistent_.heap_index}
+        );
     return usage;
 }
 
 void VulkanRuntime::Destroy() noexcept {
+    if (shared_) shared_->Release(this);
     const VkDevice device = ctx_ ? ctx_->device : VK_NULL_HANDLE;
     arena_bytes_ = 0;
     staging_bytes_ = 0;
@@ -154,6 +161,11 @@ void VulkanRuntime::Destroy() noexcept {
         if (allocation.memory) vkFreeMemory(device, allocation.memory, nullptr);
     }
     auxiliary_.clear();
+    if (persistent_.buffer) vkDestroyBuffer(device, persistent_.buffer, nullptr);
+    if (persistent_.memory) vkFreeMemory(device, persistent_.memory, nullptr);
+    persistent_ = {};
+    persistent_bytes_ = 0;
+    persistent_ready_ = false;
     if (!shared_) {
         for (Allocation* allocation : {&staging_, &arena_}) {
             if (allocation->buffer != VK_NULL_HANDLE) {
@@ -246,6 +258,7 @@ VulkanRuntime::Allocation VulkanRuntime::CreateAllocation(
 
 void VulkanRuntime::CreateArena(VkDeviceSize bytes) {
     if (shared_) {
+        shared_->RequireIdle(this);
         VulkanRuntime& owner = shared_->backing();
         if (ctx_.get() != owner.ctx_.get() || bytes > owner.arena_bytes_)
             throw std::invalid_argument(
@@ -582,6 +595,7 @@ void VulkanRuntime::DestroyPipelines(
 }
 
 void VulkanRuntime::BeginCommandBuffer() {
+    RequireIdle();
     VkCommandBufferBeginInfo begin_info{};
     begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
@@ -598,6 +612,7 @@ void VulkanRuntime::BeginCommandBuffer() {
             VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT |
                 VK_ACCESS_TRANSFER_READ_BIT | VK_ACCESS_TRANSFER_WRITE_BIT
         );
+        RestoreSharedState();
     }
 #ifdef VQM_STAGE_TIMING
     if (queries_ != VK_NULL_HANDLE) {
@@ -607,6 +622,7 @@ void VulkanRuntime::BeginCommandBuffer() {
 }
 
 void VulkanRuntime::EndCommandBuffer() {
+    SaveSharedState(false);
     Check(vkEndCommandBuffer(command_buffer_), "vkEndCommandBuffer");
 }
 
@@ -744,6 +760,7 @@ void VulkanRuntime::PublishStaged(
 }
 
 void VulkanRuntime::RequireIdle() const {
+    if (shared_) shared_->RequireIdle(this);
     if (pending_) {
         throw std::logic_error(
             "vulkan: a submission is already in flight; Finish it first"
@@ -824,6 +841,7 @@ void VulkanRuntime::QueueSubmit(const VulkanSubmitSync& sync) {
 }
 
 void VulkanRuntime::QueueSubmitInfo(const VkSubmitInfo& submit) {
+    if (shared_) shared_->RequireIdle(this);
     Check(vkResetFences(ctx_->device, 1, &fence_), "vkResetFences");
     // The queue is process-wide and VkQueue is externally synchronized, so a
     // second pipeline submitting from another thread waits here. Only the call
@@ -834,6 +852,7 @@ void VulkanRuntime::QueueSubmitInfo(const VkSubmitInfo& submit) {
         Check(vkQueueSubmit(ctx_->queue, 1, &submit, fence_), "vkQueueSubmit");
     }
     pending_ = true;
+    if (shared_) shared_->Submitted(this);
 }
 
 void VulkanRuntime::WaitFence() {

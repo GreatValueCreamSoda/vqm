@@ -85,6 +85,7 @@ struct Layout {
 };
 
 struct ButterLayoutPlan {
+    std::vector<PersistentRange> persistent_ranges;
     Layout layout;
     std::size_t base_pixels = 0;
     std::size_t staging_desc = 0;

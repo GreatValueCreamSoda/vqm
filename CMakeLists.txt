@@ -90,6 +90,7 @@ set(VQM_CORE_SOURCES
   src/vulkan/vulkan_source.cc
   src/vulkan/vulkan_memory_query.cc
   src/vulkan/vulkan_runtime.cc
+  src/vulkan/vulkan_runtime_scratch.cc
   src/vulkan/vulkan_runtime_inputs.cc
   src/vulkan/vulkan_shared_storage.cc)
 

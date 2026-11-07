@@ -6,6 +6,8 @@
 
 #include "bindings.glsl"
 
+layout(std430, binding = 1) buffer MotionHistory { float motion_history[]; };
+
 layout(push_constant, std430) uniform Params {
     uint width;
     uint height;

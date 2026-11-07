@@ -21,12 +21,15 @@
 #include "metrics/butteraugli/butteraugli_internal.h"
 #include "handles.h"
 #include "input.h"
+#include "vulkan/vulkan_support.h"
+#include "vulkan/vulkan_shared_storage.h"
 
 namespace vqm {
 
 struct ButteraugliPipeline::Impl {
     explicit Impl(
-        const ButteraugliConfig& config, const VulkanDevice* device = nullptr
+        const ButteraugliConfig& config, const VulkanDevice* device = nullptr,
+        std::shared_ptr<internal::SharedMetricStorage> scratch = {}
     );
 
     UploadedImage Upload(const Image& image);
@@ -60,7 +63,8 @@ std::uint64_t Generation(std::uint64_t slot) {
 }  // namespace
 
 ButteraugliPipeline::Impl::Impl(
-    const ButteraugliConfig& config, const VulkanDevice* device
+    const ButteraugliConfig& config, const VulkanDevice* device,
+    std::shared_ptr<internal::SharedMetricStorage> scratch
 )
     : size(config.size) {
     internal::ValidateButteraugliConfig(config);
@@ -71,10 +75,17 @@ ButteraugliPipeline::Impl::Impl(
     params.hf_asymmetry = config.hf_asymmetry;
     params.xmul = config.xmul;
     params.intensity_target = config.intensity_target;
-    gpu = internal::CreateVulkanButteraugliPipeline(
-        geometry, params, config.gpu_resident_images, config.chroma_filter,
-        config.streaming_inputs, config.input_bytes, config.memory_policy, device
-    );
+    if (scratch)
+        gpu = internal::CreateSharedVulkanButteraugliPipeline(
+            geometry, params, config, scratch->backing().shared_context(),
+            scratch
+        );
+    else
+        gpu = internal::CreateVulkanButteraugliPipeline(
+            geometry, params, config.gpu_resident_images, config.chroma_filter,
+            config.streaming_inputs, config.input_bytes, config.memory_policy,
+            device
+        );
     if (!gpu) throw std::runtime_error("vulkan: no usable compute device");
 }
 
@@ -132,6 +143,11 @@ ButteraugliPipeline::ButteraugliPipeline(
     : impl_(std::make_unique<Impl>(config, &device)) {}
 
 ButteraugliPipeline::~ButteraugliPipeline() = default;
+ButteraugliPipeline::ButteraugliPipeline(
+    ButteraugliConfig config, const VulkanDevice* device,
+    std::shared_ptr<internal::SharedMetricStorage> scratch
+)
+    : impl_(std::make_unique<Impl>(config, device, std::move(scratch))) {}
 ButteraugliPipeline::ButteraugliPipeline(ButteraugliPipeline&&) noexcept =
     default;
 ButteraugliPipeline& ButteraugliPipeline::operator=(

@@ -29,4 +29,17 @@ SharedMetricStorage::SharedMetricStorage(
     }
 }
 
+void SharedMetricStorage::RequireIdle(const VulkanRuntime* caller) const {
+    if (borrower_ && borrower_ != caller && borrower_->pending())
+        throw std::logic_error("shared scratch: another metric is in flight");
+}
+
+void SharedMetricStorage::Submitted(VulkanRuntime* caller) noexcept {
+    borrower_ = caller;
+}
+
+void SharedMetricStorage::Release(const VulkanRuntime* caller) noexcept {
+    if (borrower_ == caller) borrower_ = nullptr;
+}
+
 }  // namespace vqm::internal

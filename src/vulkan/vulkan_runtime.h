@@ -31,6 +31,7 @@
 #include "vqm_memory_types.h"
 #include "vqm_vulkan.h"
 #include "vulkan_support.h"
+#include "memory_plan.h"
 
 namespace vqm::internal {
 
@@ -138,8 +139,9 @@ public:
         ChromaFilter chroma_filter = ChromaFilter::Bilinear;
         std::size_t push_constant_size = 0;
         // Optional device-local storage bindings 4.., owned by this runtime.
-        // Existing metrics keep the original four-binding descriptor layout.
+        // Persistent ranges retain metric state when the arena is shared.
         std::vector<VkDeviceSize> auxiliary_bytes;
+        std::vector<PersistentRange> persistent_ranges;
     };
 
     struct SourceCopies {
@@ -164,9 +166,15 @@ public:
     void CreateDescriptors(
         VkDeviceSize plane_base_bytes, VkDeviceSize plane_bytes
     );
+    void InitializeSharedState();
+    [[nodiscard]] std::uint32_t BindPersistentPlanes();
     void Destroy() noexcept;
 
     [[nodiscard]] VulkanContext& context() const noexcept { return *ctx_; }
+    [[nodiscard]] std::shared_ptr<VulkanContext>
+    shared_context() const noexcept {
+        return ctx_;
+    }
     [[nodiscard]] bool arena_visible() const noexcept { return arena_visible_; }
     [[nodiscard]] PipelineMemoryUsage GetMemoryUsage() const;
     [[nodiscard]] const Allocation& arena_allocation() const noexcept {
@@ -337,6 +345,8 @@ public:
 
 private:
     friend class SharedMetricStorage;
+    void RestoreSharedState();
+    void SaveSharedState(bool initialize);
     void QueueSubmitInfo(const VkSubmitInfo& submit);
     [[nodiscard]] std::byte* StreamingDestination(std::size_t image) const;
     void WriteStreamingSource(
@@ -393,6 +403,10 @@ private:
     bool arena_visible_ = false;
     Allocation staging_;
     std::vector<Allocation> auxiliary_;
+    Allocation persistent_;
+    VkDeviceSize persistent_bytes_ = 0;
+    bool persistent_ready_ = false;
+    bool persistent_planes_ = false;
     VkDeviceSize staging_bytes_ = 0;
     float* staging_map_ = nullptr;
 

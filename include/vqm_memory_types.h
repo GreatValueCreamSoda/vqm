@@ -33,4 +33,16 @@ struct PipelineMemoryUsage {
     std::vector<MemoryAllocation> auxiliary = {};
 };
 
+struct MetricScratchRequirements {
+    std::uint64_t arena_bytes = 0;
+    std::uint64_t fallback_staging_bytes = 0;
+    std::vector<std::uint64_t> persistent_bytes = {};
+    bool reusable = false;
+};
+
+namespace internal {
+class SharedMetricStorage;
+struct MetricScratchAccess;
+}  // namespace internal
+
 }  // namespace vqm

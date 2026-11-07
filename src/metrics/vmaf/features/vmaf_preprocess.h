@@ -172,11 +172,11 @@ private:
 
 // Reference motion and temporal weighting
 
-// Absolute arena offsets, in 32-bit words. The caller allocates full-resolution
-// luma and blurred planes, PartialCount(size) words of partials, and
-// one score word. Planes must not overlap while the dispatches run, except that
-// `previous` may be ignored on the first frame. The input is the reference Y'
-// plane in libvmaf's FP32 domain: code / 2^(bits-8) - 128; it is not RGB and
+// Absolute logical offsets, in 32-bit words. The caller allocates
+// full-resolution luma and history planes, PartialCount(size) words of partials,
+// and one score word. Planes must not overlap while the dispatches run, except
+// that `previous` may be ignored on the first frame. The input is the reference
+// Y' plane in libvmaf's FP32 domain: code / 2^(bits-8) - 128; it is not RGB and
 // must not undergo range expansion or transfer conversion.
 struct VmafMotionBuffers {
     std::uint32_t luma = 0;
@@ -187,16 +187,18 @@ struct VmafMotionBuffers {
 };
 
 // Record the default five-tap FP32 motion feature for one frame. A previous
-// blurred reference is retained in the caller's arena; current blur goes to a
-// different plane. The scalar score is the mean absolute difference of those
-// planes, or zero for the first frame. The runtime must have a push constant
-// range of at least PushBytes() and must outlive this object. The caller owns
-// command-buffer recording, queue submission, arena bounds, and score readback.
+// blurred reference is retained in binding 1; current blur goes to a different
+// plane. History offsets are relative to history_base in that binding, while
+// luma, partials and score use the arena. The scalar score is the mean absolute
+// difference of those planes, or zero for the first frame. The runtime must have
+// a push constant range of at least PushBytes() and must outlive this object.
+// The caller owns command-buffer recording, queue submission, arena bounds, and
+// score readback.
 class VmafMotion {
 public:
     // Disabling subgroups keeps the portable shared reduction available for
     // direct comparison on devices that support the subgroup variant.
-    explicit VmafMotion(VulkanRuntime& runtime);
+    explicit VmafMotion(VulkanRuntime& runtime, std::uint32_t history_base = 0);
     ~VmafMotion();
     VmafMotion(const VmafMotion&) = delete;
     VmafMotion& operator=(const VmafMotion&) = delete;
@@ -209,6 +211,7 @@ public:
 
 private:
     VulkanRuntime* runtime_;
+    std::uint32_t history_base_ = 0;
     std::array<VkPipeline, 2> pipelines_{};
 };
 

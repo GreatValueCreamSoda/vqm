@@ -26,6 +26,7 @@
 #include "vqm_views.h"
 #include "vqm_vulkan.h"
 #include "vulkan/vulkan_runtime.h"
+#include "vulkan/vulkan_shared_storage.h"
 #include "vulkan/vulkan_support.h"
 
 // VMAF motion: Copyright 2016-2020 Netflix, Inc.
@@ -468,7 +469,15 @@ struct Layout {
                 "vmaf v1: image exceeds device storage buffer range"
             );
         }
-        return {arena_bytes, Bytes(readback + ReadbackLayout::kWords)};
+        return {arena_bytes,
+                Bytes(readback + ReadbackLayout::kWords),
+                {},
+                {{Bytes(motion.previous),
+                  Bytes(
+                      (older_motion != 0 ? 3u : 2u) * feature_size.width *
+                      feature_size.height
+                  ),
+                  false}}};
     }
 };
 std::optional<::vqm::VmafV1Frame> PublicFrame(
@@ -493,11 +502,17 @@ BufferMemoryPlan PlanVmafV1Memory(
 }  // namespace internal
 
 struct VmafV1Pipeline::Impl {
-    explicit Impl(VmafV1Config pipeline_config, const VulkanDevice* device)
+    explicit Impl(
+        VmafV1Config pipeline_config, const VulkanDevice* device,
+        std::shared_ptr<SharedMetricStorage> shared = {}
+    )
         : config(pipeline_config),
           layout(pipeline_config),
-          context(RequireVulkanContext(device)),
-          runtime(context, RuntimeConfig()),
+          context(
+              shared ? shared->backing().shared_context()
+                     : RequireVulkanContext(device)
+          ),
+          runtime(context, RuntimeConfig(), std::move(shared)),
           sequence(config.clip, config.model, config.hfr) {
         const auto memory = layout.MemoryPlan(*context);
         runtime.CreateArena(memory.arena_bytes);
@@ -518,8 +533,9 @@ struct VmafV1Pipeline::Impl {
             speed_prescaler.emplace(runtime);
         speed.emplace(runtime);
         cambi.emplace(runtime, layout.hdr.has_value());
-        motion.emplace(runtime);
         resident.Resize(config.gpu_resident_images);
+        runtime.InitializeSharedState();
+        motion.emplace(runtime, runtime.BindPersistentPlanes());
     }
     VulkanRuntime::Config RuntimeConfig() {
         VulkanRuntime::Config out;
@@ -533,6 +549,7 @@ struct VmafV1Pipeline::Impl {
         out.base_size = config.size;
         out.streaming = config.streaming_inputs;
         out.memory_policy = config.memory_policy;
+        out.persistent_ranges = layout.MemoryPlan(*context).persistent_ranges;
         out.push_constant_size = RequiredPushBytes();
         return out;
     }
@@ -776,6 +793,11 @@ VmafV1Pipeline::VmafV1Pipeline(VmafV1Config config)
 VmafV1Pipeline::VmafV1Pipeline(VmafV1Config config, const VulkanDevice& device)
     : impl_(std::make_unique<Impl>(config, &device)) {}
 VmafV1Pipeline::~VmafV1Pipeline() = default;
+VmafV1Pipeline::VmafV1Pipeline(
+    VmafV1Config config, const VulkanDevice* device,
+    std::shared_ptr<internal::SharedMetricStorage> scratch
+)
+    : impl_(std::make_unique<Impl>(config, device, std::move(scratch))) {}
 VmafV1Pipeline::VmafV1Pipeline(VmafV1Pipeline&&) noexcept = default;
 VmafV1Pipeline& VmafV1Pipeline::operator=(VmafV1Pipeline&&) noexcept = default;
 PipelineMemoryUsage VmafV1Pipeline::GetMemoryUsage() const {

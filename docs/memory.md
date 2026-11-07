@@ -53,6 +53,25 @@ policy before querying, and use the same configuration for construction.
 Every pipeline also exposes `GetMemoryUsage()` to report the allocations
 actually retained after construction.
 
+## Shared scratch requirements
+
+Standalone metric queries also return `scratch`: logical `arena_bytes`,
+`fallback_staging_bytes`, and a `persistent_bytes` list of private device-local
+buffer sizes needed when sharing. These are buffer sizes, not Vulkan allocation
+sizes or a free-VRAM estimate. Standalone `direct` and `staged` scenarios retain
+their existing meaning: full standalone allocations, without private copies of
+arena state that is already retained there. Do not add `scratch` to those
+standalone scenarios.
+
+`scratch.reusable` is false when resident images or caller-mapped input pools
+are requested: those handles cannot survive another metric overwriting their
+arena. The unified `Metrics` API and CLI disable those pools, query all selected
+metrics, and allocate the maximum arena and staging sizes at initialization.
+They also allocate each metric's private retained storage. Their reported
+`scratch` component and private components already account for all allocations;
+use those scenarios for per-heap budgets rather than summing standalone arenas.
+See [shared workspace](shared-workspace.md) for ownership and lifetime rules.
+
 For a known allocation scenario, `MaxWorkersForBudget` accepts one scenario or
 several scenarios per worker and adds their allocation sizes by heap.
 `MaxWorkersForBudgetWorstCase` instead charges each heap for the largest

@@ -440,7 +440,8 @@ void CheckMotionRange(std::uint32_t offset, std::size_t count) {
 
 }  // namespace
 
-VmafMotion::VmafMotion(VulkanRuntime& runtime) : runtime_(&runtime) {
+VmafMotion::VmafMotion(VulkanRuntime& runtime, std::uint32_t history_base)
+    : runtime_(&runtime), history_base_(history_base) {
     constexpr std::array names{"vmaf_motion_horizontal", "vmaf_motion_reduce"};
     pipelines_ = runtime_->CreatePipelines(names);
 }
@@ -481,8 +482,8 @@ void VmafMotion::Record(
     const MotionPush push{static_cast<std::uint32_t>(size.width),
                           static_cast<std::uint32_t>(size.height),
                           buffers.luma,
-                          buffers.previous,
-                          buffers.blurred,
+                          has_previous ? buffers.previous - history_base_ : 0u,
+                          buffers.blurred - history_base_,
                           0u,  // Reserved to preserve push-constant offsets.
                           buffers.partials,
                           buffers.score,

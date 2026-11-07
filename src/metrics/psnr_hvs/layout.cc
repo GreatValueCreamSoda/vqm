@@ -136,6 +136,8 @@ Layout BuildLayout(const PsnrHvsConfig& config, const VulkanContext& context) {
     if (layout.staging_words >
         std::numeric_limits<std::size_t>::max() / sizeof(float))
         throw std::invalid_argument("psnr_hvs: staging exceeds host addressing");
+    layout.persistent_ranges = {
+        {Bytes(layout.tables), Bytes(kTableWords), true}};
     return layout;
 }
 
@@ -145,7 +147,8 @@ BufferMemoryPlan PlanPsnrHvsMemory(
     const PsnrHvsConfig& config, const VulkanContext& context
 ) {
     const auto layout = psnr_hvs_layout::BuildLayout(config, context);
-    return {layout.bytes, Bytes(layout.staging_words)};
+    return {
+        layout.bytes, Bytes(layout.staging_words), {}, layout.persistent_ranges};
 }
 
 }  // namespace vqm::internal

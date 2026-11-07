@@ -88,23 +88,27 @@ resident handles. VMAF's background and v1 input format are also taken from
 the top-level input configuration. `Native` VMAF v1 requires the two configured
 formats to match; explicit 4:2:0 or 4:4:4 supports different source formats.
 
-With both SSIMULACRA 2 and Butteraugli enabled, their temporary arena is shared
-and the metrics run sequentially. VMAF v0, VMAF v1, CVVDP and PSNR-HVS retain
-their own allocations; their scratch is not part of that shared arena.
-PSNR-HVS has no temporal history. A single selected metric gets only its own
-pipeline. A `Metrics` object
-is one worker and is not thread-safe.
+All selected metrics run sequentially on shared temporary storage, with private
+buffers for retained state. A single selected metric gets only its own pipeline
+and appropriately sized scratch. A `Metrics` object is one worker and is not
+thread-safe.
 
 Host inputs are uploaded separately for each selected metric. To reuse an
 already-uploaded pair without those copies, provide caller-owned
 `VulkanBufferView` inputs on a borrowed device.
 
-`GetMemoryRequirements(config)` from `vqm_metrics.h` queries the selected
-spatial, VMAF, CVVDP and PSNR-HVS allocation requirements before construction;
-`metrics.GetMemoryUsage()` reports the actual corresponding allocations. The
-spatial entry counts shared scratch once. `MaxWorkersForBudgetWorstCase` accepts
-these requirements and per-heap budgets, counting each selected component.
-Leave room for external buffers and driver resources.
+Construction plans every selected metric, allocates one scratch arena sized
+to the largest requirement, and binds it to each private pipeline. Each frame
+reuses that allocation automatically. VMAF motion state and CVVDP history stay
+private; selecting other metrics does not reset their sequences.
+
+`GetMemoryRequirements(config)` from `vqm_metrics.h` queries this layout before
+construction; `metrics.GetMemoryUsage()` reports the corresponding allocations.
+The `scratch` entry counts the shared arena and optional staging buffer once.
+The other entries count private retained storage only, in `auxiliary`; `spatial`
+combines SSIMULACRA 2 and Butteraugli metadata. Their arena and staging fields
+are empty. `MaxWorkersForBudgetWorstCase` counts scratch plus every private
+allocation by heap. Leave room for external buffers and driver resources.
 
 ## PSNR-HVS frame scores
 

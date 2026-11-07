@@ -159,6 +159,11 @@ public:
     [[nodiscard]] PipelineMemoryUsage GetMemoryUsage() const;
 
 private:
+    friend struct internal::MetricScratchAccess;
+    ButteraugliPipeline(
+        ButteraugliConfig config, const VulkanDevice* device,
+        std::shared_ptr<internal::SharedMetricStorage> scratch
+    );
     struct Impl;
     std::unique_ptr<Impl> impl_;
 };

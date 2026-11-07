@@ -44,6 +44,7 @@ struct Push {
 static_assert(sizeof(Push) == 40);
 
 struct Layout {
+    std::vector<PersistentRange> persistent_ranges;
     std::uint32_t tables = 0;
     std::array<std::uint32_t, 2> prepared{};
     std::array<std::uint32_t, 3> partials{};

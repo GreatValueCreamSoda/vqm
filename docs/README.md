@@ -20,7 +20,7 @@ The project README covers CLI usage and score interpretation.
 - [Unified metrics and frame alignment](metrics.md)
 - [Component ownership](architecture.md)
 - [GPU memory planning](memory.md)
-- [Shared spatial scratch](shared-workspace.md)
+- [Shared metric scratch](shared-workspace.md)
 - [Vulkan synchronization](vulkan-synchronization.md)
 
 ## Provenance

@@ -126,7 +126,6 @@ class ButteraugliGpuPipeline {
 public:
     virtual ~ButteraugliGpuPipeline() = default;
     virtual void RequireIdle() const = 0;
-    virtual void ActivateShared() = 0;
 
     [[nodiscard]] virtual std::uint64_t Submit(
         const Image& original, const Image& distorted, float background

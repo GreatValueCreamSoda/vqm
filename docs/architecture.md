@@ -21,6 +21,7 @@ src/
   metrics/
     metrics.cc                 combined metric evaluation
     shared_workspace.*         serial spatial-metric composition
+    metric_scratch.h           shared scratch planning and pipeline construction
     ssimulacra2/                facade, score, layout, Vulkan passes, shaders/
     butteraugli/                facade, tables, layout, Vulkan passes, shaders/
     psnr_hvs/                   facade, layout, FP32 DCT/masking, shaders/

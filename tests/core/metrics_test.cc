@@ -72,13 +72,24 @@ void CheckMemoryRequirements(
 ) {
     CHECK(actual.has_value() == planned.has_value());
     if (!actual || !planned) return;
-    const auto& scenario =
-        actual->uses_staging ? planned->staged : planned->direct;
+    const auto& scenario = (actual->uses_staging || !planned->direct.supported)
+                               ? planned->staged
+                               : planned->direct;
     CHECK(scenario.supported);
     CHECK(actual->arena.buffer_bytes == scenario.arena.buffer_bytes);
     CHECK(actual->arena.allocation_bytes == scenario.arena.allocation_bytes);
     CHECK(actual->staging.buffer_bytes == scenario.staging.buffer_bytes);
     CHECK(actual->staging.allocation_bytes == scenario.staging.allocation_bytes);
+    CHECK(actual->auxiliary.size() == scenario.auxiliary.size());
+    if (actual->auxiliary.size() != scenario.auxiliary.size()) return;
+    for (std::size_t index = 0; index < actual->auxiliary.size(); ++index) {
+        const auto& allocation = actual->auxiliary[index];
+        const auto& expected = scenario.auxiliary[index];
+        CHECK(allocation.buffer_bytes == expected.buffer_bytes);
+        CHECK(allocation.allocation_bytes == expected.allocation_bytes);
+        CHECK(allocation.memory_type == expected.memory_type);
+        CHECK(allocation.heap == expected.heap);
+    }
 }
 
 }  // namespace
@@ -145,6 +156,7 @@ VQM_TEST(TestMetricsAllFrameAlignedScores) {
     Metrics metrics(config);
     const auto memory = metrics.GetMemoryUsage();
     const auto requirements = GetMemoryRequirements(config);
+    CheckMemoryRequirements(memory.scratch, requirements.scratch);
     CheckMemoryRequirements(memory.spatial, requirements.spatial);
     CheckMemoryRequirements(memory.vmaf_v0, requirements.vmaf_v0);
     CheckMemoryRequirements(memory.vmaf_v1, requirements.vmaf_v1);
@@ -287,6 +299,7 @@ VQM_TEST(TestMetricsSelectionAndMemoryUsage) {
     Ssimulacra2Pipeline standalone(single);
     const auto memory = one.GetMemoryUsage();
     const auto requirement = GetMemoryRequirements(config);
+    CheckMemoryRequirements(memory.scratch, requirement.scratch);
     CheckMemoryRequirements(memory.spatial, requirement.spatial);
     CheckMemoryRequirements(memory.vmaf_v0, requirement.vmaf_v0);
     CheckMemoryRequirements(memory.vmaf_v1, requirement.vmaf_v1);
@@ -295,7 +308,7 @@ VQM_TEST(TestMetricsSelectionAndMemoryUsage) {
     CHECK(!memory.vmaf_v1);
     if (memory.spatial) {
         CHECK(
-            memory.spatial->arena.allocation_bytes ==
+            memory.scratch->arena.allocation_bytes ==
             standalone.GetMemoryUsage().arena.allocation_bytes
         );
     }
@@ -321,13 +334,14 @@ VQM_TEST(TestMetricsSelectionAndMemoryUsage) {
     SharedMetricWorkspace expected(shared_config);
     const auto shared_memory = shared.GetMemoryUsage();
     const auto shared_requirement = GetMemoryRequirements(config);
+    CheckMemoryRequirements(shared_memory.scratch, shared_requirement.scratch);
     CheckMemoryRequirements(shared_memory.spatial, shared_requirement.spatial);
     CheckMemoryRequirements(shared_memory.vmaf_v0, shared_requirement.vmaf_v0);
     CheckMemoryRequirements(shared_memory.vmaf_v1, shared_requirement.vmaf_v1);
     CHECK(shared_memory.spatial.has_value());
     if (shared_memory.spatial)
         CHECK(
-            shared_memory.spatial->arena.allocation_bytes ==
+            shared_memory.scratch->arena.allocation_bytes ==
             expected.GetMemoryUsage().arena.allocation_bytes
         );
 }

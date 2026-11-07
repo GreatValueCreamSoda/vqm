@@ -15,6 +15,8 @@
 #include "metrics/ssimulacra2/ssimulacra2_internal.h"
 #include "ssimulacra2.h"
 #include "vulkan.h"
+#include "vulkan/vulkan_support.h"
+#include "vulkan/vulkan_shared_storage.h"
 
 // The metric pipeline: decoded samples -> XYB -> 2x downsample -> Gaussian
 // blur -> error maps -> norms, all of it on the Vulkan compute device. The
@@ -51,7 +53,8 @@ namespace vqm {
 
 struct Ssimulacra2Pipeline::Impl {
     explicit Impl(
-        const Ssimulacra2Config& config, const VulkanDevice* device = nullptr
+        const Ssimulacra2Config& config, const VulkanDevice* device = nullptr,
+        std::shared_ptr<internal::SharedMetricStorage> scratch = {}
     );
     UploadedImage Upload(const Image& image);
     void Release(UploadedImage image);
@@ -71,7 +74,8 @@ struct Ssimulacra2Pipeline::Impl {
 };
 
 Ssimulacra2Pipeline::Impl::Impl(
-    const Ssimulacra2Config& config, const VulkanDevice* device
+    const Ssimulacra2Config& config, const VulkanDevice* device,
+    std::shared_ptr<internal::SharedMetricStorage> scratch
 )
     : size(config.size) {
     // Construct the kernel first to preserve initialization failure ordering.
@@ -86,11 +90,18 @@ Ssimulacra2Pipeline::Impl::Impl(
         );
     }
     resident.Resize(config.gpu_resident_images);
-    gpu = internal::CreateVulkanSsimulacra2Pipeline(
-        {scales.count, scales.sizes.data()}, kernel, config.gpu_resident_images,
-        config.half_planes, config.chroma_filter, config.streaming_inputs,
-        config.input_bytes, config.memory_policy, device
-    );
+    if (scratch)
+        gpu = internal::CreateSharedVulkanSsimulacra2Pipeline(
+            {scales.count, scales.sizes.data()}, kernel, config,
+            scratch->backing().shared_context(), scratch
+        );
+    else
+        gpu = internal::CreateVulkanSsimulacra2Pipeline(
+            {scales.count, scales.sizes.data()}, kernel,
+            config.gpu_resident_images, config.half_planes, config.chroma_filter,
+            config.streaming_inputs, config.input_bytes, config.memory_policy,
+            device
+        );
     if (!gpu) throw std::runtime_error("vulkan: no usable compute device");
 }
 
@@ -136,6 +147,11 @@ Ssimulacra2Pipeline::Ssimulacra2Pipeline(
     : impl_(std::make_unique<Impl>(config, &device)) {}
 
 Ssimulacra2Pipeline::~Ssimulacra2Pipeline() = default;
+Ssimulacra2Pipeline::Ssimulacra2Pipeline(
+    Ssimulacra2Config config, const VulkanDevice* device,
+    std::shared_ptr<internal::SharedMetricStorage> scratch
+)
+    : impl_(std::make_unique<Impl>(config, device, std::move(scratch))) {}
 Ssimulacra2Pipeline::Ssimulacra2Pipeline(Ssimulacra2Pipeline&&) noexcept =
     default;
 Ssimulacra2Pipeline& Ssimulacra2Pipeline::operator=(

@@ -125,6 +125,11 @@ public:
     [[nodiscard]] PipelineMemoryUsage GetMemoryUsage() const;
 
 private:
+    friend struct internal::MetricScratchAccess;
+    PsnrHvsPipeline(
+        PsnrHvsConfig config, const VulkanDevice* device,
+        std::shared_ptr<internal::SharedMetricStorage> scratch
+    );
     struct Impl;
     std::unique_ptr<Impl> impl_;
 };

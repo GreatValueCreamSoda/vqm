@@ -207,6 +207,9 @@ ButterLayoutPlan BuildButterLayout(
 
     PopulateLevelTable(layout, geometry);
     PlanButterStaging(plan, streaming, resident_images);
+    plan.persistent_ranges = {
+        {0, Bytes(kKernelFloats), true},
+        {Bytes(layout.table_word), Bytes(kTableWords), true}};
     return plan;
 }
 
@@ -226,7 +229,9 @@ BufferMemoryPlan PlanButteraugliMemory(
     return {static_cast<std::size_t>(plan.layout.bytes),
             static_cast<std::size_t>(
                 Bytes(plan.staging_partials + 4u * plan.layout.partial_groups)
-            )};
+            ),
+            {},
+            plan.persistent_ranges};
 }
 
 }  // namespace vqm::internal

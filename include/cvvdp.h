@@ -102,6 +102,11 @@ public:
     [[nodiscard]] PipelineMemoryUsage GetMemoryUsage() const;
 
 private:
+    friend struct internal::MetricScratchAccess;
+    CvvdpPipeline(
+        CvvdpConfig config, const VulkanDevice* device,
+        std::shared_ptr<internal::SharedMetricStorage> scratch
+    );
     friend struct internal::CvvdpFrameAccess;
     struct Impl;
     std::unique_ptr<Impl> impl_;
