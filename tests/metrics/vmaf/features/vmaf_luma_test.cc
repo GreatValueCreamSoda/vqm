@@ -4,6 +4,7 @@
 // BSD-2-Clause-Patent; see licenses/NETFLIX-VMAF-LICENSE.
 
 #include <array>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -14,6 +15,7 @@
 #include "support.h"
 #include "vmaf.h"
 #include "metrics/vmaf/features/vmaf_preprocess.h"
+#include "metrics/vmaf/features/vmaf_hdr.h"
 #include "vqm_views.h"
 #include "vqm_vulkan.h"
 #include "vulkan/vulkan_runtime.h"
@@ -572,5 +574,75 @@ VQM_TEST(TestVmafSdrSubsampledYuvSourceEdges) {
             CHECK_NEAR(values[pixels + i], -16.0, 0.02);
             CHECK_NEAR(values[pixels + chroma_area + i], 16.0, 0.02);
         }
+    }
+}
+
+VQM_TEST(TestVmafHdrQuantizesToLimited16BitCodes) {
+    if (!vqm::test::GpuAvailable()) return;
+    constexpr Size size{32, 16};
+    constexpr std::uint32_t luma = 32 * 16, chroma = luma / 4;
+    constexpr std::array output{kOutput, kOutput + luma,
+                                kOutput + luma + chroma};
+    constexpr auto count = luma + 2 * chroma;
+    constexpr auto scratch = kOutput + count;
+    const ImageFormat format{
+        .type = PixelType::Word,
+        .family = ColorFamily::Yuv,
+        .range = PixelRange::Full,
+        .matrix = MatrixCoefficients::Bt2100ICtCp,
+        .transfer = TransferCharacteristics::St2084,
+        .primaries = ColorPrimaries::Bt2020,
+        .subsample_w = 1,
+        .subsample_h = 1,
+        .depth = 10,
+    };
+    Image image{size, format, {}};
+    constexpr std::array<std::uint16_t, 8> samples{0,   64,  129, 503,
+                                                   512, 643, 921, 1023};
+    image.data.resize(RequiredBytes(format, size));
+    for (std::size_t i = 0; i < count; ++i) {
+        const auto code = samples[i % samples.size()];
+        std::memcpy(image.data.data() + 2 * i, &code, sizeof(code));
+    }
+
+    VulkanRuntime::Config config;
+    config.stream_region = {0, 4 * kPixels};
+    config.stream_desc = {kDesc0, kDesc1};
+    config.staging_desc_offset = 8 * kPixels;
+    config.staging_image_bytes = 16 * kPixels;
+    config.base_pixels = luma;
+    config.base_size = size;
+    config.streaming = true;
+    config.push_constant_size = VmafHdrConverter::PushBytes();
+    VulkanRuntime runtime(AcquireVulkanContext(), config);
+    const auto arena_bytes = Bytes(scratch + 2 * luma);
+    runtime.CreateArena(arena_bytes);
+    if (!runtime.arena_visible())
+        runtime.CreateStaging(Bytes(kReadback + count));
+    runtime.CreateCommandObjects();
+    runtime.CreateDescriptors(0, arena_bytes);
+    VmafHdrConverter converter(runtime);
+    runtime.UploadStreaming(image, image);
+    runtime.PrepareSourceBindings({});
+    runtime.BeginCommandBuffer();
+    (void)runtime.PublishSources({});
+    converter.Record(
+        0, kDesc0, format, size, size, {{}, scratch, scratch + luma}, output
+    );
+    if (runtime.arena_visible())
+        runtime.ComputeToHostBarrier();
+    else
+        runtime.RecordReadback(kOutput, kReadback, count);
+    runtime.EndCommandBuffer();
+    runtime.SubmitAndWait();
+    const float* values = runtime.arena_visible()
+                              ? runtime.arena_map() + kOutput
+                              : runtime.staging_map() + kReadback;
+    for (std::size_t i = 0; i < count; ++i) {
+        const double input = samples[i % samples.size()];
+        const double code = i < luma
+                                ? 4096.0 + input * 56064.0 / 1023.0
+                                : 32768.0 + (input - 512.0) * 57344.0 / 1023.0;
+        CHECK(values[i] == std::nearbyint(code) / 256.0 - 128.0);
     }
 }

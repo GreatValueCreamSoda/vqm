@@ -106,6 +106,22 @@ class VideoCliArguments(unittest.TestCase):
                 self.assertIn(flag, result.stderr)
                 self.assertEqual(result.stdout, "")
 
+    def test_rejects_vmaf_v1_model_with_wrong_metric_or_name(self) -> None:
+        """Require a VMAF v1 selection and a supported preset."""
+        for metric, model in (("vmaf-v0", "4k-3h"), ("vmaf-v1", "unknown")):
+            result = _run("--metric", metric, "--vmaf-v1-model", model, "a", "b")
+            self.assertEqual(result.returncode, 2, result.stderr)
+            self.assertIn("--vmaf-v1-model", result.stderr)
+
+    def test_vmaf_v1_temporal_and_hdr_option_validation(self) -> None:
+        """Require VMAF v1 and let its HDR model control geometry."""
+        for flags, flag in ((("--metric", "vmaf-v0", "--vmaf-v1-hfr"), "--vmaf-v1-hfr"),
+                            (("--metric", "vmaf-v1", "--vmaf-v1-model", "hdr-4k-1.5h",
+                              "--vmaf-pad"), "--vmaf-pad")):
+            result = _run(*flags, "a", "b")
+            self.assertEqual(result.returncode, 2, result.stderr)
+            self.assertIn(flag, result.stderr)
+
     def test_pair_list_requires_machine_output_and_unique_ids(self) -> None:
         """Validate complete TSV records before opening any clip or GPU."""
         with tempfile.TemporaryDirectory() as temporary:
@@ -216,6 +232,43 @@ class VideoCliGpu(unittest.TestCase):
         for metric, results in features.items():
             with self.subTest(metric=metric):
                 self.assertEqual(len(results), len(modes))
+
+    def test_vmaf_v1_hfr_drains_both_frames(self) -> None:
+        """Keep both delayed HFR scores in the ordered CLI report."""
+        _require_gpu()
+        root = Path(self.enterContext(tempfile.TemporaryDirectory()))
+        original = root / "hfr-original.y4m"
+        distorted = root / "hfr-distorted.y4m"
+        _write_y4m(original, width=216, height=80, fps="60000:1001")
+        _write_y4m(distorted, width=216, height=80, fps="60000:1001", distorted=True)
+        result = _run(
+            "--json", "--metric", "vmaf-v0,vmaf-v1", "--vmaf-v1-hfr", original,
+            distorted
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        for line in result.stdout.splitlines():
+            clip = json.loads(line)
+            self.assertEqual(clip["frames"], 3)
+            self.assertEqual(
+                [frame["index"] for frame in clip["frame_results"]], [0, 1, 2]
+            )
+
+    def test_vmaf_v1_4k_3h_can_score_above_100(self) -> None:
+        """Pass the selected predictor through to clip scoring and reporting."""
+        _require_gpu()
+        root = Path(self.enterContext(tempfile.TemporaryDirectory()))
+        original = root / "clip.y4m"
+        _write_y4m(original, width=320, height=240)
+        result = _run(
+            "--json", "--verbose", "--metric", "vmaf-v1", "--vmaf-v1-model", "4k-3h",
+            original, original
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        report = json.loads(result.stdout)
+        self.assertGreater(report["score"], 100)
+        self.assertLessEqual(report["score"], 110)
+        scores = [frame["score"] for frame in report["frame_results"]]
+        self.assertEqual(report["frame_stats"]["perfect_frames"], scores.count(110))
 
     def test_psnr_hvs_pools_frame_errors_before_db_conversion(self) -> None:
         """Zero-error frames contribute to the clip mean without dominating it."""

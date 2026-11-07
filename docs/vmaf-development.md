@@ -1,7 +1,7 @@
 # VMAF
 
 VQM exposes two Vulkan sequence pipelines: the floating-point v0.6.1 model in
-`vmaf.h`, and the standard SDR v1.0.16 3H model in `vmaf_v1.h`. Both evaluate
+`vmaf.h`, and the SDR and HDR v1 models in `vmaf_v1.h`. Both evaluate
 ordered frame pairs and return per-frame scores and features. They accept
 pre-uploaded images, strided host views and caller-owned Vulkan buffers as well
 as owning `Image` inputs. Borrowed buffers must remain alive and unmodified
@@ -22,8 +22,8 @@ if (auto ready = pipeline.Push(ref, dist)) {
     // ready->index and ready->score identify an emitted frame.
 }
 // Push the remaining pairs in sequence order, collecting every ready frame.
-if (auto last = pipeline.Flush()) {
-    // Collect the final frame, including the only frame of a still image.
+while (auto tail = pipeline.Flush()) {
+    // Collect each delayed frame, including the only frame of a still image.
 }
 auto mean = pipeline.PooledScore(); // arithmetic mean, or nullopt if empty
 ```
@@ -33,16 +33,17 @@ look-ahead for motion2. With `temporal_weighting = false`, every V0 `Push`
 emits its own frame and `Flush` emits none. V1's first `Push` emits nothing:
 frame zero receives the first reference transition for a multi-frame sequence,
 and is emitted after the second `Push`. A single-frame V1 sequence receives
-zero motion on `Flush`.
-For both pipelines, `Flush` completes the sequence and `Reset` starts another.
+zero motion on `Flush`. HFR starts emitting on the third push. The first
+`Flush` closes input, and each call returns at most one remaining frame. After
+draining, `PooledScore` returns the mean. `Reset` starts another sequence.
 The decoded inputs must remain valid during `Push`. Every resident call prepares
-both images; the retained previous reference is used for the motion feature.
+both images and retains filtered reference history for motion.
 
 ## Inputs and precision
 
 Both pipelines accept the SDR planar image formats supported by VQM, including
-RGB, YUV and grayscale, integer and floating-point samples, and alpha. PQ and
-HLG transfer functions are rejected because the implemented model is SDR.
+RGB, YUV and grayscale, integer and floating-point samples, and alpha.
+SDR presets require an SDR transfer function.
 The caller describes each source's color metadata and format; the same rules
 and layout requirements used by SSIMULACRA 2 apply to the input.
 
@@ -79,7 +80,8 @@ sequence that started in the conversion domain. V1's
 inputs. Values 6–16 specify the original encode bit depth for CAMBI's
 anti-dithering. CAMBI uses the luma canvas selected by `fit`.
 
-V1 needs each chroma plane to be at least 80×80. Its CAMBI path requires at
+SDR v1 needs each chroma plane to be at least 80×80 after the selected model's
+SpEED prescale. Its CAMBI path requires at
 least one luma dimension of 216 pixels or more and all five scales to fit the
 computed window. The effective CAMBI scale cannot exceed 1920×1080, and its
 odd window cannot exceed 33 pixels. At or above 1920×1080 pixels by area, the
@@ -89,13 +91,11 @@ CAMBI scale. These restrictions are checked by the pipeline constructor.
 The GPU feature stages use FP32. The conversion path quantizes its intermediate
 to 16-bit codes; CAMBI deliberately uses a 10-bit integer code domain. The CPU
 model predictors use double precision, as in libvmaf. V0 implements the float
-v0.6.1 feature path for both shipped predictor tables. V1 targets
-`vmaf_v1.0.16_3d0h.json`, whose reference uses integer ADM3 and motion3; VQM's
+v0.6.1 feature path for both shipped predictor tables. The v1 reference
+models use integer ADM3 and motion3. VQM's
 corresponding FP32 GPU features approximate those extractors. FP32 filters,
 reductions and nonlinear operations can also differ in evaluation order and
-rounding. Neither implementation promises bit-exact results. The v0.6.1
-integer feature extractor and v1 phone, 4K-display, HFR and HDR model variants
-are not implemented.
+rounding. Neither implementation promises bit-exact results.
 
 ## v0.6.1 models
 
@@ -148,13 +148,82 @@ intervals. Plain `b` resamples the training data and `rb` bootstraps prediction
 residues. The upstream guide recommends `b`.
 [Pinned confidence interval guide](https://github.com/Netflix/vmaf/blob/4611e47a7330cd342498dcc130e1008efbeab6e4/resource/doc/conf_interval.md)
 
-`VmafConfig::fit` and `VmafV1Config::fit` select the feature geometry.
+## v1.0.16 SDR models
+
+Set `VmafV1Config::model` in C++ or use `--vmaf-v1-model` in `vqm` and
+`vqm_bench`. Viewing distance is expressed in screen heights.
+
+| Preset | Canvas | Netflix model suffix | SpEED chroma prescale | Score range |
+| --- | --- | --- | ---: | ---: |
+| `1080p-3h` (default) | 1920×1080 | `3d0h` | 1× | 0–100 |
+| `4k-1.5h` | 3840×2160 | `1d5h_2160` | 1× | 0–100 |
+| `4k-3h` | 3840×2160 | `3d0h_2160` | 0.5× | 0–110 |
+| `phone-5h` | 1920×1080 | `5d0h` | 0.6× | 0–100 |
+
+The presets share the same SVM coefficients. They select their own ADM3
+sensitivity, SpEED prescale, score transform, and clipping range. The CLI's
+`Perfect` statistic counts frames at the selected model's score ceiling.
+[Pinned model guide](https://github.com/Netflix/vmaf/blob/4611e47a7330cd342498dcc130e1008efbeab6e4/resource/doc/models_v1.md)
+
+```sh
+./build/vqm --metric vmaf-v1 --vmaf-v1-model 4k-1.5h --vmaf-scale original.y4m distorted.y4m
+```
+
+## HFR motion
+
+Set `VmafV1Config::hfr` or pass `--vmaf-v1-hfr` for the matching HFR variant
+of the selected viewing preset, including HDR. The flag targets roughly
+50/60 fps content. It selects two-frame reference differencing and a moving
+average of the processed motion feature. Spatial features and predictor
+coefficients come from the selected viewing preset.
+[Pinned HFR model guide](https://github.com/Netflix/vmaf/blob/4611e47a7330cd342498dcc130e1008efbeab6e4/resource/doc/models_v1.md#high-frame-rate-hfr-content)
+
+## v1.1.8 HDR model
+
+Select `--vmaf-v1-model hdr-4k-1.5h` or `VmafV1Model::Hdr4K`. VQM accepts
+8-, 10-, 12-, or 16-bit PQ BT.2020 YUV using BT.2020 non-constant luminance
+or ICtCp, with 4:2:0, 4:2:2, or 4:4:4 chroma. The API reads each input's
+format independently. For HDR10 in Y4M, set the color metadata on the CLI.
+
+```sh
+./build/vqm --metric vmaf-v1 --vmaf-v1-model hdr-4k-1.5h \
+  --input-transfer st2084 --input-primaries bt2020 \
+  --input-matrix bt2020ncl --input-range limited original.y4m distorted.y4m
+```
+
+The model scales the short side to 2160 pixels while retaining aspect ratio
+and orientation. Its feature input is limited-range PQ BT.2020 ICtCp 4:2:0.
+The Vulkan conversion uses bicubic luma and bilinear chroma and rounds each
+output sample to the nearest 16-bit code, with ties to even and no dithering. Those codes
+are stored exactly in the same FP32 feature planes used by SDR. The HDR
+feature settings include PQ CAMBI thresholds and the ADM3 MAE sensitivity
+blend with the finest scale excluded from pooling. GPU resampling and
+transfer arithmetic can produce small differences from zimg's code values.
+[Pinned HDR model guide](https://github.com/Netflix/vmaf/blob/4611e47a7330cd342498dcc130e1008efbeab6e4/resource/doc/models_v1.md#hdr-models)
+
+To regenerate the HDR oracle, build the pinned libvmaf reference with zimg
+available to Meson, then run the fixture generator.
+
+```sh
+python3 tools/fetch_references.py --only vmaf
+python3 tools/build_references.py --only vmaf
+meson setup build/vmaf-hdr-build build/vmaf-src/libvmaf --buildtype=release \
+  -Ddefault_library=static -Dbuilt_in_models=false -Denable_asm=false \
+  -Denable_tests=false -Denable_docs=false -Denable_tools=true \
+  -Denable_float=true -Denable_zimg=true
+meson compile -C build/vmaf-hdr-build
+.venv/bin/python tests/make_vmaf_v1_oracles.py --hdr > tests/metrics/vmaf/pipeline/vmaf_v1_hdr_reference.inc
+```
+
+## Feature geometry
+
+For SDR, `VmafConfig::fit` and `VmafV1Config::fit` select the feature geometry.
 `VmafFitMode::Native` is the default and uses the input dimensions.
 `Fit` scales the content to fit inside the model canvas, preserving aspect
 ratio. `Pad` centers the content in the smallest enclosing 16:9 canvas with
 integer dimensions at source scale. `FitAndPad` combines scaling and padding
-to the model canvas. The canvas is 1920×1080 for both standard models and
-3840×2160 for the v0 4K model. `VmafConfig::model_size` overrides the v0
+to the model canvas. The canvas is 1920×1080 for standard and phone viewing
+and 3840×2160 for 4K viewing. `VmafConfig::model_size` overrides the v0
 canvas for `Fit` and `FitAndPad`.
 
 V1 applies the geometry to luma and chroma. Padding uses black luma and

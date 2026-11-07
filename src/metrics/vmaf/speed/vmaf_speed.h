@@ -121,8 +121,29 @@ struct VmafSpeedBuffers {
     std::uint32_t result = 0;
 };
 
-// Standard v1.0.16 SpEED UV with default 1x prescale, model noise/floor,
-// variance mode 5 and 45 cap. The chroma planes must be at least 80x80.
+// Bilinear prescale of reference/distorted U and V before SpEED filtering.
+// The four source and destination planes must be disjoint.
+class VmafSpeedPrescaler {
+public:
+    explicit VmafSpeedPrescaler(VulkanRuntime& runtime);
+    ~VmafSpeedPrescaler();
+    VmafSpeedPrescaler(const VmafSpeedPrescaler&) = delete;
+    VmafSpeedPrescaler& operator=(const VmafSpeedPrescaler&) = delete;
+    [[nodiscard]] static constexpr std::size_t PushBytes() noexcept {
+        return 12 * sizeof(std::uint32_t);
+    }
+    void Record(
+        Size input, Size output, const std::array<std::uint32_t, 4>& source,
+        const VmafSpeedBuffers& buffers
+    );
+
+private:
+    VulkanRuntime& runtime_;
+    VkPipeline pipeline_;
+};
+
+// SDR v1.0.16 SpEED UV after any prescale, with model noise/floor, variance
+// mode 5 and 45 cap. The chroma planes must be at least 80x80.
 // Output is score, status: 0 regular, 1 singular channel(s) imputed per
 // libvmaf, 2 numerical failure (the caller must not use that score).
 // Caller owns the arena, descriptor binding, submission and readback.

@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include <array>
 #include <cstdint>
 #include <optional>
 
@@ -11,21 +12,27 @@
 
 namespace vqm::internal {
 
-// Motion3 timeline for the pinned v1.0.16 3H model's default temporal
-// options (motion_max_val=18, no moving average, no five-frame window).
-// Push receives the transition from the previous reference (zero for the
-// first). Frame zero is stamped with the first transition, so no result is
-// ready until Push 1. Following frames need one additional transition; Flush
-// emits the last, or frame zero with value zero for a single-frame sequence.
+// Motion3 for pinned VMAF v1. Push receives the reference transition at the
+// selected stride (one for standard, two for HFR), or zero before that stride.
 class VmafV1MotionTimeline {
 public:
+    explicit VmafV1MotionTimeline(bool hfr = false) : hfr_(hfr) {}
     [[nodiscard]] std::optional<VmafMotionFrame> Push(double transition);
     [[nodiscard]] std::optional<VmafMotionFrame> Flush();
+    [[nodiscard]] bool Drained() const noexcept {
+        return finished_ && next_ == frames_;
+    }
     void Reset() noexcept;
 
 private:
+    [[nodiscard]] double AdvanceHfr(std::uint64_t index, double transition);
     std::uint64_t frames_ = 0;
+    std::uint64_t next_ = 0;
     double previous_transition_ = 0;
+    double older_transition_ = 0;
+    double hfr_motion_ = 0;
+    double hfr_processed_ = 0;
+    bool hfr_;
     bool finished_ = false;
 };
 
@@ -43,7 +50,11 @@ struct VmafV1Frame {
 };
 class VmafV1Sequence {
 public:
-    explicit VmafV1Sequence(bool clip = true) : clip_(clip) {}
+    explicit VmafV1Sequence(
+        bool clip = true, VmafV1Model model = VmafV1Model::Standard1080,
+        bool hfr = false
+    )
+        : motion_(hfr), clip_(clip), model_(model) {}
     [[nodiscard]] std::optional<VmafV1Frame> Push(
         const VmafV1Spatial& spatial, double transition
     );
@@ -52,15 +63,16 @@ public:
     void Reset() noexcept;
 
 private:
-    [[nodiscard]] VmafV1Frame FinishFrame(
-        std::uint64_t index, const VmafV1Spatial& spatial, double motion
+    [[nodiscard]] std::optional<VmafV1Frame> FinishFrame(
+        const std::optional<VmafMotionFrame>& ready
     );
     VmafV1MotionTimeline motion_;
-    std::optional<VmafV1Spatial> pending_;
+    std::array<VmafV1Spatial, 3> pending_{};
+    std::uint64_t submitted_ = 0;
     double score_sum_ = 0;
     std::uint64_t emitted_ = 0;
-    bool finished_ = false;
     bool clip_;
+    VmafV1Model model_;
 };
 
 }  // namespace vqm::internal

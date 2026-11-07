@@ -58,10 +58,12 @@ struct BenchOptions {
     // Native preserves coded YUV; explicit modes normalize to the chosen SDR
     // chroma layout before scoring.
     std::string vmaf_chroma = "native";
-    // VMAF v0 only: keep the source geometry or fit it into the model canvas.
+    // Keep the source geometry or fit it into the selected model canvas.
     std::string vmaf_fit = "native";
     // VMAF v0.6.1 predictor and feature/score options.
     std::string vmaf_model = "1080";
+    std::optional<vqm::VmafV1Model> vmaf_v1_model;
+    bool vmaf_v1_hfr = false;
     bool vmaf_neg = false;
     bool vmaf_transform = false;
     bool vmaf_temporal = true;

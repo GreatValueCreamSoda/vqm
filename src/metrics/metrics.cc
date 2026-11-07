@@ -17,6 +17,7 @@
 #include "metrics/cvvdp/cvvdp_internal.h"
 #include "metrics/psnr_hvs/layout.h"
 #include "metrics/vmaf/features/vmaf_preprocess.h"
+#include "metrics/vmaf/features/vmaf_hdr.h"
 #include "vqm_shared.h"
 #include "vqm_views.h"
 #include "vqm_vulkan.h"
@@ -50,7 +51,13 @@ SelectedConfigs SelectConfigs(const MetricsConfig& config) {
     internal::ValidateImage(
         config.distorted_format, config.size, "distorted format"
     );
-    if (config.vmaf_v0 || config.vmaf_v1) {
+    const bool hdr =
+        config.vmaf_v1 && config.vmaf_v1->model == VmafV1Model::Hdr4K;
+    if (hdr) {
+        internal::ValidateVmafHdrFormat(config.original_format);
+        internal::ValidateVmafHdrFormat(config.distorted_format);
+    }
+    if (config.vmaf_v0 || (config.vmaf_v1 && !hdr)) {
         internal::ValidateVmafSdrFormat(config.original_format);
         internal::ValidateVmafSdrFormat(config.distorted_format);
     }
@@ -108,7 +115,7 @@ SelectedConfigs SelectConfigs(const MetricsConfig& config) {
         configure_inputs(metric);
         metric.input_format = config.original_format;
         metric.background = config.background;
-        if (metric.chroma_sampling == VmafChromaSampling::Native &&
+        if (!hdr && metric.chroma_sampling == VmafChromaSampling::Native &&
             !internal::SameImageFormat(
                 config.original_format, config.distorted_format
             ))
@@ -496,14 +503,16 @@ struct Metrics::Impl {
     std::optional<MetricsResult> Flush() {
         if (failed)
             throw std::logic_error("metrics: previous call failed; call Reset");
-        if (finished) return std::nullopt;
         try {
-            if (v0) AddFrame(v0->Flush(), false);
-            if (v1) AddFrame(v1->Flush(), true);
-            if (cvvdp) final_cvvdp = cvvdp->Finalize();
-            finished = true;
+            if (!finished) {
+                if (v0) AddFrame(v0->Flush(), false);
+                if (v1)
+                    while (const auto frame = v1->Flush()) AddFrame(frame, true);
+                if (cvvdp) final_cvvdp = cvvdp->Finalize();
+                finished = true;
+            }
             auto result = TakeReady();
-            if (!pending.empty())
+            if (!result && !pending.empty())
                 throw std::logic_error("metrics: incomplete frame at flush");
             return result;
         } catch (...) {
@@ -610,7 +619,11 @@ MetricsResult Metrics::ComputeImage(
 std::optional<MetricsResult> Metrics::Flush() { return impl_->Flush(); }
 MetricsFinalResult Metrics::Finalize() {
     auto tail = impl_->Flush();
-    return {std::move(tail), impl_->final_cvvdp, impl_->next_index};
+    auto last = impl_->Flush();
+    if (!last)
+        return {std::move(tail), impl_->final_cvvdp, impl_->next_index, {}};
+    return {std::move(last), impl_->final_cvvdp, impl_->next_index,
+            std::move(tail)};
 }
 void Metrics::Reset() { impl_->Reset(); }
 MetricsMemoryUsage Metrics::GetMemoryUsage() const {

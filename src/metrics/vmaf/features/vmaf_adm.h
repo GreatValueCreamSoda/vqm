@@ -10,6 +10,7 @@
 #include <vulkan/vulkan.h>
 
 #include "vqm_image.h"
+#include "vmaf_v1.h"
 
 namespace vqm::internal {
 
@@ -93,7 +94,7 @@ private:
 
 // ADM3 (v1.0.16 3H)
 
-// Float approximation of the v1.0.16 3H ADM3 feature. The buffers have the
+// Float approximation of the v1.0.16 SDR ADM3 feature. The buffers have the
 // same layout as VmafAdmBuffers, except partials need 9*PartialCount words and
 // results need 13 words: (DLM numerator, denominator, AIM numerator) for each
 // scale, then ADM3. The source is still coded luma scaled to 8-bit values.
@@ -106,7 +107,10 @@ public:
     static constexpr std::size_t PushBytes() noexcept {
         return VmafAdm::PushBytes();
     }
-    void Record(Size input, const VmafAdmBuffers& buffers);
+    void Record(
+        Size input, const VmafAdmBuffers& buffers,
+        VmafV1Model model = VmafV1Model::Standard1080
+    );
 
 private:
     VulkanRuntime* runtime_;

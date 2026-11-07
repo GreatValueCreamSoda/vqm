@@ -19,6 +19,7 @@
 #include "metrics/vmaf/features/vmaf_adm.h"
 #include "metrics/vmaf/cambi/vmaf_cambi.h"
 #include "metrics/vmaf/features/vmaf_preprocess.h"
+#include "metrics/vmaf/features/vmaf_hdr.h"
 #include "metrics/vmaf/vmaf_memory.h"
 #include "metrics/vmaf/speed/vmaf_speed.h"
 #include "metrics/vmaf/v1/vmaf_v1_internal.h"
@@ -38,35 +39,50 @@ std::optional<VmafMotionFrame> VmafV1MotionTimeline::Push(double transition) {
     if (finished_) throw std::logic_error("vmaf motion3: sequence is finished");
     if (!std::isfinite(transition) || transition < 0.0)
         throw std::invalid_argument("vmaf motion3: invalid transition");
-    if (frames_ == 0) {
-        if (transition != 0.0)
-            throw std::invalid_argument(
-                "vmaf motion3: first transition must be zero"
-            );
-        frames_ = 1;
-        return std::nullopt;
-    }
+    const auto stride = hfr_ ? 2u : 1u;
+    if (frames_ < stride && transition != 0.0)
+        throw std::invalid_argument("vmaf motion3: missing reference history");
     if (frames_ == std::numeric_limits<std::uint64_t>::max())
         throw std::overflow_error("vmaf motion3: too many frames");
+    const auto index = frames_++;
+    if (index < stride) return std::nullopt;
     const auto current = std::min(transition, 18.0);
-    const VmafMotionFrame result{
-        frames_ - 1,
-        frames_ == 1 ? current : std::min(previous_transition_, current)};
+    const double score = hfr_         ? AdvanceHfr(index, current)
+                         : index == 1 ? current
+                                      : std::min(previous_transition_, current);
+    older_transition_ = previous_transition_;
     previous_transition_ = current;
-    ++frames_;
-    return result;
+    return VmafMotionFrame{next_++, score};
 }
+
+double VmafV1MotionTimeline::AdvanceHfr(std::uint64_t index, double transition) {
+    if (index == 2) {
+        hfr_motion_ = hfr_processed_ = transition;
+        return transition;
+    }
+    // Compute motion3 for the previous frame. Keep it until that frame's
+    // spatial features reach the head of the two-frame output delay.
+    const auto score = hfr_motion_;
+    const auto processed =
+        index == 3 ? transition : std::min(older_transition_, transition);
+    hfr_motion_ = (processed + hfr_processed_) / 2.0;
+    hfr_processed_ = processed;
+    return score;
+}
+
 std::optional<VmafMotionFrame> VmafV1MotionTimeline::Flush() {
-    if (finished_) return std::nullopt;
     finished_ = true;
-    if (frames_ == 0) return std::nullopt;
-    return VmafMotionFrame{frames_ - 1,
-                           frames_ == 1 ? 0.0 : previous_transition_};
+    if (Drained()) return std::nullopt;
+    double score = previous_transition_;
+    if (hfr_) {
+        score = next_ + 1 < frames_
+                    ? hfr_motion_
+                    : (previous_transition_ + hfr_processed_) / 2.0;
+    }
+    return VmafMotionFrame{next_++, score};
 }
 void VmafV1MotionTimeline::Reset() noexcept {
-    frames_ = 0;
-    previous_transition_ = 0.0;
-    finished_ = false;
+    *this = VmafV1MotionTimeline(hfr_);
 }
 
 }  // namespace vqm::internal
@@ -76,55 +92,42 @@ void VmafV1MotionTimeline::Reset() noexcept {
 
 namespace vqm::internal {
 
-VmafV1Frame VmafV1Sequence::FinishFrame(
-    std::uint64_t index, const VmafV1Spatial& spatial, double motion
+std::optional<VmafV1Frame> VmafV1Sequence::FinishFrame(
+    const std::optional<VmafMotionFrame>& ready
 ) {
+    if (!ready) return std::nullopt;
+    const auto& spatial = pending_[ready->index % pending_.size()];
     const VmafV1Features features{spatial.cambi, spatial.speed_chroma_uv,
-                                  spatial.adm3, motion};
-    const double score = VmafV1Predict(features, clip_);
+                                  spatial.adm3, ready->motion2};
+    const double score = VmafV1Predict(features, clip_, model_);
     score_sum_ += score;
     ++emitted_;
-    return {index, features, score};
+    return VmafV1Frame{ready->index, features, score};
 }
 std::optional<VmafV1Frame> VmafV1Sequence::Push(
     const VmafV1Spatial& spatial, double transition
 ) {
-    if (finished_) throw std::logic_error("vmaf v1: sequence is finished");
     if (!std::isfinite(spatial.cambi) ||
         !std::isfinite(spatial.speed_chroma_uv) || !std::isfinite(spatial.adm3))
         throw std::invalid_argument("vmaf v1: spatial features must be finite");
     const auto ready = motion_.Push(transition);
-    if (!ready) {
-        pending_ = spatial;
-        return std::nullopt;
-    }
-    if (!pending_) throw std::logic_error("vmaf v1: missing pending frame");
-    const auto result = FinishFrame(ready->index, *pending_, ready->motion2);
-    pending_ = spatial;
-    return result;
+    pending_[submitted_++ % pending_.size()] = spatial;
+    return FinishFrame(ready);
 }
 std::optional<VmafV1Frame> VmafV1Sequence::Flush() {
-    if (finished_) return std::nullopt;
-    const auto ready = motion_.Flush();
-    finished_ = true;
-    if (!ready) return std::nullopt;
-    if (!pending_) throw std::logic_error("vmaf v1: missing pending frame");
-    const auto result = FinishFrame(ready->index, *pending_, ready->motion2);
-    pending_.reset();
-    return result;
+    return FinishFrame(motion_.Flush());
 }
 std::optional<double> VmafV1Sequence::PooledScore() const {
-    if (!finished_)
+    if (!motion_.Drained())
         throw std::logic_error("vmaf v1: flush sequence before pooling");
     if (emitted_ == 0) return std::nullopt;
     return score_sum_ / static_cast<double>(emitted_);
 }
 void VmafV1Sequence::Reset() noexcept {
     motion_.Reset();
-    pending_.reset();
+    submitted_ = 0;
     score_sum_ = 0;
     emitted_ = 0;
-    finished_ = false;
 }
 
 }  // namespace vqm::internal
@@ -149,14 +152,15 @@ struct ReadbackLayout {
 constexpr std::size_t RequiredPushBytes() {
     return std::max(
         {VmafAdm3::PushBytes(), VmafCambi::PushBytes(), VmafSpeed::PushBytes(),
-         VmafMotion::PushBytes(), VmafLumaConverter::PushBytes(),
-         VmafSdrConverter::PushBytes(), VmafResizer::PushBytes()}
+         VmafSpeedPrescaler::PushBytes(), VmafMotion::PushBytes(),
+         VmafLumaConverter::PushBytes(), VmafSdrConverter::PushBytes(),
+         VmafResizer::PushBytes(), VmafHdrConverter::PushBytes()}
     );
 }
 
 void ValidateDispatchLimits(
     Size source_size, Size size, Size chroma_size, const VmafCambiPlan& cambi,
-    const VkPhysicalDeviceLimits& limits
+    const VkPhysicalDeviceLimits& limits, bool hdr
 ) {
     // SpEED covariance emits 1250 groups for each of its two channels, and
     // the batched filter uses four independent planes in dispatch Z. CAMBI
@@ -170,14 +174,14 @@ void ValidateDispatchLimits(
         std::max<std::size_t>({Groups(source_size.width, 16),
                                Groups(size.width, 16), 2500, speed_partials,
                                cambi_partials});
-    const auto groups_y =
-        std::max<std::uint32_t>({Groups(source_size.height, 16),
-                                 Groups(size.height, 8),
-                                 Groups(cambi.max_scale_size.height, 8), 5});
+    const auto groups_y = std::max<std::uint32_t>(
+        {Groups(source_size.height, 16), Groups(size.height, 8),
+         Groups(cambi.max_scale_size.height, hdr ? 2u : 8u), 5}
+    );
     // The 256x1 and 16x16 shaders are always used. The optional 512-wide
     // SpEED eigen shader is selected only when the device supports it.
-    // CAMBI contrast's fixed shared arrays occupy 16,004 bytes; see its
-    // shader declaration. No other unconditional VMAF v1 shader uses more.
+    // SDR CAMBI contrast's fixed shared arrays occupy 16,004 bytes.
+    // The packed PQ variant fits in the same limit.
     constexpr std::uint32_t kMinSharedBytes =
         (48 * 40 + 8 * 256 + 1 + 8 * 4) * 4;
     if (limits.maxComputeWorkGroupSize[0] < 256 ||
@@ -195,7 +199,6 @@ void ValidateDispatchLimits(
     }
 }
 
-constexpr Size kModelCanvas{1920, 1080};
 using FramePlanes = std::array<std::array<std::uint32_t, 3>, 2>;
 
 std::size_t CheckedPixels(Size size) {
@@ -245,11 +248,15 @@ struct Layout {
     VmafSpeedBuffers speed{};
     VmafCambiBuffers cambi{};
     VmafMotionBuffers motion{};
+    std::uint32_t older_motion = 0;
     Size base_size{};
     Size feature_size{};
     Size chroma_size{};
+    Size speed_size{};
+    std::array<std::uint32_t, 4> chroma_source{};
     std::optional<FrameFit> fit;
     VmafCambiPlan cambi_plan{};
+    std::optional<VmafHdrBuffers> hdr;
     std::uint32_t depth = 0;
     bool native_input = false;
     bool chroma420 = false;
@@ -260,8 +267,19 @@ struct Layout {
     explicit Layout(const VmafV1Config& config) {
         base_size = config.size;
         const auto source_pixels = CheckedPixels(base_size);
+        const auto& model = VmafV1Parameters(config.model);
+        const bool hdr_model = config.model == VmafV1Model::Hdr4K;
+        if (hdr_model && (config.fit != VmafFitMode::Native ||
+                          config.chroma_sampling != VmafChromaSampling::Native))
+            throw std::invalid_argument(
+                "vmaf v1 HDR: model controls scaling and chroma subsampling"
+            );
         const auto geometry =
-            PlanVmafGeometry(base_size, kModelCanvas, config.fit);
+            hdr_model ? VmafFrameGeometry{VmafHdrGeometry(
+                                              base_size, model.canvas.height
+                                          ),
+                                          {}}
+                      : PlanVmafGeometry(base_size, model.canvas, config.fit);
         feature_size = geometry.canvas;
         const auto size = feature_size;
         const auto pixels = CheckedPixels(size);
@@ -271,7 +289,7 @@ struct Layout {
             config.chroma_sampling != VmafChromaSampling::Yuv444)
             throw std::invalid_argument("vmaf v1: invalid chroma sampling");
         const bool native_mode =
-            config.chroma_sampling == VmafChromaSampling::Native;
+            !hdr_model && config.chroma_sampling == VmafChromaSampling::Native;
         if (native_mode) {
             ValidateVmafSdrFormat(fmt);
             ValidateImage(fmt, base_size, "vmaf v1 input format");
@@ -307,7 +325,7 @@ struct Layout {
         const auto source_chroma =
             SubsampledSize(base_size, subsample_w, subsample_h);
         chroma_size = SubsampledSize(size, subsample_w, subsample_h);
-        if (base_size != size) {
+        if (!hdr_model && base_size != size) {
             fit.emplace();
             fit->luma = {base_size, size, geometry.fit};
             // Project the luma rectangle onto the coded chroma grid. Keep the
@@ -318,14 +336,24 @@ struct Layout {
                 {SubsampledSize(geometry.fit.content, subsample_w, subsample_h),
                  geometry.fit.x >> subsample_w, geometry.fit.y >> subsample_h}};
         }
-        const std::size_t chroma = chroma_size.width * chroma_size.height;
+        // Match the pinned SpEED extractor's nearest-integer dimensions.
+        speed_size = {
+            static_cast<std::size_t>(
+                static_cast<double>(chroma_size.width) * model.chroma_prescale +
+                0.5
+            ),
+            static_cast<std::size_t>(
+                static_cast<double>(chroma_size.height) * model.chroma_prescale +
+                0.5
+            )};
+        const std::size_t speed_pixels = speed_size.width * speed_size.height;
         const std::size_t speed_scratch =
-            VmafSpeedFilter::ScratchWords(chroma_size);
+            VmafSpeedFilter::ScratchWords(speed_size);
         const std::size_t speed_output =
-            VmafSpeedFilter::OutputPixels(chroma_size);
-        const Size filtered{chroma_size.width / 16, chroma_size.height / 16};
+            VmafSpeedFilter::OutputPixels(speed_size);
+        const Size filtered{speed_size.width / 16, speed_size.height / 16};
         const auto speed_partials = VmafSpeedStats::PartialCount(filtered);
-        cambi_plan = VmafCambi::Plan(size);
+        cambi_plan = VmafCambi::Plan(size, hdr_model);
         std::uint64_t cursor = 0;
         auto add = [&](std::uint64_t count) {
             if (count > std::numeric_limits<std::uint32_t>::max() - cursor)
@@ -345,6 +373,15 @@ struct Layout {
         resident.reserve(config.gpu_resident_images);
         for (std::size_t i = 0; i < config.gpu_resident_images; ++i)
             resident.push_back(add(4 * source_pixels));
+        if (hdr_model) {
+            hdr.emplace();
+            hdr->source = add(source_pixels);
+            hdr->horizontal =
+                add(std::max(base_size.width, size.width) * base_size.height);
+            const auto working_pixels = std::min(base_size.width, size.width) *
+                                        std::min(base_size.height, size.height);
+            for (auto& plane : hdr->working) plane = add(working_pixels);
+        }
         if (fit) {
             const auto chroma_pixels =
                 source_chroma.width * source_chroma.height;
@@ -375,8 +412,14 @@ struct Layout {
         cambi.result = add(1);
         motion.score = add(1);
         for (std::size_t i = 0; i < 2; ++i) {
-            speed.reference[i] = add(chroma);
-            speed.distorted[i] = add(chroma);
+            speed.reference[i] = add(speed_pixels);
+            speed.distorted[i] = add(speed_pixels);
+        }
+        chroma_source = {speed.reference[0], speed.reference[1],
+                         speed.distorted[0], speed.distorted[1]};
+        if (speed_size != chroma_size) {
+            for (auto& plane : chroma_source)
+                plane = add(chroma_size.width * chroma_size.height);
         }
         speed.filter_scratch = add(4 * speed_scratch);
         speed.down = add(4 * speed_output);
@@ -403,6 +446,7 @@ struct Layout {
         motion.luma = adm.reference[0];
         motion.previous = add(pixels);
         motion.blurred = add(pixels);
+        if (config.hfr) older_motion = add(pixels);
         motion.partials = add(VmafMotion::PartialCount(size));
         total = static_cast<std::uint32_t>(cursor);
         staging = PlanStagingSources(
@@ -415,7 +459,8 @@ struct Layout {
         const VulkanContext& context
     ) const {
         ValidateDispatchLimits(
-            base_size, feature_size, chroma_size, cambi_plan, context.limits
+            base_size, feature_size, speed_size, cambi_plan, context.limits,
+            hdr.has_value()
         );
         const auto arena_bytes = Bytes(total);
         if (arena_bytes > context.limits.maxStorageBufferRange) {
@@ -453,7 +498,7 @@ struct VmafV1Pipeline::Impl {
           layout(pipeline_config),
           context(RequireVulkanContext(device)),
           runtime(context, RuntimeConfig()),
-          sequence(config.clip) {
+          sequence(config.clip, config.model, config.hfr) {
         const auto memory = layout.MemoryPlan(*context);
         runtime.CreateArena(memory.arena_bytes);
         if (!runtime.arena_visible())
@@ -463,11 +508,16 @@ struct VmafV1Pipeline::Impl {
         runtime.CreateCommandObjects();
         runtime.CreateDescriptors(0, memory.arena_bytes);
         luma.emplace(runtime);
-        if (!layout.native_input) sdr.emplace(runtime);
+        if (layout.hdr)
+            hdr.emplace(runtime);
+        else if (!layout.native_input)
+            sdr.emplace(runtime);
         if (layout.fit) resizer.emplace(runtime);
         adm.emplace(runtime);
+        if (layout.speed_size != layout.chroma_size)
+            speed_prescaler.emplace(runtime);
         speed.emplace(runtime);
-        cambi.emplace(runtime);
+        cambi.emplace(runtime, layout.hdr.has_value());
         motion.emplace(runtime);
         resident.Resize(config.gpu_resident_images);
     }
@@ -491,6 +541,11 @@ struct VmafV1Pipeline::Impl {
             throw std::logic_error("vmaf v1: sequence finished; call Reset");
     }
     void ValidateFormat(const ImageFormat& format) const {
+        if (layout.hdr) {
+            ValidateVmafHdrFormat(format);
+            ValidateImage(format, config.size, "vmaf v1 HDR input format");
+            return;
+        }
         ValidateVmafSdrFormat(format);
         if (config.chroma_sampling == VmafChromaSampling::Native &&
             !SameImageFormat(format, config.input_format))
@@ -515,10 +570,40 @@ struct VmafV1Pipeline::Impl {
             runtime.ReleaseResident(slot);
         });
     }
+    void RecordHdrPlanes(
+        const std::array<const ImageFormat*, 2>& formats,
+        const FramePlanes& planes
+    ) {
+        for (std::size_t image = 0; image < planes.size(); ++image) {
+            const auto& format = *formats[image];
+            const bool canonical =
+                format.matrix == MatrixCoefficients::Bt2100ICtCp &&
+                format.range == PixelRange::Limited && format.subsample_w == 1 &&
+                format.subsample_h == 1 &&
+                format.chroma_location == ChromaLocation::Left &&
+                config.size == layout.feature_size;
+            if (canonical) {
+                for (std::uint32_t plane = 0; plane < 3; ++plane)
+                    luma->RecordPlane(
+                        image, layout.desc[image], planes[image][plane],
+                        config.size, format, plane
+                    );
+            } else {
+                hdr->Record(
+                    image, layout.desc[image], format, config.size,
+                    layout.feature_size, *layout.hdr, planes[image]
+                );
+            }
+        }
+    }
     void RecordInputPlanes(
         const std::array<const ImageFormat*, 2>& formats,
         const FramePlanes& planes
     ) {
+        if (hdr) {
+            RecordHdrPlanes(formats, planes);
+            return;
+        }
         if (layout.native_input) {
             for (std::uint32_t plane = 0; plane < 3; ++plane)
                 for (std::size_t image = 0; image < planes.size(); ++image)
@@ -585,10 +670,10 @@ struct VmafV1Pipeline::Impl {
         runtime.OpenStage(Stage::VmafV1Luma);
 #endif
         const FramePlanes feature_planes{
-            std::array{layout.adm.reference[0], layout.speed.reference[0],
-                       layout.speed.reference[1]},
-            std::array{layout.adm.distorted[0], layout.speed.distorted[0],
-                       layout.speed.distorted[1]}};
+            std::array{layout.adm.reference[0], layout.chroma_source[0],
+                       layout.chroma_source[1]},
+            std::array{layout.adm.distorted[0], layout.chroma_source[2],
+                       layout.chroma_source[3]}};
         RecordInputPlanes(
             formats, layout.fit ? layout.fit->source : feature_planes
         );
@@ -597,12 +682,17 @@ struct VmafV1Pipeline::Impl {
         runtime.CloseStage();
         runtime.OpenStage(Stage::VmafV1Adm);
 #endif
-        adm->Record(layout.feature_size, layout.adm);
+        adm->Record(layout.feature_size, layout.adm, config.model);
 #ifdef VQM_STAGE_TIMING
         runtime.CloseStage();
         runtime.OpenStage(Stage::VmafV1Speed);
 #endif
-        speed->Record(layout.chroma_size, layout.speed);
+        if (speed_prescaler)
+            speed_prescaler->Record(
+                layout.chroma_size, layout.speed_size, layout.chroma_source,
+                layout.speed
+            );
+        speed->Record(layout.speed_size, layout.speed);
 #ifdef VQM_STAGE_TIMING
         runtime.CloseStage();
         runtime.OpenStage(Stage::VmafV1Cambi);
@@ -618,7 +708,7 @@ struct VmafV1Pipeline::Impl {
         runtime.CloseStage();
         runtime.OpenStage(Stage::VmafV1Motion);
 #endif
-        motion->Record(layout.feature_size, layout.motion, previous);
+        motion->Record(layout.feature_size, layout.motion, HasMotionHistory());
 #ifdef VQM_STAGE_TIMING
         runtime.CloseStage();
 #endif
@@ -649,28 +739,36 @@ struct VmafV1Pipeline::Impl {
         if (!std::isfinite(spatial.cambi) ||
             !std::isfinite(spatial.speed_chroma_uv) ||
             !std::isfinite(spatial.adm3) || !std::isfinite(transition) ||
-            transition < 0.0 || (!previous && transition != 0.0)) {
+            transition < 0.0 || (!HasMotionHistory() && transition != 0.0)) {
             throw std::runtime_error("vmaf v1: invalid GPU feature result");
         }
-        std::swap(layout.motion.previous, layout.motion.blurred);
-        previous = true;
         VQM_TIMED(VmafV1Score);
-        return PublicFrame(sequence.Push(spatial, transition));
+        const auto frame = sequence.Push(spatial, transition);
+        std::swap(layout.motion.previous, layout.motion.blurred);
+        if (config.hfr) std::swap(layout.motion.previous, layout.older_motion);
+        if (!HasMotionHistory()) ++motion_history;
+        return PublicFrame(frame);
     }
+    [[nodiscard]] bool HasMotionHistory() const {
+        return motion_history >= (config.hfr ? 2u : 1u);
+    }
+
     VmafV1Config config;
     Layout layout;
     std::shared_ptr<VulkanContext> context;
     VulkanRuntime runtime;
     std::optional<VmafLumaConverter> luma;
     std::optional<VmafSdrConverter> sdr;
+    std::optional<VmafHdrConverter> hdr;
     std::optional<VmafResizer> resizer;
     std::optional<VmafAdm3> adm;
+    std::optional<VmafSpeedPrescaler> speed_prescaler;
     std::optional<VmafSpeed> speed;
     std::optional<VmafCambi> cambi;
     std::optional<VmafMotion> motion;
     ResidentTable resident;
     VmafV1Sequence sequence;
-    bool previous = false;
+    unsigned motion_history = 0;
     bool finished = false;
 };
 VmafV1Pipeline::VmafV1Pipeline(VmafV1Config config)
@@ -750,7 +848,7 @@ std::optional<double> VmafV1Pipeline::PooledScore() const {
 }
 void VmafV1Pipeline::Reset() {
     impl_->sequence.Reset();
-    impl_->previous = false;
+    impl_->motion_history = 0;
     impl_->finished = false;
 }
 }  // namespace vqm

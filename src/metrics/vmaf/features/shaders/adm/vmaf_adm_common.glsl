@@ -5,7 +5,7 @@ layout(push_constant) uniform Params {
     uint width;
     uint height;
     uint reference;
-    uint distorted;
+    uint first_scale;
     uint restored;
     uint additive;
     uint stride;

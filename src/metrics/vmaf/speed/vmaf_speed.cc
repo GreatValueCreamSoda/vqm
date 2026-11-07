@@ -211,11 +211,53 @@ namespace {
 struct SpeedCombinePush {
     std::uint32_t channels, result;
 };
+struct SpeedPrescalePush {
+    std::uint32_t input_width, input_height, output_width, output_height;
+    std::array<std::uint32_t, 4> source, destination;
+};
+static_assert(sizeof(SpeedPrescalePush) == VmafSpeedPrescaler::PushBytes());
+
 void CheckSpeedFeatureRange(std::uint32_t offset, std::size_t count) {
     if (count > std::numeric_limits<std::uint32_t>::max() - offset)
         throw std::invalid_argument("vmaf speed: arena offset overflow");
 }
 }  // namespace
+
+VmafSpeedPrescaler::VmafSpeedPrescaler(VulkanRuntime& runtime)
+    : runtime_(runtime),
+      pipeline_(runtime.CreatePipeline("vmaf_speed_prescale")) {}
+
+VmafSpeedPrescaler::~VmafSpeedPrescaler() {
+    runtime_.DestroyPipelines(std::array{pipeline_});
+}
+
+void VmafSpeedPrescaler::Record(
+    Size input, Size output, const std::array<std::uint32_t, 4>& source,
+    const VmafSpeedBuffers& buffers
+) {
+    CheckSpeedFilterGeometry(input);
+    CheckSpeedFilterGeometry(output);
+    if (output.width > input.width || output.height > input.height)
+        throw std::invalid_argument("vmaf speed: invalid chroma prescale");
+    const SpeedPrescalePush push{static_cast<std::uint32_t>(input.width),
+                                 static_cast<std::uint32_t>(input.height),
+                                 static_cast<std::uint32_t>(output.width),
+                                 static_cast<std::uint32_t>(output.height),
+                                 source,
+                                 {buffers.reference[0], buffers.reference[1],
+                                  buffers.distorted[0], buffers.distorted[1]}};
+    for (auto offset : push.source)
+        CheckSpeedFeatureRange(offset, input.width * input.height);
+    for (auto offset : push.destination)
+        CheckSpeedFeatureRange(offset, output.width * output.height);
+    runtime_.ComputeBarrier();
+    runtime_.Dispatch(
+        pipeline_, &push, sizeof(push), Groups(output.width, 16),
+        Groups(output.height, 16), 4
+    );
+    runtime_.ComputeBarrier();
+}
+
 VmafSpeed::VmafSpeed(VulkanRuntime& runtime)
     : runtime_(&runtime),
       filter_(runtime),

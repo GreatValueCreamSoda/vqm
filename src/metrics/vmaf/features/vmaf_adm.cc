@@ -85,7 +85,7 @@ void VmafAdmWavelet::Record(Size input, const VmafAdmWaveletBuffers& buffers) {
 
 namespace {
 struct AdmPush {
-    std::uint32_t width, height, reference, distorted, restored, additive;
+    std::uint32_t width, height, reference, first_scale, restored, additive;
     std::uint32_t stride, partials, results, scale, groups, original_pixels;
     float axial, diagonal;
 };
@@ -151,14 +151,12 @@ std::size_t ValidateAdmBuffers(
 void RecordAdmPyramid(
     VulkanRuntime& runtime, Size input, const VmafAdmBuffers& buffers,
     std::size_t stride, const std::array<VkPipeline, 4>& pipelines,
-    const std::array<std::array<float, 2>, 4>& csf
+    const std::array<std::array<float, 2>, 4>& csf, bool skip_scale0 = false
 ) {
     Size size = input;
     AdmPush push{};
     push.reference = buffers.reference_details;
-    // Fused wavelet/decouple consumes distorted detail bands in registers.
-    // Keep the unused field to preserve the shared shader push-constant layout.
-    push.distorted = 0;
+    push.first_scale = skip_scale0 ? 1u : 0u;
     push.restored = buffers.restored;
     push.additive = buffers.additive;
     push.stride = static_cast<std::uint32_t>(stride);
@@ -193,6 +191,7 @@ void RecordAdmPyramid(
         // reused.
         runtime.Dispatch(pipelines[0], &wavelet, sizeof(wavelet), gx, gy, 1);
         runtime.ComputeBarrier();
+        if (scale < push.first_scale) continue;
         runtime.Dispatch(pipelines[1], &push, sizeof(push), gx, gy, 1);
         runtime.ComputeBarrier();
         runtime.Dispatch(pipelines[2], &push, sizeof(push), 1, 1, 1);
@@ -240,16 +239,36 @@ void VmafAdm::Record(Size input, const VmafAdmBuffers& buffers) {
     RecordAdmPyramid(*runtime_, input, buffers, stride, pipelines_, kAdm2Csf);
 }
 
-// ADM3 (v1.0.16 3H)
+// ADM3 (v1.0.16 SDR)
 
 namespace {
-// Fixed blend coefficients for the pinned v1.0.16 3H model:
-// libvmaf barten_csf_tools.h:130-133, revision 4611e47.
-constexpr std::array<std::array<float, 2>, 4> kAdm3Csf{{
+// Barten-Watson blend for the pinned models, from libvmaf
+// barten_csf_tools.h:130-143,248-258 at revision 4611e47.
+// 1080p 3H and 2160p 1.5H share the same angular pixel density.
+constexpr std::array<std::array<float, 2>, 4> kAdm3StandardCsf{{
     {0.01183f, 0.004302f},
     {0.025026f, 0.011778f},
     {0.04295f, 0.023918f},
     {0.058621f, 0.035901f},
+}};
+// Mode 3 uses the MAE blend, BLENDED_CSF_1080_3H_MAE in the same source.
+constexpr std::array<std::array<float, 2>, 4> kAdm3HdrCsf{{
+    {0.011249f, 0.004097f},
+    {0.022606f, 0.010921f},
+    {0.035930f, 0.021430f},
+    {0.045673f, 0.031313f},
+}};
+constexpr std::array<std::array<float, 2>, 4> kAdm3TvCsf{{
+    {0.00226f, 0.000479f},
+    {0.01183f, 0.004302f},
+    {0.025026f, 0.011778f},
+    {0.04295f, 0.023918f},
+}};
+constexpr std::array<std::array<float, 2>, 4> kAdm3PhoneCsf{{
+    {0.004212f, 0.000984f},
+    {0.014809f, 0.005852f},
+    {0.029642f, 0.0146f},
+    {0.047464f, 0.027574f},
 }};
 
 }  // namespace
@@ -262,14 +281,23 @@ VmafAdm3::VmafAdm3(VulkanRuntime& runtime) : runtime_(&runtime) {
 
 VmafAdm3::~VmafAdm3() { runtime_->DestroyPipelines(pipelines_); }
 
-void VmafAdm3::Record(Size input, const VmafAdmBuffers& buffers) {
+void VmafAdm3::Record(
+    Size input, const VmafAdmBuffers& buffers, VmafV1Model model
+) {
     const auto stride = ValidateAdmBuffers(
         *runtime_, input, buffers,
         {.partial_values_per_group = 9,
          .result_words = 13,
          .overflow_message = "vmaf adm3: arena offset overflow"}
     );
-    RecordAdmPyramid(*runtime_, input, buffers, stride, pipelines_, kAdm3Csf);
+    const auto& csf = model == VmafV1Model::Phone   ? kAdm3PhoneCsf
+                      : model == VmafV1Model::Tv4K  ? kAdm3TvCsf
+                      : model == VmafV1Model::Hdr4K ? kAdm3HdrCsf
+                                                    : kAdm3StandardCsf;
+    RecordAdmPyramid(
+        *runtime_, input, buffers, stride, pipelines_, csf,
+        model == VmafV1Model::Hdr4K
+    );
 }
 
 }  // namespace vqm::internal

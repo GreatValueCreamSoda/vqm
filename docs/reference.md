@@ -1,7 +1,7 @@
 # VQM API and implementation guide
 
 VQM is a C++20 Vulkan library implementing SSIMULACRA 2.1, Butteraugli,
-floating-point VMAF v0.6.1, standard SDR VMAF v1.0.16 3H, ColorVideoVDP and
+floating-point VMAF v0.6.1, SDR and HDR VMAF v1, ColorVideoVDP and
 FP32 PSNR-HVS. The core library takes decoded planar images and uses the
 Vulkan loader and system threading support. GPU input
 conversion handles the supported sample types, pixel ranges, alpha types,

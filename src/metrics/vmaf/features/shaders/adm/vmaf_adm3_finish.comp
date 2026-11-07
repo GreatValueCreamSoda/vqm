@@ -5,8 +5,8 @@
 #include "vmaf_adm_common.glsl"
 layout(local_size_x = 1) in;
 void main() {
-    float num = 0.0, den = 0.0, aim = 0.0;
-    for (uint s = 0; s < 4; ++s) {
+    float num = 0.0, den = pc.first_scale == 0u ? 0.0 : 1e-10, aim = 0.0;
+    for (uint s = pc.first_scale; s < 4; ++s) {
         num += arena[pc.results + 3 * s];
         den += arena[pc.results + 3 * s + 1];
         aim += arena[pc.results + 3 * s + 2];

@@ -27,6 +27,7 @@
 #include "butteraugli.h"
 #include "cvvdp.h"
 #include "metrics/cvvdp/cvvdp_internal.h"
+#include "metrics/vmaf/v1/vmaf_v1_model.h"
 #include "psnr_hvs.h"
 #include "vmaf.h"
 #include "vmaf_v1.h"
@@ -77,12 +78,16 @@ struct FrameStats {
     std::uint64_t infinite_frames = 0;
 };
 
-double PerfectFrameScore(Metric metric) {
+double PerfectFrameScore(Metric metric, const Options& options) {
     switch (metric) {
         case Metric::Ssimulacra2:
         case Metric::VmafV0:
-        case Metric::VmafV1:
             return 100.0;
+        case Metric::VmafV1:
+            return internal::VmafV1Parameters(
+                       options.vmaf_v1_model.value_or(VmafV1Model::Standard1080)
+            )
+                .clip[1];
         case Metric::Butteraugli:
             return 0.0;
         case Metric::Cvvdp:
@@ -93,10 +98,9 @@ double PerfectFrameScore(Metric metric) {
     throw std::logic_error("unknown metric");
 }
 
-FrameStats SummarizeFrames(Metric metric, std::span<const Frame> frames) {
+FrameStats SummarizeFrames(double perfect_score, std::span<const Frame> frames) {
     FrameStats stats;
     stats.min = stats.max = frames.front().score;
-    const auto perfect_score = PerfectFrameScore(metric);
     std::uint64_t finite_frames = 0;
     double mean = 0, squared_deviations = 0;
     for (const auto& frame : frames) {
@@ -293,6 +297,11 @@ public:
         } else if (metric == Metric::VmafV1) {
             VmafV1Config config{.size = key.size, .input_format = key.original};
             config.fit = VmafFit(options);
+            config.hfr = options.vmaf_v1_hfr;
+            config.model =
+                options.vmaf_v1_model.value_or(VmafV1Model::Standard1080);
+            if (config.model == VmafV1Model::Hdr4K)
+                config.gpu_resident_images = 0;
             v1_ = MakePipeline<VmafV1Pipeline>(config, device);
         } else if (metric == Metric::PsnrHvs) {
             PsnrHvsConfig config{.size = key.size};
@@ -365,7 +374,8 @@ public:
             return;
         }
         if (v0_) Add(result, v0_->Flush());
-        if (v1_) Add(result, v1_->Flush());
+        if (v1_)
+            while (const auto frame = v1_->Flush()) Add(result, frame);
         if (result.frames.size() != count)
             throw std::runtime_error("incomplete emitted frame results");
         if (v0_ || v1_) {
@@ -703,7 +713,9 @@ void RunPair(
         const auto& result = clip.metrics[i];
         const auto stats =
             options.verbose
-                ? std::optional(SummarizeFrames(metric, result.frames))
+                ? std::optional(SummarizeFrames(
+                      PerfectFrameScore(metric, options), result.frames
+                  ))
                 : std::nullopt;
         if (options.json)
             PrintJson(metric, pair, clip, result, stats);

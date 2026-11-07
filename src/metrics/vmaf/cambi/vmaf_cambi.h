@@ -107,12 +107,14 @@ class VmafCambiContrast {
 public:
     explicit VmafCambiContrast(
         VulkanRuntime& runtime, bool allow_half = true,
-        bool allow_subgroups = true
+        bool allow_subgroups = true, bool pq = false
     );
     ~VmafCambiContrast();
     VmafCambiContrast(const VmafCambiContrast&) = delete;
     VmafCambiContrast& operator=(const VmafCambiContrast&) = delete;
-    [[nodiscard]] static std::size_t Pixels(Size size, unsigned window);
+    [[nodiscard]] static std::size_t Pixels(
+        Size size, unsigned window, bool pq = false
+    );
     [[nodiscard]] static constexpr std::size_t PushBytes() noexcept {
         return 10 * sizeof(std::uint32_t);
     }
@@ -132,6 +134,7 @@ public:
 
 private:
     VulkanRuntime* runtime_;
+    bool pq_;
     bool half_source_ = false;
     bool subgroup_pipeline_ = false;
     VkPipeline pipeline_ = VK_NULL_HANDLE;
@@ -221,16 +224,16 @@ struct VmafCambiPlan {
 
 // Standard SDR v1.0.16 CAMBI: same source/encode geometry, 1080p high-res
 // speedup, .06 threshold, default top 60%, and max 17. Encode depth 0 defaults
-// to input depth. Different encode geometry, HDR and full-reference CAMBI are
-// not implemented. Plan rejects unsupported dimensions/windows. Caller owns
-// arena, submission and synchronization.
+// to input depth. PQ selects the HDR model's visibility thresholds.
+// Plan rejects unsupported dimensions and windows. Caller owns the arena,
+// submission and synchronization.
 class VmafCambi {
 public:
-    explicit VmafCambi(VulkanRuntime& runtime);
+    explicit VmafCambi(VulkanRuntime& runtime, bool pq = false);
     ~VmafCambi();
     VmafCambi(const VmafCambi&) = delete;
     VmafCambi& operator=(const VmafCambi&) = delete;
-    [[nodiscard]] static VmafCambiPlan Plan(Size size);
+    [[nodiscard]] static VmafCambiPlan Plan(Size size, bool pq = false);
     [[nodiscard]] static constexpr std::size_t PushBytes() noexcept {
         return VmafCambiPool::PushBytes();
     }
@@ -241,6 +244,7 @@ public:
 
 private:
     VulkanRuntime* runtime_;
+    bool pq_;
     VmafCambiPrepare prepare_;
     VmafCambiDecimate decimate_;
     VmafCambiContrast contrast_;

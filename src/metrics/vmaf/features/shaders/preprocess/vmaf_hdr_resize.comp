@@ -1,0 +1,65 @@
+// Copyright (c) 2026 VQM contributors. BSD-3-Clause; see LICENSE.
+#version 450
+
+#include "bindings.glsl"
+layout(local_size_x = 16, local_size_y = 16) in;
+layout(push_constant) uniform Push {
+    uint source, destination, width, height, out_width, out_height;
+    uint vertical, flags;
+    float shift;
+}
+pc;
+
+float kernel(float x, bool chroma) {
+    x = abs(x);
+    if (chroma) return max(1.0 - x, 0.0);
+    if (x < 1.0) return 1.0 + x * x * (-2.5 + x * 1.5);
+    if (x < 2.0) return 2.0 + x * (-4.0 + x * (2.5 - 0.5 * x));
+    return 0.0;
+}
+
+float resize_axis(
+    uint base, uint stride, int size, uint out_size, uint index, bool chroma
+) {
+    if (uint(size) == out_size && pc.shift == 0.0)
+        return arena[base + index * stride];
+    const float ratio = float(size) / float(out_size);
+    const float position = (float(index) + 0.5) * ratio - 0.5 + pc.shift;
+    const float filter_scale = max(1.0, ratio);
+    const float support = (chroma ? 1.0 : 2.0) * filter_scale;
+    const int first = int(ceil(position - support));
+    const int last = int(floor(position + support));
+    float sum = 0.0, total = 0.0;
+    for (int i = first; i <= last; ++i) {
+        const float weight =
+            kernel((float(i) - position) / filter_scale, chroma);
+        const int reflected = i < 0 ? -i - 1 : i >= size ? 2 * size - i - 1 : i;
+        const uint at = uint(clamp(reflected, 0, size - 1));
+        sum += weight * arena[base + at * stride];
+        total += weight;
+    }
+    return sum / total;
+}
+
+void main() {
+    const uvec2 p = gl_GlobalInvocationID.xy;
+    if (p.x >= pc.out_width || p.y >= pc.out_height) return;
+    const bool chroma = (pc.flags & 1u) != 0u;
+    float value = pc.vertical != 0u
+                      ? resize_axis(
+                            pc.source + p.x, pc.width, int(pc.height),
+                            pc.out_height, p.y, chroma
+                        )
+                      : resize_axis(
+                            pc.source + p.y * pc.width, 1u, int(pc.width),
+                            pc.out_width, p.x, chroma
+                        );
+    if ((pc.flags & 2u) != 0u) {
+        // zimg's limited-range 16-bit conversion with no dither. FP32
+        // represents all 65,536 centered codes exactly.
+        const float code =
+            chroma ? fma(value, 57344.0, 32768.0) : fma(value, 56064.0, 4096.0);
+        value = roundEven(clamp(code, 0.0, 65535.0)) / 256.0 - 128.0;
+    }
+    arena[pc.destination + p.y * pc.out_width + p.x] = value;
+}

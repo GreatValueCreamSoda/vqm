@@ -1,0 +1,37 @@
+// VMAF SpEED: Copyright 2016-2025 Netflix, Inc.
+// BSD-2-Clause-Patent; see licenses/NETFLIX-VMAF-LICENSE.
+// Center-aligned bilinear downsampling follows libvmaf's vif_tools.c
+// bilinear resampling at revision 4611e47. No quantization precedes SpEED.
+
+#version 450
+#include "bindings.glsl"
+
+layout(local_size_x = 16, local_size_y = 16) in;
+layout(push_constant) uniform Push {
+    uint input_width;
+    uint input_height;
+    uint output_width;
+    uint output_height;
+    uint source[4];
+    uint destination[4];
+}
+pc;
+
+void main() {
+    const uvec3 p = gl_GlobalInvocationID;
+    if (p.x >= pc.output_width || p.y >= pc.output_height) return;
+    const vec2 ratio = vec2(pc.input_width, pc.input_height) /
+                       vec2(pc.output_width, pc.output_height);
+    const vec2 pos = (vec2(p.xy) + 0.5) * ratio - 0.5;
+    const uvec2 first = uvec2(floor(pos));
+    const uvec2 last =
+        min(first + 1u, uvec2(pc.input_width, pc.input_height) - 1u);
+    const vec2 weight = fract(pos);
+    const uint row0 = pc.source[p.z] + first.y * pc.input_width;
+    const uint row1 = pc.source[p.z] + last.y * pc.input_width;
+    arena[pc.destination[p.z] + p.y * pc.output_width + p.x] =
+        (1.0 - weight.y) * (1.0 - weight.x) * arena[row0 + first.x] +
+        (1.0 - weight.y) * weight.x * arena[row0 + last.x] +
+        weight.y * (1.0 - weight.x) * arena[row1 + first.x] +
+        weight.y * weight.x * arena[row1 + last.x];
+}

@@ -2,7 +2,7 @@
 
 VQM is a C++20 library and command-line tool for comparing images and video
 with Vulkan compute. It implements SSIMULACRA 2.1, Butteraugli, floating-point VMAF
-v0.6.1, standard SDR VMAF v1.0.16 3H, ColorVideoVDP v0.5.7, and FP32
+v0.6.1, SDR and HDR VMAF v1, ColorVideoVDP v0.5.7, and FP32
 PSNR-HVS. The library accepts decoded planar images in a range of color
 formats and can read caller-owned Vulkan buffers directly. The CLI reads PNG,
 JPEG and progressive YUV4MPEG2 clips.
@@ -19,9 +19,8 @@ JPEG and progressive YUV4MPEG2 clips.
   implements the 211-support-vector 1080p/3H and 262-support-vector 4KTV/1.5H
   float predictors, with NEG and phone-transform options. Its SDR inputs can be
   converted on the GPU to coded YUV.
-- **VMAF v1.0.16 3H:** the standard 1080p SDR sequence model. It accepts SDR
-  planar inputs and supports selectable 4:2:0 or 4:4:4 processing. Other v1
-  display, HFR and HDR models are not implemented.
+- **VMAF v1:** SDR v1.0.16 at 1080p 3H, 4K 1.5H, 4K 3H, or phone 5H, plus
+  HDR v1.1.8 at 4K 1.5H. Each preset supports optional five-frame HFR motion.
 - **ColorVideoVDP:** display-aware SDR/HDR image and video quality in JOD;
   higher is better, identity is 10 and negative scores are valid. The base
   v0.5.7 model supports explicit physical viewing conditions and whole-clip
@@ -113,10 +112,17 @@ every Y4M frame in order, with matching geometry, rational frame rates and frame
 counts. SSIMULACRA 2, Butteraugli, and VMAF average their frame scores.
 PSNR-HVS averages weighted frame errors before converting to dB. CVVDP returns
 its whole-clip JOD after temporal distortion pooling.
-Both VMAF variants use the input dimensions by default. `--vmaf-scale` scales
-the content to fit within 1920×1080 while preserving its aspect ratio.
+SDR VMAF uses the input dimensions by default. For v1, select a
+viewing preset with `--vmaf-v1-model 1080p-3h|4k-1.5h|4k-3h|phone-5h`.
+The default is `1080p-3h`. `--vmaf-scale` fits the content within the model's
+1920×1080 or 3840×2160 canvas while preserving its aspect ratio.
 `--vmaf-pad` adds black bars to reach 16:9 at the current scale. Use both
-flags to scale and pad to the full model canvas.
+flags to scale and pad to the full model canvas. Use `--vmaf-v1-hfr` with any
+v1 preset for roughly 50/60 fps content. Select `--vmaf-v1-model hdr-4k-1.5h`
+for PQ BT.2020 video. The HDR model controls geometry and scales the short
+side to 2160 pixels while preserving the input aspect ratio.
+[HDR input and reference details](docs/vmaf-development.md#v118-hdr-model)
+
 PNG and JPEG are interpreted as sRGB with BT.709 primaries; the CLI also offers
 input color overrides and a `--raw` mode. Run `./build/vqm --help` for the
 options. For SSIMULACRA 2 and Butteraugli images with alpha, the CLI evaluates
@@ -242,8 +248,8 @@ toggle the feature-gain and phone-score options, and `fit`/`model_size` select
 the evaluation geometry. `temporal_weighting = false` is a derived
 mode for content where motion2 is misleading: it forces motion2 to zero, skips
 the motion passes, and scores every frame immediately.
-`VmafV1Pipeline` in `vmaf_v1.h` provides the standard v1 model with its own
-frame-boundary behavior. Its `fit` setting can scale or pad luma and chroma.
+`VmafV1Pipeline` in `vmaf_v1.h` selects a viewing preset through
+`VmafV1Config::model`. Its `fit` setting can scale or pad luma and chroma.
 Set `VmafV1Config::chroma_sampling` to
 `VmafChromaSampling::Yuv420` or `Yuv444` to convert SDR inputs to a common
 BT.709 representation, including mixed source formats; the default `Native`

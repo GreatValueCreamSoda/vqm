@@ -20,19 +20,42 @@
 #define CAMBI_SOURCE_LOAD(value) (value)
 #endif
 #include "bindings.glsl"
+#ifdef VQM_CAMBI_PQ
+layout(local_size_x = 16, local_size_y = 4) in;
+const uint kRows = 2u;
+const uint kHistogramWords = 512u;
+const uint kMaxWindow = 59u;
+// PQ TVI for differences 1..4 at .019 and visibility at .06 cd/m².
+const int kTvi[4] = int[4](237, 1027, 1027, 1027);
+const int kVisibility = 108;
+#else
 layout(local_size_x = 16, local_size_y = 16) in;
+const uint kRows = 8u;
+const uint kHistogramWords = 256u;
+const uint kMaxWindow = 33u;
+const int kTvi[4] = int[4](182, 309, 436, 563);
+const int kVisibility = 78;
+#endif
+const uint kThreads = kRows * 32u;
+const int kFirstCode = kVisibility - 11;
+const int kLastCode = kTvi[3];
 // Eight output rows share exact packed integer histograms. Moving one column
 // updates only the entering and leaving samples, following the sliding histogram
 // mechanism in libvmaf/src/feature/cambi.c:1172-1179. The cooperative workgroup
 // organization and source tile are ours. 48*40 + 8*256 + 1 + 8*4 words = 16,004
 // B, below Vulkan's 16 KiB minimum even for the largest 33-pixel window.
-// Eligible symbols are 0..497, exactly representable in FP16. Only this
-// source tile shrinks: the half variant uses 12,164 shared bytes, while the
-// integer histograms, FP32 contrast arithmetic and global banks are unchanged.
-shared CAMBI_SOURCE_TYPE source_tile[48 * 40];
-shared uint histograms[8 * 256];
+const uint kTileSamples = (15u + kMaxWindow) * (kRows + kMaxWindow - 1u);
+#ifdef VQM_CAMBI_PQ
+// PQ covers a wider code interval. Packing two codes into each word keeps
+// the shared tile and histograms within Vulkan's 16 KiB minimum at 4:1.
+shared uint source_tile[kTileSamples / 2u];
+#else
+// SDR's half variant stores exact integer codes in the narrower source tile.
+shared CAMBI_SOURCE_TYPE source_tile[kTileSamples];
+#endif
+shared uint histograms[kRows * kHistogramWords];
 shared uint active_rows;
-shared float contrast_terms[8 * 4];
+shared float contrast_terms[kRows * 4u];
 layout(push_constant) uniform Push {
     uint width, height, input_offset, mask, horizontal, filtered, contrast;
     uint radius, phase, row_base;
@@ -46,9 +69,9 @@ float mode3(float a, float b, float c) {
 }
 
 uint bin_count(uint row, int bin) {
-    if (bin < 0 || bin > 496) return 0u;
+    if (bin < 0 || bin > kLastCode - kFirstCode) return 0u;
     uint b = uint(bin);
-    uint packed = histograms[row * 256u + b / 2u];
+    uint packed = histograms[row * kHistogramWords + b / 2u];
     return (packed >> (16u * (b & 1u))) & 65535u;
 }
 
@@ -58,7 +81,8 @@ void update_bin(uint row, uint packed, bool add) {
     // The starting window contains every sample that can leave this slide,
     // so a 16-bit count cannot underflow even if atomics are interleaved.
     atomicAdd(
-        histograms[row * 256u + bin / 2u], add ? increment : 0u - increment
+        histograms[row * kHistogramWords + bin / 2u],
+        add ? increment : 0u - increment
     );
 }
 
@@ -66,8 +90,17 @@ uint packed_sample(int x, int y) {
     if (x < 0 || y < 0 || x >= int(pc.width) || y >= int(pc.height)) return 0u;
     uint at = uint(y) * pc.width + uint(x);
     int value = int(arena[pc.filtered + at]);
-    if (arena[pc.mask + at] == 0.0 || value < 67 || value > 563) return 0u;
-    return uint(value - 66);
+    if (arena[pc.mask + at] == 0.0 || value < kFirstCode || value > kLastCode)
+        return 0u;
+    return uint(value - kFirstCode + 1);
+}
+
+uint tile_sample(uint index) {
+#ifdef VQM_CAMBI_PQ
+    return (source_tile[index / 2u] >> (16u * (index & 1u))) & 65535u;
+#else
+    return CAMBI_SOURCE_LOAD(source_tile[index]);
+#endif
 }
 
 void contrast_map() {
@@ -86,7 +119,7 @@ void contrast_map() {
     uint extent = 16u + 2u * pc.radius;
     uint window = 1u + 2u * pc.radius;
     int x0 = int(gl_WorkGroupID.x * 16u) - int(pc.radius);
-    int y0 = int(gl_WorkGroupID.y * 8u) - int(pc.radius);
+    int y0 = int(gl_WorkGroupID.y * kRows) - int(pc.radius);
     if (CAMBI_LOGICAL_INDEX == 0u) active_rows = 0u;
     barrier();
     // Probe the output centers before clearing histograms or loading their
@@ -94,58 +127,68 @@ void contrast_map() {
     // Publish the center samples into the tile for reuse by active groups.
     if (lane < 16u) {
         uint out_x = gl_WorkGroupID.x * 16u + lane;
-        uint out_y = gl_WorkGroupID.y * 8u + row;
+        uint out_y = gl_WorkGroupID.y * kRows + row;
         uint packed = packed_sample(int(out_x), int(out_y));
+#ifndef VQM_CAMBI_PQ
         source_tile[(row + pc.radius) * extent + lane + pc.radius] =
             CAMBI_SOURCE_STORE(packed);
+#endif
         if (packed != 0u) atomicOr(active_rows, 1u << row);
     }
     barrier();
     if (active_rows == 0u) {
         if (lane < 16u) {
             uint out_x = gl_WorkGroupID.x * 16u + lane;
-            uint out_y = gl_WorkGroupID.y * 8u + row;
+            uint out_y = gl_WorkGroupID.y * kRows + row;
             if (out_x < pc.width && out_y < pc.height)
                 arena[pc.contrast + out_y * pc.width + out_x] = 0.0;
         }
         return;
     }
-    for (uint i = CAMBI_LOGICAL_INDEX; i < 8u * 256u; i += 256u)
+    for (uint i = CAMBI_LOGICAL_INDEX; i < kRows * kHistogramWords;
+         i += kThreads)
         histograms[i] = 0u;
-    for (uint i = CAMBI_LOGICAL_INDEX; i < extent * (8u + 2u * pc.radius);
-         i += 256u) {
+#ifdef VQM_CAMBI_PQ
+    for (uint i = 2u * CAMBI_LOGICAL_INDEX;
+         i < extent * (kRows + 2u * pc.radius); i += 2u * kThreads) {
+        int x = x0 + int(i % extent);
+        int y = y0 + int(i / extent);
+        source_tile[i / 2u] =
+            packed_sample(x, y) | (packed_sample(x + 1, y) << 16u);
+    }
+#else
+    for (uint i = CAMBI_LOGICAL_INDEX; i < extent * (kRows + 2u * pc.radius);
+         i += kThreads) {
         uint x = i % extent, y = i / extent;
         // The 16x8 output center rectangle is already in the shared tile.
         if (x >= pc.radius && x < pc.radius + 16u && y >= pc.radius &&
-            y < pc.radius + 8u)
+            y < pc.radius + kRows)
             continue;
         source_tile[i] =
             CAMBI_SOURCE_STORE(packed_sample(x0 + int(x), y0 + int(y)));
     }
+#endif
     barrier();
     bool row_active = (active_rows & (1u << row)) != 0u;
-    if (active_rows == 255u) {
+    if (active_rows == (1u << kRows) - 1u) {
         // All rows are needed: build the first window cooperatively, then
         // derive each next row by removing its top and adding its bottom.
         // The row slide follows libvmaf/src/feature/cambi.c:1172-1179; our
         // packed counter copies and barriers are independent of subgroup size.
-        for (uint i = CAMBI_LOGICAL_INDEX; i < window * window; i += 256u) {
-            uint packed = CAMBI_SOURCE_LOAD(
-                source_tile[(i / window) * extent + i % window]
-            );
+        for (uint i = CAMBI_LOGICAL_INDEX; i < window * window; i += kThreads) {
+            uint packed = tile_sample((i / window) * extent + i % window);
             if (packed != 0u) update_bin(0u, packed, true);
         }
         barrier();
-        for (uint target = 1u; target < 8u; ++target) {
-            histograms[target * 256u + CAMBI_LOGICAL_INDEX] =
-                histograms[(target - 1u) * 256u + CAMBI_LOGICAL_INDEX];
+        for (uint target = 1u; target < kRows; ++target) {
+            for (uint i = CAMBI_LOGICAL_INDEX; i < kHistogramWords;
+                 i += kThreads)
+                histograms[target * kHistogramWords + i] =
+                    histograms[(target - 1u) * kHistogramWords + i];
             barrier();
-            for (uint x = CAMBI_LOGICAL_INDEX; x < window; x += 256u) {
-                uint leaving =
-                    CAMBI_SOURCE_LOAD(source_tile[(target - 1u) * extent + x]);
-                uint entering = CAMBI_SOURCE_LOAD(
-                    source_tile[(target + window - 1u) * extent + x]
-                );
+            for (uint x = CAMBI_LOGICAL_INDEX; x < window; x += kThreads) {
+                uint leaving = tile_sample((target - 1u) * extent + x);
+                uint entering = tile_sample((target + window - 1u) * extent + x);
                 if (leaving != entering) {
                     if (leaving != 0u) update_bin(target, leaving, false);
                     if (entering != 0u) update_bin(target, entering, true);
@@ -158,9 +201,8 @@ void contrast_map() {
         // histograms for inactive rows.
         if (row_active) {
             for (uint i = lane; i < window * window; i += 32u) {
-                uint packed = CAMBI_SOURCE_LOAD(
-                    source_tile[(row + i / window) * extent + i % window]
-                );
+                uint packed =
+                    tile_sample((row + i / window) * extent + i % window);
                 if (packed != 0u) update_bin(row, packed, true);
             }
         }
@@ -172,16 +214,14 @@ void contrast_map() {
         // while the other lanes slide the histogram. The barrier that already
         // separates reading and updating the histogram publishes the terms too.
         if (lane < 4u) {
-            uint center_packed = CAMBI_SOURCE_LOAD(
-                source_tile[(row + pc.radius) * extent + x + pc.radius]
-            );
+            uint center_packed =
+                tile_sample((row + pc.radius) * extent + x + pc.radius);
             float result = 0.0;
             if (center_packed != 0u) {
-                int center = int(center_packed) + 66;
+                int center = int(center_packed) + kFirstCode - 1;
                 int bin = int(center_packed) - 1;
                 int d = int(lane) + 1;
-                const int tvi[4] = int[4](182, 309, 436, 563);
-                if (center + 4 <= tvi[lane] && center + 4 + d > 78) {
+                if (center + 4 <= kTvi[lane] && center + 4 + d > kVisibility) {
                     int p0 = int(bin_count(row, bin));
                     int pother = int(
                         max(bin_count(row, bin + d), bin_count(row, bin - d))
@@ -202,7 +242,7 @@ void contrast_map() {
             barrier();
         if (lane == 0u) {
             uint out_x = gl_WorkGroupID.x * 16u + x;
-            uint out_y = gl_WorkGroupID.y * 8u + row;
+            uint out_y = gl_WorkGroupID.y * kRows + row;
             if (out_x < pc.width && out_y < pc.height) {
                 float result = contrast_terms[row * 4u];
                 for (uint d = 1u; d < 4u; ++d)
@@ -214,8 +254,8 @@ void contrast_map() {
         if (row_active) {
             for (uint k = lane; k < window; k += 32u) {
                 uint at = (row + k) * extent + x;
-                uint leaving = CAMBI_SOURCE_LOAD(source_tile[at]),
-                     entering = CAMBI_SOURCE_LOAD(source_tile[at + window]);
+                uint leaving = tile_sample(at),
+                     entering = tile_sample(at + window);
                 if (leaving != entering) {
                     if (leaving != 0u) update_bin(row, leaving, false);
                     if (entering != 0u) update_bin(row, entering, true);

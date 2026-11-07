@@ -95,13 +95,14 @@ struct MetricsMemoryRequirements {
     std::span<const std::uint64_t> heap_budgets
 );
 
-// Finalization preserves the existing one-frame VMAF tail and exposes clip
-// metrics separately. Repeated Finalize returns the same clip score without
-// repeating last_frame. Flush also closes CVVDP; Finalize may follow it.
+// Finalization exposes clip metrics and any unconsumed tail. With HFR,
+// penultimate_frame precedes last_frame when both are present. Repeated
+// Finalize returns the same clip score with an empty tail.
 struct MetricsFinalResult {
     std::optional<MetricsResult> last_frame;
     std::optional<CvvdpScore> cvvdp;
     std::uint64_t frames = 0;
+    std::optional<MetricsResult> penultimate_frame;
 };
 
 class Metrics {
@@ -163,6 +164,7 @@ public:
         const VulkanBufferView& original, const VulkanBufferView& distorted,
         const VulkanSubmitSync& sync
     );
+    // Close input and emit one remaining result per call. Finalize may follow.
     [[nodiscard]] std::optional<MetricsResult> Flush();
     [[nodiscard]] MetricsFinalResult Finalize();
     void Reset();

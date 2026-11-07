@@ -13,6 +13,7 @@
 
 #include "bench.h"
 #include "io.h"
+#include "vmaf_v1_options.h"
 
 namespace bench_driver {
 
@@ -23,6 +24,8 @@ std::string Usage(std::string_view program) {
           [--half-planes] [--score-only] [--host-views] [--vulkan-buffers] [--decode-threads N] [--pool]
           [--throughput-seconds S] [--vmaf-chroma native|420|444]
           [--vmaf-fit native|pad] [--vmaf-model 1080|4k] [--vmaf-neg] [--vmaf-transform] [--vmaf-no-temporal]
+          [--vmaf-v1-model 1080p-3h|4k-1.5h|4k-3h|phone-5h|hdr-4k-1.5h]
+          [--vmaf-v1-hfr]
           [--metric-pair independent|shared|unified]
           [--cvvdp-video] [--cvvdp-display standard|compact]
           [--cvvdp-ppd N] [--cvvdp-peak NITS] [--cvvdp-contrast RATIO] [--cvvdp-ambient LUX]
@@ -154,6 +157,17 @@ bool ParseArgs(
                 return false;
             }
             options.vmaf_model = value;
+        } else if (arg == "--vmaf-v1-hfr") {
+            options.vmaf_v1_hfr = true;
+        } else if (arg == "--vmaf-v1-model") {
+            if (has_value)
+                options.vmaf_v1_model = vqm::tool::ParseVmafV1Model(args[++i]);
+            if (!has_value || !options.vmaf_v1_model) {
+                error = std::format(
+                    "--vmaf-v1-model expects {}", vqm::tool::kVmafV1ModelChoices
+                );
+                return false;
+            }
         } else if (arg == "--vmaf-neg") {
             options.vmaf_neg = true;
         } else if (arg == "--vmaf-transform") {
@@ -365,6 +379,19 @@ bool ParseArgs(
     }
     if (!options.IsVmaf() && options.vmaf_fit != "native") {
         error = "--vmaf-fit requires a VMAF metric";
+        return false;
+    }
+    if (options.vmaf_v1_hfr && options.metric != Metric::VmafV1) {
+        error = "--vmaf-v1-hfr requires --metric vmaf-v1";
+        return false;
+    }
+    if (options.vmaf_v1_model && options.metric != Metric::VmafV1) {
+        error = "--vmaf-v1-model requires --metric vmaf-v1";
+        return false;
+    }
+    if (options.vmaf_v1_model == vqm::VmafV1Model::Hdr4K &&
+        (options.vmaf_fit != "native" || options.vmaf_chroma != "native")) {
+        error = "hdr-4k-1.5h controls scaling and chroma subsampling";
         return false;
     }
     if (!options.IsVmaf() && !options.vmaf_temporal) {

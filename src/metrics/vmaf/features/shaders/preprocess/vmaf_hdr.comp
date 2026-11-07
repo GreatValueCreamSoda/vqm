@@ -1,0 +1,54 @@
+// Copyright (c) 2026 VQM contributors. BSD-3-Clause; see LICENSE.
+#version 450
+
+#include "bindings.glsl"
+layout(local_size_x = 16, local_size_y = 16) in;
+layout(push_constant) uniform Push {
+    uint desc_base, width, height;
+    uint planes[3];
+    uint plane;
+    float background;
+}
+pc;
+
+uint source_width() { return pc.width; }
+uint source_height() { return pc.height; }
+#include "color.glsl"
+
+float pq_encode(float linear) {
+    if (linear <= 0.0) return 0.0;
+    const float power = pow(linear, 0.1593017578125);
+    const float ratio =
+        1.0 + (-0.1640625 + 0.1640625 * power) / (1.0 + 18.6875 * power);
+    return pow(ratio, 78.84375);
+}
+
+void main() {
+    const uvec2 p = gl_GlobalInvocationID.xy;
+    if (p.x >= pc.width || p.y >= pc.height) return;
+    const uint at = p.y * pc.width + p.x;
+    if (pc.plane < 3u) {
+        arena[pc.planes[0] + at] = raw_sample(pc.plane, p.x, p.y);
+        return;
+    }
+
+    // BT.2100 PQ ICtCp. Invert the BT.2020 non-constant-luminance
+    // matrix, then apply the LMS matrix in linear light.
+    const float y = arena[pc.planes[0] + at];
+    const float u = arena[pc.planes[1] + at];
+    const float v = arena[pc.planes[2] + at];
+    const vec3 rgb_pq = vec3(
+        y + 1.4746 * v,
+        y - (0.0593 * 1.8814 / 0.6780) * u - (0.2627 * 1.4746 / 0.6780) * v,
+        y + 1.8814 * u
+    );
+    const vec3 rgb = vec3(
+        st2084_eotf(rgb_pq.x), st2084_eotf(rgb_pq.y), st2084_eotf(rgb_pq.z)
+    );
+    const float l = pq_encode(dot(rgb, vec3(1688.0, 2146.0, 262.0) / 4096.0));
+    const float m = pq_encode(dot(rgb, vec3(683.0, 2951.0, 462.0) / 4096.0));
+    const float s = pq_encode(dot(rgb, vec3(99.0, 309.0, 3688.0) / 4096.0));
+    arena[pc.planes[0] + at] = 0.5 * (l + m);
+    arena[pc.planes[1] + at] = (6610.0 * (l - m) + 7003.0 * (s - m)) / 4096.0;
+    arena[pc.planes[2] + at] = (17933.0 * (l - m) - 543.0 * (s - m)) / 4096.0;
+}

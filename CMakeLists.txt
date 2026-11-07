@@ -156,6 +156,8 @@ vqm_add_shader(butter_erode metrics/butteraugli/shaders/butter_erode.comp)
 vqm_add_shader(butter_reduce metrics/butteraugli/shaders/butter_reduce.comp)
 vqm_add_shader(vmaf_luma metrics/vmaf/features/shaders/preprocess/vmaf_luma.comp)
 vqm_add_source_shaders(vmaf_sdr metrics/vmaf/features/shaders/preprocess/vmaf_sdr.comp FALSE)
+vqm_add_shader(vmaf_hdr metrics/vmaf/features/shaders/preprocess/vmaf_hdr.comp)
+vqm_add_shader(vmaf_hdr_resize metrics/vmaf/features/shaders/preprocess/vmaf_hdr_resize.comp)
 vqm_add_shader(vmaf_resize metrics/vmaf/features/shaders/preprocess/vmaf_resize.comp)
 vqm_add_shader(vmaf_motion_horizontal metrics/vmaf/features/shaders/preprocess/vmaf_motion_horizontal.comp)
 vqm_add_shader(vmaf_motion_reduce metrics/vmaf/features/shaders/preprocess/vmaf_motion_reduce.comp)
@@ -182,6 +184,7 @@ vqm_add_shader(vmaf_adm3_dwt_decouple metrics/vmaf/features/shaders/adm/vmaf_adm
 vqm_add_shader(vmaf_adm3_accumulate metrics/vmaf/features/shaders/adm/vmaf_adm3_accumulate.comp)
 vqm_add_shader(vmaf_adm3_reduce metrics/vmaf/features/shaders/adm/vmaf_adm3_reduce.comp)
 vqm_add_shader(vmaf_adm3_finish metrics/vmaf/features/shaders/adm/vmaf_adm3_finish.comp)
+vqm_add_shader(vmaf_speed_prescale metrics/vmaf/speed/shaders/vmaf_speed_prescale.comp)
 vqm_add_shader(vmaf_speed_filter_vertical metrics/vmaf/speed/shaders/vmaf_speed_filter_vertical.comp)
 vqm_add_shader(vmaf_speed_filter_horizontal metrics/vmaf/speed/shaders/vmaf_speed_filter_horizontal.comp)
 vqm_add_shader(vmaf_speed_stats_cov metrics/vmaf/speed/shaders/vmaf_speed_stats_cov.comp)
@@ -197,6 +200,7 @@ vqm_add_shader(vmaf_speed_stats_reduce metrics/vmaf/speed/shaders/vmaf_speed_sta
 vqm_add_shader(vmaf_speed_combine metrics/vmaf/speed/shaders/vmaf_speed_combine.comp)
 vqm_add_shader(vmaf_cambi_prepare metrics/vmaf/cambi/shaders/vmaf_cambi_prepare.comp)
 vqm_add_shader(vmaf_cambi_contrast metrics/vmaf/cambi/shaders/vmaf_cambi_contrast.comp)
+vqm_add_shader(vmaf_cambi_contrast_pq metrics/vmaf/cambi/shaders/vmaf_cambi_contrast.comp -DVQM_CAMBI_PQ=1)
 vqm_add_shader(vmaf_cambi_contrast_half metrics/vmaf/cambi/shaders/vmaf_cambi_contrast.comp -DVQM_CAMBI_HALF_SOURCE=1)
 vqm_add_shader(vmaf_cambi_contrast_subgroup metrics/vmaf/cambi/shaders/vmaf_cambi_contrast.comp -DVQM_CAMBI_SUBGROUP_ROWS=1)
 vqm_add_shader(vmaf_cambi_contrast_subgroup_half metrics/vmaf/cambi/shaders/vmaf_cambi_contrast.comp -DVQM_CAMBI_SUBGROUP_ROWS=1 -DVQM_CAMBI_HALF_SOURCE=1)
@@ -280,6 +284,7 @@ set(VQM_CORE_SOURCES
   # VMAF features, models and sequences.
   src/metrics/vmaf/features/vmaf_adm.cc
   src/metrics/vmaf/features/vmaf_preprocess.cc
+  src/metrics/vmaf/features/vmaf_hdr.cc
   src/metrics/vmaf/features/vmaf_vif.cc
   src/metrics/vmaf/cambi/vmaf_cambi.cc
   src/metrics/vmaf/speed/vmaf_speed.cc

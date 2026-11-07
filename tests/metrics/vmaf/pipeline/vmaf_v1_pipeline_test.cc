@@ -16,11 +16,13 @@
 namespace {
 using namespace vqm;
 constexpr Size kV1Size{512, 384};
+constexpr Size kViewingSize{640, 480};
 constexpr Size kModelCanvas{1920, 1080};
 struct V1Oracle {
     double cambi, speed, adm3, motion3, score;
 };
 #include "vmaf_v1_reference.inc"
+#include "vmaf_v1_hdr_reference.inc"
 
 std::uint16_t Sample(
     unsigned plane, std::size_t x, std::size_t y, std::size_t frame,
@@ -67,6 +69,48 @@ Image MakeFrame(
     return result;
 }
 
+std::size_t HdrSample(
+    unsigned plane, std::size_t x, std::size_t y, std::size_t width,
+    std::size_t frame, bool distorted
+) {
+    if (plane == 0) {
+        auto value =
+            125 + (x + y / 3 + 63 * frame) % (width / 2) * 480 / (width / 2);
+        if (distorted)
+            value = (value + 2) / 5 * 5 +
+                    ((x / 47 + y / 53 + frame) % 5 == 0 ? 1u : 0u);
+        return value;
+    }
+    auto value =
+        442 + (x / 5 * (5 + plane) + y / 7 * (7 - plane) + frame * 3) % 141;
+    if (distorted)
+        value = value - 10 + (x / 9 * 3 + y / 13 * 7 + frame * 7) % 21;
+    return value;
+}
+
+Image MakeHdrFrame(
+    const ImageFormat& format, Size size, std::size_t frame, bool distorted
+) {
+    Image result{size, format, {}};
+    result.data.resize(RequiredBytes(format, size));
+    const auto planes = vqm::internal::PlaneLayout(format, size);
+    for (unsigned plane = 0; plane < 3; ++plane) {
+        const auto& layout = planes[plane];
+        for (std::size_t y = 0; y < layout.height; ++y) {
+            for (std::size_t x = 0; x < layout.width; ++x) {
+                auto value =
+                    HdrSample(plane, x, y, layout.width, frame, distorted);
+                if (format.depth == 16)
+                    value = value * 64 + (x + 2 * y + frame) % 64;
+                const auto code = static_cast<std::uint16_t>(value);
+                const auto offset = layout.offset + 2 * (y * layout.width + x);
+                std::memcpy(result.data.data() + offset, &code, sizeof(code));
+            }
+        }
+    }
+    return result;
+}
+
 Image PillarboxV1Frame(const Image& source) {
     Image result{kModelCanvas, source.format, {}};
     result.data.resize(RequiredBytes(source.format, kModelCanvas));
@@ -95,25 +139,78 @@ Image PillarboxV1Frame(const Image& source) {
     return result;
 }
 void CheckFrame(
-    const VmafV1Frame& frame, const V1Oracle& expected, std::size_t index
+    const VmafV1Frame& frame, const V1Oracle& expected, std::size_t index,
+    double speed_tolerance
 ) {
     CHECK(frame.index == index);
     CHECK_NEAR(frame.cambi, expected.cambi, 0.04);
-    CHECK_NEAR(frame.speed_chroma_uv, expected.speed, 0.08);
+    CHECK_NEAR(frame.speed_chroma_uv, expected.speed, speed_tolerance);
     CHECK_NEAR(frame.adm3, expected.adm3, 0.005);
     CHECK_NEAR(frame.motion3, expected.motion3, 0.04);
     CHECK_NEAR(frame.score, expected.score, 0.35);
 }
 template <std::size_t N>
+void RunHdrVideo(
+    Size size, MatrixCoefficients matrix, bool hfr,
+    const std::array<V1Oracle, N>& expected
+) {
+    const ImageFormat format{
+        .type = PixelType::Word,
+        .family = ColorFamily::Yuv,
+        .range = PixelRange::Limited,
+        .matrix = matrix,
+        .transfer = TransferCharacteristics::St2084,
+        .primaries = ColorPrimaries::Bt2020,
+        .subsample_w = 1,
+        .subsample_h = 1,
+        .depth = static_cast<std::uint8_t>(
+            matrix == MatrixCoefficients::Bt2100ICtCp ? 16 : 10
+        ),
+    };
+    VmafV1Pipeline pipeline(
+        {
+            .size = size,
+            .input_format = format,
+            .gpu_resident_images = 0,
+            .model = VmafV1Model::Hdr4K,
+            .hfr = hfr,
+        }
+    );
+    std::size_t received = 0;
+    double score_sum = 0.0;
+    const auto check = [&](const VmafV1Frame& frame) {
+        CHECK(received < N);
+        if (received >= N) return;
+        const auto& oracle = expected[received];
+        CheckFrame(frame, oracle, received++, 0.025);
+        CHECK_NEAR(frame.score, oracle.score, 0.05);
+        score_sum += oracle.score;
+    };
+    for (std::size_t i = 0; i < N; ++i) {
+        auto result = pipeline.Push(
+            MakeHdrFrame(format, size, i, false),
+            MakeHdrFrame(format, size, i, true)
+        );
+        if (result) check(*result);
+    }
+    while (const auto frame = pipeline.Flush()) check(*frame);
+    CHECK(received == N);
+    const auto pooled = pipeline.PooledScore();
+    CHECK(pooled.has_value());
+    if (pooled) CHECK_NEAR(*pooled, score_sum / static_cast<double>(N), 0.05);
+}
+
+template <std::size_t N>
 void RunVideo(
     VmafV1Pipeline& pipeline, const ImageFormat& format,
-    const std::array<V1Oracle, N>& expected, bool resident
+    const std::array<V1Oracle, N>& expected, bool resident, Size size = kV1Size,
+    double speed_tolerance = 0.08
 ) {
     double expected_sum = 0.0;
     std::size_t received = 0;
     for (std::size_t frame = 0; frame < N; ++frame) {
-        auto a = MakeFrame(format, frame, false);
-        auto b = MakeFrame(format, frame, true);
+        auto a = MakeFrame(format, frame, false, size);
+        auto b = MakeFrame(format, frame, true, size);
         std::optional<VmafV1Frame> result;
         if (resident) {
             auto ref = pipeline.Upload(a);
@@ -126,14 +223,18 @@ void RunVideo(
         }
         if (result) {
             CHECK(received < N);
-            if (received < N) CheckFrame(*result, expected[received], received);
+            if (received < N)
+                CheckFrame(
+                    *result, expected[received], received, speed_tolerance
+                );
             ++received;
         }
         expected_sum += expected[frame].score;
     }
-    if (const auto result = pipeline.Flush()) {
+    while (const auto result = pipeline.Flush()) {
         CHECK(received < N);
-        if (received < N) CheckFrame(*result, expected[received], received);
+        if (received < N)
+            CheckFrame(*result, expected[received], received, speed_tolerance);
         ++received;
     }
     CHECK(received == N);
@@ -142,6 +243,40 @@ void RunVideo(
     if (pooled) CHECK_NEAR(*pooled, expected_sum / static_cast<double>(N), 0.35);
 }
 }  // namespace
+
+VQM_TEST(TestVmafV1HdrPipelineReferenceSequences) {
+    if (!vqm::test::GpuAvailable()) return;
+    RunHdrVideo(
+        {1280, 720}, MatrixCoefficients::Bt2020Ncl, false, kOracle420HdrNclScaled
+    );
+    RunHdrVideo(
+        {3840, 2160}, MatrixCoefficients::Bt2020Ncl, true, kOracle420HdrNclHfr
+    );
+    RunHdrVideo(
+        {3840, 2160}, MatrixCoefficients::Bt2100ICtCp, false, kOracle420HdrIctcp
+    );
+}
+
+VQM_TEST(TestVmafV1HfrPipelineReferenceSequences) {
+    if (!vqm::test::GpuAvailable()) return;
+    const ImageFormat format{
+        .type = PixelType::Word,
+        .family = ColorFamily::Yuv,
+        .range = PixelRange::Limited,
+        .matrix = MatrixCoefficients::Bt709,
+        .subsample_w = 1,
+        .subsample_h = 1,
+        .depth = 10,
+    };
+    VmafV1Pipeline pipeline(
+        {.size = kV1Size, .input_format = format, .hfr = true}
+    );
+    RunVideo(pipeline, format, kOracle420Hfr2, false);
+    pipeline.Reset();
+    RunVideo(pipeline, format, kOracle420Hfr3, true);
+    pipeline.Reset();
+    RunVideo(pipeline, format, kOracle420Hfr6, false);
+}
 
 VQM_TEST(TestVmafV1PipelineReferenceSequences) {
     if (!vqm::test::GpuAvailable()) return;
@@ -161,10 +296,24 @@ VQM_TEST(TestVmafV1PipelineReferenceSequences) {
     config.encoded_bit_depth = 8;
     VmafV1Pipeline encoded8(config);
     RunVideo(encoded8, format, kOracle444VideoEnc8, false);
+    config.encoded_bit_depth = 0;
+    config.size = kViewingSize;
+    for (const auto& [model, oracle] :
+         {std::pair{VmafV1Model::Standard4K, &kOracle444Close4K},
+          std::pair{VmafV1Model::Tv4K, &kOracle444Tv4K},
+          std::pair{VmafV1Model::Phone, &kOracle444Phone}}) {
+        config.model = model;
+        VmafV1Pipeline variant(config);
+        // The 0.5x prescale amplifies covariance rounding on this periodic
+        // fixture. Keep the same ADM, CAMBI, motion and final-score tolerances.
+        const double speed_tolerance = model == VmafV1Model::Tv4K ? 0.16 : 0.08;
+        RunVideo(variant, format, *oracle, false, config.size, speed_tolerance);
+    }
     format.subsample_w = 1;
     format.subsample_h = 1;
     config.input_format = format;
-    config.encoded_bit_depth = 0;
+    config.model = VmafV1Model::Standard1080;
+    config.size = kV1Size;
     VmafV1Pipeline subsampled(config);
     RunVideo(subsampled, format, kOracle420Single, false);
     subsampled.Reset();

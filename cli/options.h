@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include <optional>
 #include <span>
 #include <string>
 #include <string_view>
@@ -10,6 +11,7 @@
 
 #include "cvvdp_options.h"
 #include "io.h"
+#include "vmaf_v1.h"
 
 namespace vqm::cli {
 
@@ -23,6 +25,8 @@ struct Options {
     bool nvdec = false;
     bool vmaf_scale = false;
     bool vmaf_pad = false;
+    std::optional<VmafV1Model> vmaf_v1_model;
+    bool vmaf_v1_hfr = false;
     std::vector<Metric> metrics{Metric::Ssimulacra2};
     tool::CvvdpOptions cvvdp;
     float hf_asymmetry = 1.0f;

@@ -28,8 +28,12 @@ Config VmafBenchmarkConfig(
 ) {
     Config config;
     config.size = original.size;
-    if constexpr (std::is_same_v<Config, vqm::VmafV1Config>)
+    if constexpr (std::is_same_v<Config, vqm::VmafV1Config>) {
         config.input_format = original.format;
+        config.hfr = options.vmaf_v1_hfr;
+        config.model =
+            options.vmaf_v1_model.value_or(vqm::VmafV1Model::Standard1080);
+    }
     config.chroma_sampling =
         options.vmaf_chroma == "420"   ? vqm::VmafChromaSampling::Yuv420
         : options.vmaf_chroma == "444" ? vqm::VmafChromaSampling::Yuv444
@@ -122,7 +126,7 @@ VmafPairMeasurement MeasureVmafSequence(
             }
         }
     }
-    if (const auto result = pipeline.Flush()) {
+    while (const auto result = pipeline.Flush()) {
         score = result->score;
         totals.checksum += score;
     }

@@ -179,15 +179,19 @@ static_assert(sizeof(CambiContrastPush) == VmafCambiContrast::PushBytes());
 }  // namespace
 
 VmafCambiContrast::VmafCambiContrast(
-    VulkanRuntime& runtime, bool allow_half, bool allow_subgroups
+    VulkanRuntime& runtime, bool allow_half, bool allow_subgroups, bool pq
 )
     : runtime_(&runtime),
+      pq_(pq),
       // Float16 workgroup storage needs the enabled shaderFloat16 feature,
       // independently of buffer storage or the physical device's support.
-      half_source_(allow_half && runtime.context().shader_float16),
-      subgroup_pipeline_(allow_subgroups && SupportsCambiSubgroupRows(runtime)),
+      half_source_(!pq && allow_half && runtime.context().shader_float16),
+      subgroup_pipeline_(
+          !pq && allow_subgroups && SupportsCambiSubgroupRows(runtime)
+      ),
       pipeline_(runtime.CreatePipeline(
-          subgroup_pipeline_
+          pq ? "vmaf_cambi_contrast_pq"
+          : subgroup_pipeline_
               ? (half_source_ ? "vmaf_cambi_contrast_subgroup_half"
                               : "vmaf_cambi_contrast_subgroup")
               : (half_source_ ? "vmaf_cambi_contrast_half"
@@ -196,10 +200,12 @@ VmafCambiContrast::VmafCambiContrast(
 VmafCambiContrast::~VmafCambiContrast() {
     runtime_->DestroyPipelines(std::array{pipeline_});
 }
-std::size_t VmafCambiContrast::Pixels(Size size, unsigned window) {
-    if (!size.width || !size.height || size.width > 1920 || size.height > 1080 ||
-        !window || window > 33 || (window & 1u) == 0 || size.width < window ||
-        size.height < window)
+std::size_t VmafCambiContrast::Pixels(Size size, unsigned window, bool pq) {
+    const auto max_width = pq ? 4320u : 1920u;
+    const auto max_height = pq ? 4320u : 1080u;
+    if (!size.width || !size.height || size.width > max_width ||
+        size.height > max_height || !window || window > (pq ? 59u : 33u) ||
+        (window & 1u) == 0 || size.width < window || size.height < window)
         throw std::invalid_argument(
             "vmaf cambi: unsupported contrast geometry or window"
         );
@@ -208,15 +214,16 @@ std::size_t VmafCambiContrast::Pixels(Size size, unsigned window) {
 void VmafCambiContrast::Record(
     Size size, unsigned window, const VmafCambiContrastBuffers& b
 ) {
-    const auto pixels = Pixels(size, window);
+    const auto pixels = Pixels(size, window, pq_);
     const std::array offsets{b.input, b.mask, b.horizontal, b.filtered,
                              b.contrast};
     for (auto offset : offsets)
         if (pixels > std::numeric_limits<std::uint32_t>::max() - offset)
             throw std::invalid_argument("vmaf cambi: arena offset overflow");
     const auto& limits = runtime_->context().limits;
+    const auto rows = pq_ ? 2u : 8u;
     if (Groups(size.width, 16) > limits.maxComputeWorkGroupCount[0] ||
-        Groups(size.height, 8) > limits.maxComputeWorkGroupCount[1])
+        Groups(size.height, rows) > limits.maxComputeWorkGroupCount[1])
         throw std::invalid_argument(
             "vmaf cambi: geometry exceeds device limits"
         );
@@ -235,7 +242,7 @@ void VmafCambiContrast::Record(
         push.phase = phase;
         runtime_->Dispatch(
             pipeline_, &push, sizeof(push), Groups(size.width, 16),
-            Groups(size.height, 16), 1
+            Groups(size.height, 2 * rows), 1
         );
         runtime_->ComputeBarrier();
     }
@@ -244,7 +251,7 @@ void VmafCambiContrast::Record(
     push.phase = 2;
     runtime_->Dispatch(
         pipeline_, &push, sizeof(push), Groups(size.width, 16),
-        Groups(size.height, 8), 1
+        Groups(size.height, rows), 1
     );
     runtime_->ComputeBarrier();
 }
@@ -421,15 +428,16 @@ void CheckCambiFeatureRange(std::uint32_t offset, std::size_t count) {
         throw std::invalid_argument("vmaf cambi: arena offset overflow");
 }
 }  // namespace
-VmafCambi::VmafCambi(VulkanRuntime& runtime)
+VmafCambi::VmafCambi(VulkanRuntime& runtime, bool pq)
     : runtime_(&runtime),
+      pq_(pq),
       prepare_(runtime),
       decimate_(runtime),
-      contrast_(runtime),
+      contrast_(runtime, true, true, pq),
       pool_(runtime),
       combine_(runtime.CreatePipeline("vmaf_cambi_combine")) {}
 VmafCambi::~VmafCambi() { runtime_->DestroyPipelines(std::array{combine_}); }
-VmafCambiPlan VmafCambi::Plan(Size size) {
+VmafCambiPlan VmafCambi::Plan(Size size, bool pq) {
     const auto pixels = VmafCambiPrepare::Pixels(size);
     if (size.width < 216 && size.height < 216)
         throw std::invalid_argument(
@@ -450,7 +458,7 @@ VmafCambiPlan VmafCambi::Plan(Size size) {
     plan.high_res_speedup = speedup;
     for (unsigned scale = 0; scale < 5; scale++) {
         if (scale > 0) current = VmafCambiDecimate::OutputSize(current);
-        (void)VmafCambiContrast::Pixels(current, window);
+        (void)VmafCambiContrast::Pixels(current, window, pq);
         const auto count = current.width * current.height;
         plan.scale_pixels[scale] = count;
         if (count >
@@ -465,7 +473,7 @@ void VmafCambi::Record(
     Size size, std::uint32_t input_depth, std::uint32_t encoded_depth,
     const VmafCambiBuffers& b
 ) {
-    const auto plan = Plan(size);
+    const auto plan = Plan(size, pq_);
     if (encoded_depth == 0) encoded_depth = input_depth;
     if ((input_depth != 8 && input_depth != 10 && input_depth != 12 &&
          input_depth != 16) ||

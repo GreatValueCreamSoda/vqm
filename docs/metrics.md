@@ -37,7 +37,7 @@ an active sequence; call `Reset` before switching to still-image processing.
 Call `Compute` for each frame pair in order. It returns a result once every
 selected frame metric has completed that frame. Each result carries
 `frame_index`. VMAF can defer results for motion lookahead. Call `Finalize`
-after the final pair to collect any pending frame and the CVVDP clip score,
+after the final pair to collect pending frames and the CVVDP clip score,
 then call `Reset` before starting another sequence.
 
 ```cpp
@@ -47,6 +47,9 @@ for (const auto& pair : frames) {
     }
 }
 const auto final = metrics.Finalize();
+if (final.penultimate_frame) {
+    consume(final.penultimate_frame->frame_index, *final.penultimate_frame);
+}
 if (final.last_frame) {
     consume(final.last_frame->frame_index, *final.last_frame);
 }
@@ -125,10 +128,11 @@ Set `config.cvvdp = vqm::CvvdpConfig{}` and configure its physical display and
 rational frame rate. Independent `ComputeImage` populates `result.cvvdp`.
 Sequence `Compute` leaves that field empty because a frame JOD does not
 represent clip quality. Call `auto final = metrics.Finalize()` after the last
-pair: `final.last_frame` contains any remaining VMAF result, `final.cvvdp` the
-whole-clip JOD/frame count, and `final.frames` the consumed pair count. Repeated
-finalization repeats only the cached clip summary. Existing `Flush` remains
-usable; a following `Finalize` retrieves the clip summary. A CVVDP-only sequence
+pair. `final.last_frame` contains the last pending result, with an earlier
+`final.penultimate_frame` when HFR leaves two. `final.cvvdp` contains the
+whole-clip JOD and its frame count. `final.frames` counts consumed pairs.
+Repeated finalization repeats only the cached clip summary. `Flush` emits one
+pending frame per call, and `Finalize` can follow it. A CVVDP-only sequence
 emits frame-index metadata from `Compute`. See [CVVDP](cvvdp.md) for image/video
 selection, supported inputs and temporal memory limits.
 

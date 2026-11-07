@@ -234,6 +234,43 @@ VQM_TEST(TestMetricsAllFrameAlignedScores) {
     }
 }
 
+VQM_TEST(TestMetricsHfrTailStaysFrameAligned) {
+    if (!vqm::test::GpuAvailable()) return;
+    const auto pair = MakePair(false);
+    auto config = AllConfig(pair);
+    config.vmaf_v1->hfr = true;
+    Metrics metrics(config);
+    const auto submit = [&] {
+        return metrics.Compute(pair.original, pair.distorted);
+    };
+    const auto check = [](const std::optional<MetricsResult>& frame,
+                          std::uint64_t index) {
+        CHECK(frame.has_value());
+        if (!frame) return;
+        CHECK(frame->frame_index == index);
+        CHECK(frame->ssimulacra2.has_value());
+        CHECK(frame->vmaf_v0.has_value());
+        CHECK(frame->vmaf_v1.has_value());
+    };
+    CHECK(!submit());
+    CHECK(!submit());
+    check(submit(), 0);
+    const auto finalized = metrics.Finalize();
+    CHECK(finalized.frames == 3);
+    check(finalized.penultimate_frame, 1);
+    check(finalized.last_frame, 2);
+    CHECK(!metrics.Finalize().last_frame);
+
+    metrics.Reset();
+    CHECK(!submit());
+    CHECK(!submit());
+    check(metrics.Flush(), 0);
+    const auto remaining = metrics.Finalize();
+    CHECK(!remaining.penultimate_frame);
+    check(remaining.last_frame, 1);
+    CHECK(!metrics.Flush());
+}
+
 VQM_TEST(TestMetricsSelectionAndMemoryUsage) {
     if (!vqm::test::GpuAvailable()) return;
     const auto pair = MakePair(false);

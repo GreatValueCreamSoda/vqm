@@ -9,7 +9,7 @@ The main README covers the build, command line and library quick start.
 | --- | --- |
 | SSIMULACRA 2.1 | [Pipeline, norms and score mapping](ssimulacra2.md) |
 | Butteraugli | [Diffmap, two spatial levels and final score](butteraugli.md) |
-| VMAF v0.6.1 and v1.0.16 3H | [Sequence APIs, model limits and reference checks](vmaf-development.md) |
+| VMAF v0.6.1 and v1 SDR/HDR | [Sequence APIs, viewing presets and reference checks](vmaf-development.md) |
 | ColorVideoVDP v0.5.7 | [Image and video API, viewing conditions and JOD](cvvdp.md) · [Reference implementation and oracles](cvvdp-development.md) |
 | FP32 PSNR-HVS | [Native YUV inputs, dB scores and qualification status](psnr-hvs.md) |
 

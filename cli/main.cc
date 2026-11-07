@@ -24,6 +24,7 @@
 #include "io.h"
 #include "options.h"
 #include "video.h"
+#include "vmaf_v1_options.h"
 #include "vqm.h"
 #include "vqm_alpha.h"
 #include "vulkan/vulkan_support.h"
@@ -95,6 +96,8 @@ Usage: {} [--metric METRIC[,METRIC...]] [--raw|--json] [--verbose]
           [--half-planes] [--nvdec] [--iterations N] [--warmup N]
           [--chroma-filter KERNEL] [--intensity-target NITS]
           [--hf-asymmetry F] [--vmaf-scale] [--vmaf-pad]
+          [--vmaf-v1-model 1080p-3h|4k-1.5h|4k-3h|phone-5h|hdr-4k-1.5h]
+          [--vmaf-v1-hfr]
           [--cvvdp-display standard|compact] [--cvvdp-ppd N]
           [--cvvdp-aspect W:H] [--cvvdp-diagonal INCHES] [--cvvdp-distance METRES]
           [--cvvdp-peak NITS] [--cvvdp-contrast RATIO] [--cvvdp-ambient LUX]
@@ -129,10 +132,13 @@ also prints its distance_p3 aggregate.
 (defaults 80 nits and 1.0).
 CVVDP prints JOD (10 for identical, higher is better; negative values are valid).
 VMAF v0.6.1 and v1 default to the original input dimensions.
---vmaf-scale fits the content within 1920x1080 without stretching or adding
-bars. --vmaf-pad adds black bars to reach 16:9 at the current scale.
-Together they fit and pad to 1920x1080. For example, 960x720 becomes 1440x1080
-with scaling, 1280x720 with padding, or 1920x1080 with both.
+--vmaf-v1-model selects the viewing preset (default SDR 1080p-3h).
+hdr-4k-1.5h accepts PQ BT.2020 and automatically scales the short side to 2160.
+--vmaf-v1-hfr selects five-frame motion for about 50/60 fps content.
+The 4k-3h preset has a 110-point score ceiling.
+--vmaf-scale fits the content within the model canvas (1920x1080 or 3840x2160)
+without stretching or adding bars. --vmaf-pad adds black bars to reach 16:9 at
+the current scale. Together they fit and pad to the full model canvas.
 SSIMULACRA 2, Butteraugli and VMAF average their frame scores.
 CVVDP defaults to the standard viewing geometry (16:9, 30 inches, 0.7472 m).
 Use --cvvdp-peak to set display brightness in nits (default 200).
@@ -245,6 +251,16 @@ ParseResult ParseOptions(std::span<const std::string_view> args) {
             options.vmaf_scale = true;
         } else if (arg == "--vmaf-pad") {
             options.vmaf_pad = true;
+        } else if (arg == "--vmaf-v1-hfr") {
+            options.vmaf_v1_hfr = true;
+        } else if (arg == "--vmaf-v1-model") {
+            if (i + 1 >= args.size())
+                return ParseError{"--vmaf-v1-model needs a value"};
+            options.vmaf_v1_model = tool::ParseVmafV1Model(args[++i]);
+            if (!options.vmaf_v1_model)
+                return ParseError{std::format(
+                    "--vmaf-v1-model expects {}", tool::kVmafV1ModelChoices
+                )};
         } else if (tool::IsCvvdpOption(arg)) {
             if (i + 1 >= args.size())
                 return ParseError{std::format("{} needs a value", arg)};
@@ -308,6 +324,15 @@ ParseResult ParseOptions(std::span<const std::string_view> args) {
         !HasMetric(options.metrics, Metric::VmafV0) &&
         !HasMetric(options.metrics, Metric::VmafV1))
         return ParseError{"--vmaf-scale and --vmaf-pad require a VMAF metric"};
+    if (options.vmaf_v1_hfr && !HasMetric(options.metrics, Metric::VmafV1))
+        return ParseError{"--vmaf-v1-hfr requires --metric vmaf-v1"};
+    if (options.vmaf_v1_model && !HasMetric(options.metrics, Metric::VmafV1))
+        return ParseError{"--vmaf-v1-model requires --metric vmaf-v1"};
+    if (options.vmaf_v1_model == VmafV1Model::Hdr4K &&
+        (options.vmaf_scale || options.vmaf_pad))
+        return ParseError{
+            "hdr-4k-1.5h controls scaling and cannot use --vmaf-scale or "
+            "--vmaf-pad"};
     if (options.cvvdp.specified && !HasMetric(options.metrics, Metric::Cvvdp))
         return ParseError{"--cvvdp-* options require --metric cvvdp"};
     if (const auto error = options.cvvdp.GeometryError(); !error.empty())
