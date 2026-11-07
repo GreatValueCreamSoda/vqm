@@ -27,6 +27,11 @@ os.environ["PYTHONDONTWRITEBYTECODE"] = "1"
 sys.dont_write_bytecode = True
 ROOT = Path(__file__).resolve().parent.parent
 PIN = "2a268bce8d56e2f3abde46df3927d8a633707a24"
+# Fixed viewing geometries from the pinned original display models.
+DISPLAY_PPD = {
+    "standard_4k": "75.402449345163049",
+    "standard_fhd": "37.842503853602885",
+}
 sys.path.insert(0, str(ROOT / ".reference/ColorVideoVDP"))
 
 import numpy as np  # noqa: E402
@@ -317,8 +322,8 @@ def candidate_scores(rows: list[tuple[Source, Source]],
     json.loads(device.stdout)  # Reject malformed provenance before scoring.
     (args.out_dir / "device.json").write_text(device.stdout)
     command = [
-        str(snapshot.resolve()), "--metric", "cvvdp", "--score-only", "--cvvdp-display",
-        args.display.replace("_", "-"), "--pairs-file",
+        str(snapshot.resolve()), "--metric", "cvvdp", "--score-only", "--cvvdp-ppd",
+        DISPLAY_PPD[args.display], "--pairs-file",
         str(pairs_file.resolve())
     ]
     result = subprocess.run(
@@ -610,9 +615,7 @@ def arguments() -> argparse.Namespace:
         "--limit", type=int, default=300,
         help="uniform subset size; 0 selects all pairs"
     )
-    parser.add_argument(
-        "--display", choices=("standard_4k", "standard_fhd"), default="standard_4k"
-    )
+    parser.add_argument("--display", choices=tuple(DISPLAY_PPD), default="standard_4k")
     parser.add_argument("--tolerance", type=float, default=1e-3)
     parser.add_argument("--binary", type=Path, default=ROOT / "build/vqm_bench")
     parser.add_argument(

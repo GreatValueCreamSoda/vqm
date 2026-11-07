@@ -24,8 +24,9 @@ std::string Usage(std::string_view program) {
           [--throughput-seconds S] [--vmaf-chroma native|420|444]
           [--vmaf-fit native|pad] [--vmaf-model 1080|4k] [--vmaf-neg] [--vmaf-transform] [--vmaf-no-temporal]
           [--metric-pair independent|shared|unified]
-          [--cvvdp-video] [--cvvdp-display standard-4k|standard-fhd|standard-hdr]
+          [--cvvdp-video] [--cvvdp-display standard|compact]
           [--cvvdp-ppd N] [--cvvdp-peak NITS] [--cvvdp-contrast RATIO] [--cvvdp-ambient LUX]
+          [--cvvdp-aspect W:H] [--cvvdp-diagonal INCHES] [--cvvdp-distance METRES]
           [--intensity-target NITS] [--hf-asymmetry F] [--device-info] [--help]
 
 --resident N scores resident Vulkan images (N >= 2 slots, one per pair member)
@@ -63,6 +64,9 @@ reciprocal rate. --threads is an alias for --workers.
 --vmaf-no-temporal forces VMAF v0 motion2 to zero, skips the motion
 passes, and scores every frame immediately.
 --metric cvvdp measures independent still pairs and reports JOD (identity 10).
+CVVDP defaults to standard viewing geometry and derives pixels per degree
+from the fitted input size. --cvvdp-ppd fixes pixels per degree.
+Use --cvvdp-peak to set display brightness in nits (default 200).
 --cvvdp-video instead reads whole progressive Y4M clips with matching rational
 frame rates. Each warmup/iteration resets and scores one complete clip; decode
 is outside core timing. It reports ms/clip and ms/frame separately. This mode
@@ -331,6 +335,11 @@ bool ParseArgs(
     if ((options.cvvdp.specified || options.cvvdp_video) &&
         options.metric != Metric::Cvvdp) {
         error = "--cvvdp-* options require --metric cvvdp";
+        return false;
+    }
+    if (const auto geometry_error = options.cvvdp.GeometryError();
+        !geometry_error.empty()) {
+        error = geometry_error;
         return false;
     }
     if (options.metric == Metric::Cvvdp &&

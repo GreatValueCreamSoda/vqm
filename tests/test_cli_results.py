@@ -118,6 +118,34 @@ class CandidateOutputTests(unittest.TestCase):
             for payload, accepted in ((incomplete, False), (value, True)):
                 self._check_output(rows, args, payload, accepted)
 
+    def test_cvvdp_matches_frozen_reference_display(self) -> None:
+        """The candidate uses the same fixed PPD as the pinned clip oracle."""
+        rows = [
+            {
+                "sample_id": "clip",
+                "frames": 3,
+                "original": "original.y4m",
+                "distorted": "distorted.y4m"
+            }
+        ]
+        value = _result("cvvdp")
+        completed = subprocess.CompletedProcess(
+            [], 0, stdout=json.dumps(value) + "\n", stderr=""
+        )
+        with (tempfile.TemporaryDirectory() as
+              directory, mock.patch.object(temporal_run.subprocess, "run",
+                                           return_value=completed) as run):
+            root = Path(directory)
+            args = argparse.Namespace(
+                out_dir=root, binary=root / "binary", iterations=1, warmup=0
+            )
+            self.assertEqual(
+                temporal_run.candidate_scores(rows, "cvvdp", args), [value]
+            )
+        self.assertEqual(
+            run.call_args.args[0][-2:], ["--cvvdp-ppd", "75.402449345163049"]
+        )
+
     def _check_output(
         self, rows: list[dict[str, object]], args: argparse.Namespace,
         payload: dict[str, object], accepted: bool

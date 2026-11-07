@@ -9,6 +9,7 @@ import hashlib
 import importlib.util
 import io
 import json
+import subprocess
 import sys
 import tempfile
 import types
@@ -354,6 +355,27 @@ class CvvdpAgreementAdapterTests(unittest.TestCase):
         """The original CVVDP still adapter resolves its default after building reports."""
         with mock.patch.object(sys, "argv", ["cvvdp.py"]):
             self.assertIsNone(CVVDP.arguments().gate_mode)
+
+    def test_candidate_keeps_reference_display_ppd(self) -> None:
+        """Each reference still display uses fixed PPD across candidate input sizes."""
+        self.args.binary = self.root / "built-binary"
+        self.args.binary.write_bytes(b"candidate binary")
+        for display, ppd in (("standard_4k", "75.402449345163049"),
+                             ("standard_fhd", "37.842503853602885")):
+            self.args.display = display
+            outputs = [
+                subprocess.CompletedProcess([], 0, stdout="{}\n", stderr=""),
+                subprocess.CompletedProcess([], 0, stdout="9.5\n", stderr=""),
+            ]
+            with (self.subTest(display=display), mock.patch.object(CVVDP.subprocess,
+                                                                   "run",
+                                                                   side_effect=outputs)
+                  as run):
+                self.assertEqual(
+                    CVVDP.candidate_scores(self.rows[:1], self.args), [9.5]
+                )
+                command = run.call_args.args[0]
+                self.assertEqual(command[command.index("--cvvdp-ppd") + 1], ppd)
 
     def test_policy_numerical_thresholds_cannot_be_ignored(self) -> None:
         """Passing the legacy argument cannot override a tighter frozen numerical policy."""

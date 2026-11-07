@@ -12,14 +12,23 @@ namespace vqm::tool {
 // Shared physical viewing options for the CLI and benchmark. Explicit numeric
 // overrides apply after preset selection, independent of argument ordering.
 struct CvvdpOptions {
-    std::string display = "standard-4k";
+    struct AspectRatio {
+        double width;
+        double height;
+    };
+
+    std::string display = "standard";
     std::optional<double> ppd;
+    std::optional<AspectRatio> aspect;
+    std::optional<double> diagonal_inches;
+    std::optional<double> distance_metres;
     std::optional<double> peak;
     std::optional<double> contrast;
     std::optional<double> ambient;
     bool specified = false;
 
-    [[nodiscard]] CvvdpDisplay ResolveDisplay() const;
+    [[nodiscard]] std::string_view GeometryError() const;
+    [[nodiscard]] CvvdpDisplay ResolveDisplay(Size content) const;
 };
 
 [[nodiscard]] bool IsCvvdpOption(std::string_view flag);

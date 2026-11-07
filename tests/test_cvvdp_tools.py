@@ -46,17 +46,21 @@ def write_y4m(path: Path, fps: str = "30:1", frames: int = 3) -> None:
     path.write_bytes(header + contents)
 
 
-def write_late_distortion(path: Path, distorted: bool) -> None:
+def write_late_distortion(
+    path: Path, distorted: bool, *, width: int = 32, height: int = 32
+) -> None:
     """Write four changing frames with an optional final-frame spatial error.
 
     :param path: Destination file.
     :param distorted: Whether to alter only the final frame.
+    :param width: Frame width in pixels.
+    :param height: Frame height in pixels.
     """
-    contents = bytearray(b"YUV4MPEG2 W32 H32 F30:1 Ip Cmono\n")
+    contents = bytearray(f"YUV4MPEG2 W{width} H{height} F30:1 Ip Cmono\n".encode())
     for frame in range(4):
         values = [
-            32 + (5 * x + 3 * y + 19 * frame) % 192 for y in range(32)
-            for x in range(32)
+            32 + (5 * x + 3 * y + 19 * frame) % 192 for y in range(height)
+            for x in range(width)
         ]
         if distorted and frame == 3:
             values = [255 - value for value in values]
@@ -118,12 +122,70 @@ class CvvdpToolTests(unittest.TestCase):
     def test_rejects_invalid_display_options(self) -> None:
         """Reject invalid display values before opening input files."""
         cli = binary("VQM_CLI_BINARY")
-        for flag, value in (("--cvvdp-peak", "nan"), ("--cvvdp-ppd", "0"),
-                            ("--cvvdp-contrast", "-1"), ("--cvvdp-ambient", "-1"),
-                            ("--cvvdp-display", "automatic")):
+        cases = (
+            ("--cvvdp-peak", "nan"), ("--cvvdp-ppd", "0"), ("--cvvdp-contrast", "-1"),
+            ("--cvvdp-ambient", "-1"), ("--cvvdp-display", "automatic"),
+            ("--cvvdp-display", "standard-4k"), ("--cvvdp-display", "standard-fhd"),
+            ("--cvvdp-display", "standard-sdr"), ("--cvvdp-display", "compact-sdr"),
+            ("--cvvdp-display", "standard-hdr"), ("--cvvdp-aspect", "16"),
+            ("--cvvdp-aspect", "16:0"), ("--cvvdp-aspect",
+                                         "16:9:1"), ("--cvvdp-diagonal",
+                                                     "inf"), ("--cvvdp-distance", "0"),
+        )
+        for flag, value in cases:
             result = run([cli, "--metric", "cvvdp", flag, value, "a", "b"])
             self.assertEqual(result.returncode, 2, result.stderr)
-            self.assertIn(flag, result.stderr)
+            self.assertIn(flag, result.stderr.splitlines()[0])
+
+    def test_rejects_conflicting_display_geometry(self) -> None:
+        """Reject a geometry override combined with explicit PPD."""
+        cli = binary("VQM_CLI_BINARY")
+        for flag, value in (("--cvvdp-aspect", "16:9"), ("--cvvdp-diagonal", "27"),
+                            ("--cvvdp-distance", "0.7")):
+            with self.subTest(flag=flag):
+                result = run(
+                    [
+                        cli, "--metric", "cvvdp", "--cvvdp-ppd", "30", flag, value, "a",
+                        "b"
+                    ]
+                )
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertIn("--cvvdp-ppd", result.stderr.splitlines()[0])
+                self.assertEqual(result.stdout, "")
+
+    def test_display_geometry_scores_with_aspect_fitted_ppd(self) -> None:
+        """Match explicit PPD for full-screen, letterboxed and pillarboxed content."""
+        require_gpu()
+        cli = binary("VQM_CLI_BINARY")
+        with tempfile.TemporaryDirectory() as directory:
+            original, distorted = Path(directory) / "a.y4m", Path(directory) / "b.y4m"
+            write_late_distortion(original, distorted=False, width=320, height=180)
+            write_late_distortion(distorted, distorted=True, width=320, height=180)
+            # Values from the central-pixel formula for an 8-inch panel at
+            # 0.7 m, using its width for 4:3 and height for 21:9.
+            cases = (
+                ("16:9", "22.07479467324551"), ("4:3", "24.049813582989522"),
+                ("21:9", "27.473688241145847"),
+            )
+            scores = []
+            for aspect, ppd in cases:
+                inputs = [str(original), str(distorted)]
+                command = [cli, "--metric", "cvvdp", "--raw"]
+                result = run(
+                    [
+                        *command, "--cvvdp-aspect", aspect, "--cvvdp-diagonal", "8",
+                        "--cvvdp-distance", "0.7", *inputs
+                    ]
+                )
+                explicit = run([*command, "--cvvdp-ppd", ppd, *inputs])
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(explicit.returncode, 0, explicit.stderr)
+                frames, score = result.stdout.splitlines()
+                self.assertEqual(frames, "frames 4")
+                self.assertLess(float(score), 10.0)
+                self.assertEqual(result.stdout, explicit.stdout)
+                scores.append(score)
+            self.assertEqual(len(set(scores)), len(cases))
 
     def test_missing_timing_and_interlace_fail_before_gpu(self) -> None:
         """A video metric must not infer timing or score interlaced fields."""
@@ -169,7 +231,7 @@ class CvvdpToolTests(unittest.TestCase):
             self.assertEqual(truncated.stdout, "")
 
     def test_benchmark_reports_complete_clips_and_frame_units(self) -> None:
-        """A video iteration scores a whole reset clip, not one repeated pair."""
+        """A benchmark scores a reset clip using a partial display override."""
         bench = binary("VQM_BENCH_BINARY")
         require_gpu()
         with tempfile.TemporaryDirectory() as directory:
@@ -179,7 +241,8 @@ class CvvdpToolTests(unittest.TestCase):
                 [
                     bench, "--metric", "cvvdp", "--cvvdp-video", "--pair",
                     str(path),
-                    str(path), "--iterations", "2", "--warmup", "1"
+                    str(path), "--iterations", "2", "--warmup", "1", "--cvvdp-diagonal",
+                    "8"
                 ]
             )
             self.assertEqual(result.returncode, 0, result.stderr)
@@ -187,8 +250,41 @@ class CvvdpToolTests(unittest.TestCase):
             self.assertIn("ms/clip", result.stdout)
             self.assertIn("ms/frame", result.stdout)
             self.assertIn("frame rate 24000/1001", result.stdout)
+            # A diagonal override keeps the default 16:9 aspect and 0.7472 m.
+            self.assertIn("ppd 4.189031,", result.stdout)
             self.assertIn("score 10.00000000", result.stdout)
             self.assertIn("checksum 30.00000000", result.stdout)
+
+    def test_physical_presets_resolve_ppd_at_each_input_size(self) -> None:
+        """Resolve PPD by geometry and apply peak brightness independently."""
+        bench = binary("VQM_BENCH_BINARY")
+        require_gpu()
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "video.y4m"
+            # Standard and compact are both 16:9, at 30 in and 0.7472 m or
+            # 24 in and 0.6 m respectively.
+            cases = (
+                (320, 180, (), "6.28354146",
+                 200), (640, 360, ("--cvvdp-display", "standard"), "12.5670769", 200),
+                (320, 180, ("--cvvdp-display", "compact"), "6.30708789", 200), (
+                    640, 360, ("--cvvdp-peak", "1500", "--cvvdp-display", "compact"),
+                    "12.6141697", 1500
+                ),
+            )
+            for width, height, flags, ppd, peak in cases:
+                write_late_distortion(path, distorted=False, width=width, height=height)
+                result = run(
+                    [
+                        bench, "--metric", "cvvdp", "--cvvdp-video", "--pair",
+                        str(path),
+                        str(path), "--iterations", "1", "--warmup", "0", *flags
+                    ]
+                )
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertIn(
+                    f"ppd {ppd}, peak {peak} nit, contrast 1000, ambient 250 lux",
+                    result.stdout
+                )
 
     def test_cli_scores_nonidentical_final_frame(self) -> None:
         """A late spatial error must affect the complete clip score."""

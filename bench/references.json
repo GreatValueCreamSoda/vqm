@@ -95,13 +95,13 @@
     {
       "name": "ours-resident",
       "driver": "build/vqm_bench",
-      "args": ["--metric", "cvvdp", "--resident", "2"],
+      "args": ["--metric", "cvvdp", "--cvvdp-ppd", "75.402449345163049", "--resident", "2"],
       "throughput_threads": 1
     },
     {
       "name": "ours-streaming",
       "driver": "build/vqm_bench",
-      "args": ["--metric", "cvvdp"],
+      "args": ["--metric", "cvvdp", "--cvvdp-ppd", "75.402449345163049"],
       "throughput_threads": 1
     },
     {

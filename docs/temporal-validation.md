@@ -171,7 +171,9 @@ representations; their hashes and settings are part of each report.
   chroma is expanded once by exact nearest replication to 8-bit YUV444. VMAF
   receives those native coded samples. Original CVVDP receives an explicit
   FP32 limited-range BT.601 RGB conversion; the CLI uses its public GPU
-  conversion. Any conversion drift remains in the numerical report.
+  conversion. Both CVVDP arms use the frozen `standard_4k` angular density of
+  75.402449345163049 PPD at every input size. Any conversion drift remains in
+  the numerical report.
 - SSIMULACRA 2 and Butteraugli use a separate spatial representation. The
   clipped source RGB is compressed into `[0.02, 0.98]`, encoded as limited-range
   BT.601 8-bit YUV444 and decoded again from those exact quantized bytes. The

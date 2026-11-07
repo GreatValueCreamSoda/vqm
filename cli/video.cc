@@ -299,7 +299,7 @@ public:
             psnr_hvs_ = MakePipeline<PsnrHvsPipeline>(config, device);
         } else {
             CvvdpConfig config{.size = key.size};
-            config.display = options.cvvdp.ResolveDisplay();
+            config.display = options.cvvdp.ResolveDisplay(key.size);
             config.temporal = key.video;
             config.chroma_filter = options.input.chroma_filter;
             if (key.video) {

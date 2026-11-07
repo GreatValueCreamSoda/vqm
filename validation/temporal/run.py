@@ -337,6 +337,9 @@ def candidate_scores(
     ]
     if metric in SPATIAL_METRICS:
         command.extend(("--input-transfer", "srgb"))
+    elif metric == "cvvdp":
+        # Match the frozen standard_4k reference at every input resolution.
+        command.extend(("--cvvdp-ppd", "75.402449345163049"))
     started = time.perf_counter()
     result = subprocess.run(
         command, capture_output=True, text=True, timeout=600 + 20 * len(rows),

@@ -44,7 +44,7 @@ vqm::CvvdpConfig ConfigFor(
 ) {
     vqm::CvvdpConfig config;
     config.size = size;
-    config.display = options.cvvdp.ResolveDisplay();
+    config.display = options.cvvdp.ResolveDisplay(size);
     config.temporal = options.cvvdp_video;
     config.chroma_filter = options.input.chroma_filter;
     config.streaming_inputs = options.resident == 0;

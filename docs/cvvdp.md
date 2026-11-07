@@ -63,18 +63,55 @@ fields. `Flush` remains compatible and also finalizes CVVDP; a subsequent
 
 ## Display and input interpretation
 
-Display settings describe a physical screen, independently of image dimensions.
-The image is not resized. `Standard4K()` resolves the original 30-inch 4K preset
-(200 nits, contrast 1000, 250 lux, 75.4024493452 pixels/degree).
-`StandardFhd()` uses 37.8425038536 pixels/degree. `StandardHdr()` uses the 4K
-geometry with 1500 nits, contrast 1,000,000 and 10 lux. All parameters can be
-overridden, including exposure and diffuse reflectivity.
+The CLI and benchmark use `--cvvdp-display` to select viewing geometry.
+The presets use the dimensions and distance of the original display models.
+VQM derives pixels per degree (PPD) for each input.
+[Original display models](https://github.com/gfxdisp/ColorVideoVDP/blob/2a268bce8d56e2f3abde46df3927d8a633707a24/pycvvdp/vvdp_data/display_models.json)
+
+| Viewing preset | Aspect | Diagonal | Distance |
+| --- | --- | --- | --- |
+| `standard` (default) | 16:9 | 30 in | 0.7472 m |
+| `compact` | 16:9 | 24 in | 0.6 m |
+
+Set display brightness with `--cvvdp-peak` in nits (default 200). Contrast
+and ambient light default to 1,000:1 and 250 lux and can be set separately
+with `--cvvdp-contrast` and `--cvvdp-ambient`.
+
+Use `--cvvdp-aspect`, `--cvvdp-diagonal` (inches), and `--cvvdp-distance`
+(metres) to override any of the preset's geometry values.
+
+```sh
+./build/vqm --metric cvvdp --cvvdp-aspect 21:9 --cvvdp-diagonal 34 \
+  --cvvdp-distance 0.7 original.y4m distorted.y4m
+```
+
+This models centered viewing of square-pixel content fitted within the
+display at its original aspect ratio. Matching aspects fill the screen.
+Wider content fills the width and leaves space above and below, while
+narrower content fills the height and leaves space at the sides. The
+limiting dimension sets the effective pixel pitch in metres as
+`min(display_width_m / frame_width, display_height_m / frame_height)`.
+VQM scores the original frame samples and calculates central pixels per
+degree from the angle subtended by one pixel.
+[Original display geometry](https://github.com/gfxdisp/ColorVideoVDP/blob/2a268bce8d56e2f3abde46df3927d8a633707a24/pycvvdp/display_model.py#L453-L476)
+
+Use `--cvvdp-ppd` for a fixed angular density. This option is mutually
+exclusive with the geometry overrides.
+CVVDP accepts 1 to 1,000,000 PPD.
+
+The C++ library supplies fixed-PPD helpers for reproducing the original
+display models. `Standard4K()` and `StandardHdr()` use 75.4024493452 PPD,
+and `StandardFhd()` uses 37.8425038536 PPD. All library display parameters
+can be overridden, including exposure and diffuse reflectivity.
 
 Opaque RGB, grey and nonconstant-luminance YUV inputs use shared raw unpacking,
 range handling and configurable chroma reconstruction, followed by metric-local
-physical display conversion. Supported primaries are BT.709, BT.2020 and Display
-P3. Supported transfers are sRGB, BT.709/BT.601/BT.2020 SDR, absolute linear, PQ
-and HLG. As in the original `BT.709` source preset, SDR tags use the sRGB EOTF.
+physical display conversion. CVVDP uses each input's primaries (BT.709, BT.2020
+or Display P3) to map its display light to common DKL opponent-color channels.
+To score the perceptual effect of gamut mapping, supply the mapped rendition
+with its own primaries. Supported transfers are sRGB, BT.709/BT.601/BT.2020 SDR,
+absolute linear, PQ and HLG. As in the original `BT.709` source preset, SDR
+tags use the sRGB EOTF.
 **Linear samples are absolute cd/m²**, unlike other VQM metrics' relative
 linear convention. PQ and HLG use the configured physical display, not a fixed
 100-nit normalization. HLG above 1000 nits requires positive ambient light for
@@ -112,7 +149,7 @@ with this implementation. Disable temporal storage for still-only work.
 ./build/vqm --metric cvvdp --json original.y4m distorted.y4m \
   --iterations 5 --warmup 1
 ./build/vqm --metric cvvdp --json --pairs-file pairs.tsv
-./build/vqm --metric cvvdp --cvvdp-display standard-hdr \
+./build/vqm --metric cvvdp --cvvdp-peak 1500 --cvvdp-contrast 1000000 --cvvdp-ambient 10 \
   --input-transfer st2084 --input-primaries bt2020 --input-matrix bt2020ncl original.y4m distorted.y4m
 ./build/vqm_bench --metric cvvdp --pair original.png distorted.png \
   --iterations 20 --warmup 3 --resident 2
