@@ -11,10 +11,14 @@ namespace vqm::cli {
 
 // Handle compressed video before the legacy still-image loader. Returns false
 // for other inputs, including all inputs in a build without BestSource.
-[[nodiscard]] bool TryRunBestSourcePair(const Options& options);
+[[nodiscard]] bool TryRunBestSourcePair(
+    const Options& options, const std::optional<DeviceUuid>& device_uuid
+);
 
 // Process complete ordered inputs, with one result per pair and metric.
 // A failed pair throws before any of its results are printed.
-int RunSequences(const Options& options);
+int RunSequences(
+    const Options& options, const std::optional<DeviceUuid>& device_uuid
+);
 
 }  // namespace vqm::cli

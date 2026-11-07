@@ -13,10 +13,12 @@
 extern "C" {
 #include <libavutil/hwcontext.h>
 #include <libavutil/hwcontext_vulkan.h>
+#include <libavutil/uuid.h>
 }
 
 #include "gpuhash.h"
 #include "input.h"
+#include "vulkan/vulkan_support.h"
 
 namespace vqm::cli {
 namespace {
@@ -55,15 +57,20 @@ using DeviceRef = std::unique_ptr<AVBufferRef, decltype([](AVBufferRef* value) {
                                       av_buffer_unref(&value);
                                   })>;
 
-DeviceRef CreateDevice() {
+DeviceRef CreateDevice(const std::optional<DeviceUuid>& requested) {
+    // 36 UUID characters plus the null terminator required by av_uuid_unparse.
+    std::array<char, 37> uuid{};
+    if (requested) av_uuid_unparse(requested->data(), uuid.data());
     AVBufferRef* ref = nullptr;
     const int status = av_hwdevice_ctx_create(
-        &ref, AV_HWDEVICE_TYPE_VULKAN, nullptr, nullptr, 0
+        &ref, AV_HWDEVICE_TYPE_VULKAN, requested ? uuid.data() : nullptr,
+        nullptr, 0
     );
     DeviceRef owner(ref);
     if (status < 0)
         throw std::runtime_error(
-            "BestSource: cannot create FFmpeg Vulkan device"
+            std::string("BestSource: cannot create FFmpeg Vulkan device") +
+            (requested ? std::string(" for UUID ") + uuid.data() : "")
         );
     return owner;
 }
@@ -114,16 +121,8 @@ struct DeviceSide {
         );
     }
 
-    [[nodiscard]] std::array<std::uint8_t, VK_UUID_SIZE> Uuid() const {
-        VkPhysicalDeviceIDProperties ids{};
-        ids.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ID_PROPERTIES;
-        VkPhysicalDeviceProperties2 properties{};
-        properties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
-        properties.pNext = &ids;
-        vkGetPhysicalDeviceProperties2(vulkan.physical_device, &properties);
-        std::array<std::uint8_t, VK_UUID_SIZE> uuid{};
-        std::copy_n(ids.deviceUUID, uuid.size(), uuid.begin());
-        return uuid;
+    [[nodiscard]] DeviceUuid Uuid() const {
+        return internal::VulkanDeviceUuid(vulkan.physical_device);
     }
 };
 
@@ -454,24 +453,29 @@ VkDeviceSize Align(VkDeviceSize value, VkDeviceSize alignment) {
 }  // namespace
 
 struct BestSourceDevice::Impl {
-    DeviceRef device = CreateDevice();
+    DeviceRef device;
     DeviceSide side{*device};
-    std::array<std::uint8_t, VK_UUID_SIZE> uuid = side.Uuid();
+    DeviceUuid uuid = side.Uuid();
 
-    Impl() { RequireExternalSharing(side.vulkan.physical_device); }
+    explicit Impl(const std::optional<DeviceUuid>& requested)
+        : device(CreateDevice(requested)) {
+        if (requested && uuid != *requested)
+            throw std::runtime_error(
+                "BestSource: FFmpeg did not select the requested Vulkan device"
+            );
+        RequireExternalSharing(side.vulkan.physical_device);
+    }
 };
 
-BestSourceDevice::BestSourceDevice() : impl_(std::make_unique<Impl>()) {}
+BestSourceDevice::BestSourceDevice(const std::optional<DeviceUuid>& requested)
+    : impl_(std::make_unique<Impl>(requested)) {}
 BestSourceDevice::~BestSourceDevice() = default;
 
 const VulkanDevice& BestSourceDevice::vulkan() const noexcept {
     return impl_->side.vulkan;
 }
 
-const std::array<std::uint8_t, VK_UUID_SIZE>&
-BestSourceDevice::uuid() const noexcept {
-    return impl_->uuid;
-}
+const DeviceUuid& BestSourceDevice::uuid() const noexcept { return impl_->uuid; }
 
 struct BestSourceInterop::Impl {
     Impl(

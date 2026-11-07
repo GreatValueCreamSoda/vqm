@@ -34,6 +34,8 @@ static_assert(
 );
 
 int main() {
+    const auto devices = vqm::ListDevices();
+    if (!devices.empty()) vqm::SetDefaultDevice(devices.front().uuid);
     try {
         vqm::VmafV1Pipeline invalid({.size = {1, 1}});
         return 1;

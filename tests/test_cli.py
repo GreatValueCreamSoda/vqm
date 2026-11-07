@@ -141,6 +141,39 @@ class CliTests(unittest.TestCase):
                 self.assertIn("invalid value", result.stderr)
                 self.assertIn(flag, result.stderr)
 
+    def test_device_listing_and_selection(self) -> None:
+        """Score a still image using an index reported by the device listing."""
+        listing = subprocess.run(
+            [str(self.cli), "--list-devices"], check=True, capture_output=True,
+            text=True, timeout=30,
+        )
+        if listing.stdout.startswith("No compatible Vulkan compute devices"):
+            self.skipTest("no compatible Vulkan compute device")
+        devices = listing.stdout.splitlines()
+        for index, device in enumerate(devices):
+            self.assertTrue(device.startswith(f"{index}  "), device)
+            self.assertRegex(device, r"  [\da-f]{8}(?:-[\da-f]{4}){3}-[\da-f]{12}$")
+        directory = Path(self.enterContext(tempfile.TemporaryDirectory()))
+        image = directory / "identity.png"
+        make_goldens.write_png(image, 32, 32, 3, [[128] * 96] * 32)
+        result = subprocess.run(
+            [str(self.cli), "--device",
+             str(len(devices) - 1),
+             str(image),
+             str(image)], check=True, capture_output=True, text=True, timeout=120,
+        )
+        self.assertAlmostEqual(float(result.stdout), 100.0, delta=0.5)
+
+    def test_unavailable_device_index_fails_before_scoring(self) -> None:
+        """Report an unavailable index without reading either input."""
+        result = subprocess.run(
+            [str(self.cli), "--device", "999999", "original.png", "distorted.png"],
+            capture_output=True, text=True, timeout=30,
+        )
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn("--device 999999 is unavailable", result.stderr)
+        self.assertIn("--list-devices", result.stderr)
+
     def test_alpha_on_either_image_uses_worst_background(self) -> None:
         """Use the worse background score when either image contains alpha."""
         test_binary = os.environ.get("VQM_TEST_BINARY")

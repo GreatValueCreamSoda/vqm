@@ -774,25 +774,31 @@ bool HasY4mInput(const Options& options) {
     return IsY4m(options.original) || IsY4m(options.distorted);
 }
 
-bool TryRunBestSourcePair(const Options& options) {
+bool TryRunBestSourcePair(
+    const Options& options, const std::optional<DeviceUuid>& device_uuid
+) {
 #ifdef VQM_CLI_BESTSOURCE
     const Pair pair{"pair", options.original, options.distorted};
     const auto tracks = BestSourceTracks(pair);
     if (!tracks) return false;
-    BestSourceDevice device;
+    BestSourceDevice device(device_uuid);
     ScorerCache cache(options);
     RunBestSourcePair(options, pair, *tracks, cache, device);
     return true;
 #else
     (void)options;
+    (void)device_uuid;
     return false;
 #endif
 }
 
-int RunSequences(const Options& options) {
+int RunSequences(
+    const Options& options, const std::optional<DeviceUuid>& device_uuid
+) {
 #ifdef VQM_CLI_BESTSOURCE
     std::optional<BestSourceDevice> device;
 #else
+    (void)device_uuid;
     if (options.start_frame || options.frame_count)
         throw std::invalid_argument(
             "--start-frame and --frame-count require -DVQM_ENABLE_BESTSOURCE=ON"
@@ -804,7 +810,7 @@ int RunSequences(const Options& options) {
     for (const auto& pair : pairs) {
 #ifdef VQM_CLI_BESTSOURCE
         if (const auto tracks = BestSourceTracks(pair)) {
-            if (!device) device.emplace();
+            if (!device) device.emplace(device_uuid);
             RunBestSourcePair(options, pair, *tracks, cache, *device);
             continue;
         }

@@ -329,7 +329,7 @@ if(VQM_INSTALL)
     EXPORT vqmTargets
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
   install(FILES include/cvvdp.h include/psnr_hvs.h include/vqm_image.h include/ssimulacra2.h include/butteraugli.h include/vmaf.h include/vmaf_v1.h include/vqm.h include/vqm_alpha.h include/vqm_views.h
-                include/vqm_vulkan.h include/vqm_pool.h include/vqm_memory.h include/vqm_memory_types.h include/vqm_shared.h include/vqm_metrics.h
+                include/vqm_vulkan.h include/vqm_device.h include/vqm_pool.h include/vqm_memory.h include/vqm_memory_types.h include/vqm_shared.h include/vqm_metrics.h
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
   install(FILES LICENSE licenses/COLORVIDEOVDP-LICENSE licenses/JPEG-XL-LICENSE licenses/JPEG-XL-PATENTS licenses/NETFLIX-VMAF-LICENSE
                 licenses/LIBSVM-LICENSE licenses/XIPH-PSNR-HVS-LICENSE

@@ -115,8 +115,18 @@ class BestSourceCliGpu(unittest.TestCase):
         self.assertAlmostEqual(float(result.stdout), expected["score"], delta=1e-8)
 
     def test_mixed_batch_keeps_temporal_history_separate(self) -> None:
-        """Run compressed and Y4M pairs in one repeated invocation."""
+        """Run compressed and Y4M pairs on the same explicitly selected device."""
         directory = Path(self.enterContext(tempfile.TemporaryDirectory()))
+        listing = self._run(directory, "--list-devices")
+        self.assertEqual(listing.returncode, 0, listing.stderr)
+        device = next(
+            (
+                line.split()[0]
+                for line in listing.stdout.splitlines() if " GPU)" in line
+            ), None,
+        )
+        if device is None:
+            self.skipTest("no Vulkan GPU listed for hardware decoding")
         original, distorted = directory / "original.mp4", directory / "distorted.mp4"
         self._fixture(original, frames=8)
         self._fixture(distorted, frames=8, distortion=",gblur=sigma=1.2")
@@ -128,8 +138,8 @@ class BestSourceCliGpu(unittest.TestCase):
             encoding="utf-8"
         )
         encoded, raw = self._reports(
-            directory, "--metric", "vmaf-v0", "--pairs-file", pairs, "--iterations",
-            "2", "--warmup", "1"
+            directory, "--device", device, "--metric", "vmaf-v0", "--pairs-file", pairs,
+            "--iterations", "2", "--warmup", "1"
         )
         self.assertEqual((encoded["sample_id"], raw["sample_id"]), ("encoded", "raw"))
         self.assertEqual(encoded["frames"], 8)

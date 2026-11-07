@@ -12,6 +12,7 @@
 #include "vmaf.h"
 #include "vmaf_v1.h"
 #include "vqm_alpha.h"
+#include "vqm_device.h"
 #include "vqm_image.h"
 #include "vqm_memory.h"
 #include "vqm_metrics.h"

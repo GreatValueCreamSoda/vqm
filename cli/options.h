@@ -14,6 +14,7 @@
 #include "io.h"
 #include "vmaf.h"
 #include "vmaf_v1.h"
+#include "vqm_device.h"
 
 namespace vqm::cli {
 
@@ -24,6 +25,7 @@ struct Options {
     bool json = false;
     bool verbose = false;
     bool half_planes = false;
+    std::optional<unsigned> device_index;
     std::optional<std::int64_t> start_frame;
     std::optional<std::int64_t> frame_count;
     bool vmaf_scale = false;
@@ -49,7 +51,9 @@ struct ParseError {
     std::string message;
 };
 struct HelpRequested {};
-using ParseResult = std::variant<Options, ParseError, HelpRequested>;
+struct DeviceListRequested {};
+using ParseResult =
+    std::variant<Options, ParseError, HelpRequested, DeviceListRequested>;
 
 [[nodiscard]] ParseResult ParseOptions(std::span<const std::string_view> args);
 [[nodiscard]] std::string Usage(std::string_view program);

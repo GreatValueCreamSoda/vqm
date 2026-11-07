@@ -11,6 +11,7 @@
 #include <string>
 #include <vulkan/vulkan.h>
 
+#include "vqm_device.h"
 #include "vqm_image.h"
 
 namespace vqm {
@@ -18,6 +19,8 @@ struct VulkanDevice;
 }
 
 namespace vqm::internal {
+
+[[nodiscard]] DeviceUuid VulkanDeviceUuid(VkPhysicalDevice device);
 
 // Vulkan device and single compute queue. The default context owns its
 // instance and device; an interop context borrows the caller's handles.

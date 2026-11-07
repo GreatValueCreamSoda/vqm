@@ -1,9 +1,10 @@
 // Copyright (c) 2026 VQM contributors. BSD-3-Clause; see LICENSE.
 #pragma once
 
-#include <array>
-#include <cstdint>
 #include <memory>
+#include <optional>
+
+#include "vqm_device.h"
 #include "vqm_vulkan.h"
 
 struct AVBufferRef;
@@ -14,12 +15,11 @@ namespace vqm::cli {
 
 class BestSourceDevice {
 public:
-    BestSourceDevice();
+    explicit BestSourceDevice(const std::optional<DeviceUuid>& requested);
     ~BestSourceDevice();
 
     [[nodiscard]] const VulkanDevice& vulkan() const noexcept;
-    [[nodiscard]] const std::array<std::uint8_t, VK_UUID_SIZE>&
-    uuid() const noexcept;
+    [[nodiscard]] const DeviceUuid& uuid() const noexcept;
 
 private:
     friend class BestSourceInterop;

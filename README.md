@@ -74,6 +74,15 @@ count. The CLI reads PNG, JPEG and progressive Y4M, plus compressed clips with
 ./build/vqm --metric all --verbose original.y4m distorted.y4m
 ```
 
+Use `--list-devices` to see compatible Vulkan compute devices with their
+zero-based indexes, names, types, and UUIDs. Pass an index to `--device` to
+select it for the whole invocation, including batch runs.
+
+```sh
+./build/vqm --list-devices
+./build/vqm --device 0 --metric all original.y4m distorted.y4m
+```
+
 SSIMULACRA 2 is the default. Use a comma-separated list or repeat `--metric`
 to run several metrics on the same pair. `all` runs the six metrics below
 in table order. Each metric runs once in first-selected order. The pair must meet
@@ -302,9 +311,12 @@ frames are packed and scored in Vulkan device memory.
 
 The backend requires the same physical GPU for decoding and scoring, Vulkan
 opaque FD memory and semaphore sharing, and hardware support for the input
-codec. It accepts local progressive, constant-rate 8-, 10- and 12-bit YUV
-4:2:0 and 4:2:2 clips, subject to each metric's format requirements. The CLI
-uses decoded color metadata and accepts the same `--input-*` overrides as Y4M.
+codec. `--device` selects that GPU for both operations. The device list
+checks baseline compute support, so a listed device may lack Vulkan Video
+support for a given codec or format. The backend accepts local progressive,
+constant-rate 8-, 10- and 12-bit YUV 4:2:0 and 4:2:2 clips, subject to each
+metric's format requirements. The CLI uses decoded color metadata and accepts
+the same `--input-*` overrides as Y4M.
 This backend is CLI-only and requires hardware decoding at runtime.
 
 ## C++ library
@@ -329,6 +341,13 @@ default to off in an embedded build. The core links the Vulkan loader without
 requiring libpng or libjpeg. The installed core is a static C++ library that
 can also link into a shared library. Use compatible C++ compiler and standard
 library settings for the core and consumer.
+
+Use `vqm::ListDevices()` from `<vqm_device.h>` to discover compatible
+compute devices. Pass the chosen UUID to `vqm::SetDefaultDevice(uuid)`
+before the first operation that uses the library-owned device. This choice
+applies to default pipelines, pools, and memory queries in the process.
+Applications managing their own Vulkan devices can select a device per
+pipeline with the existing `VulkanDevice` overloads.
 
 ```cpp
 #include <vqm_metrics.h>

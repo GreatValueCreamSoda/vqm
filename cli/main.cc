@@ -93,6 +93,7 @@ std::string Usage(std::string_view program) {
     return std::format(
         R"help(VQM - SSIMULACRA 2.1 / Butteraugli / VMAF / ColorVideoVDP / PSNR-HVS (Vulkan)
 Usage: {} [--metric METRIC[,METRIC...]] [--raw|--json] [--verbose]
+          [--device INDEX]
           [--half-planes] [--iterations N] [--warmup N]
           [--start-frame N] [--frame-count N]
           [--chroma-filter KERNEL] [--intensity-target NITS]
@@ -105,6 +106,10 @@ Usage: {} [--metric METRIC[,METRIC...]] [--raw|--json] [--verbose]
           [--cvvdp-peak NITS] [--cvvdp-contrast RATIO] [--cvvdp-ambient LUX]
           [--input-matrix M] [--input-transfer T] [--input-primaries P] [--input-range R]
           original distorted
+
+--list-devices lists compatible Vulkan compute devices and exits.
+--device selects a zero-based index from that list for scoring and BestSource
+hardware decoding. Compressed inputs also require Vulkan Video codec support.
 
 Batch clips: use --json --pairs-file PAIRS.tsv instead of positional paths.
 Each TSV row contains sample ID, original path and distorted path, separated by tabs.
@@ -247,7 +252,8 @@ ParseResult ParseOptions(std::span<const std::string_view> args) {
             if (i + 1 >= args.size())
                 return ParseError{"--pairs-file needs a value"};
             options.pairs_file = args[++i];
-        } else if (arg == "--iterations" || arg == "--warmup") {
+        } else if (arg == "--iterations" || arg == "--warmup" ||
+                   arg == "--device") {
             if (i + 1 >= args.size())
                 return ParseError{std::format("{} needs a value", arg)};
             const auto value = args[++i];
@@ -262,8 +268,14 @@ ParseResult ParseOptions(std::span<const std::string_view> args) {
                     std::format("invalid value for {}: '{}'", arg, value)};
             if (arg == "--iterations")
                 options.iterations = count;
+            else if (arg == "--device")
+                options.device_index = count;
             else
                 options.warmup = count;
+        } else if (arg == "--list-devices") {
+            if (args.size() != 1)
+                return ParseError{"--list-devices must be used on its own"};
+            return DeviceListRequested{};
         } else if (arg == "--half-planes") {
             options.half_planes = true;
         } else if (arg == "--metric") {
@@ -466,6 +478,59 @@ int RunSsimulacra2(
 
 namespace {
 
+std::string_view DeviceTypeName(vqm::DeviceType type) {
+    switch (type) {
+        case vqm::DeviceType::IntegratedGpu:
+            return "integrated GPU";
+        case vqm::DeviceType::DiscreteGpu:
+            return "discrete GPU";
+        case vqm::DeviceType::VirtualGpu:
+            return "virtual GPU";
+        case vqm::DeviceType::Cpu:
+            return "CPU";
+        case vqm::DeviceType::Other:
+            return "other";
+    }
+    return "other";
+}
+
+void PrintDevices() {
+    const auto devices = vqm::ListDevices();
+    if (devices.empty()) {
+        std::puts("No compatible Vulkan compute devices found.");
+        return;
+    }
+    for (std::size_t i = 0; i < devices.size(); ++i) {
+        const auto& [uuid, name, type] = devices[i];
+        std::printf(
+            "%zu  %s  (%s)  ", i, name.c_str(), DeviceTypeName(type).data()
+        );
+        for (std::size_t byte = 0; byte < uuid.size(); ++byte) {
+            if (byte == 4 || byte == 6 || byte == 8 || byte == 10)
+                std::putchar('-');
+            std::printf("%02x", static_cast<unsigned>(uuid[byte]));
+        }
+        std::putchar('\n');
+    }
+}
+
+std::optional<vqm::DeviceUuid> SelectDevice(std::optional<unsigned> index) {
+    if (!index) return std::nullopt;
+    const auto devices = vqm::ListDevices();
+    if (*index >= devices.size())
+        throw std::out_of_range(
+            std::format(
+                "--device {} is unavailable. Run --list-devices to see "
+                "available "
+                "indexes.",
+                *index
+            )
+        );
+    const auto uuid = devices[*index].uuid;
+    vqm::SetDefaultDevice(uuid);
+    return uuid;
+}
+
 int RunCliMain(int argc, char** argv) try {
     const std::string_view program = argc > 0 ? argv[0] : "vqm";
     std::vector<std::string_view> args;
@@ -477,6 +542,10 @@ int RunCliMain(int argc, char** argv) try {
         std::fputs(vqm::cli::Usage(program).c_str(), stdout);
         return 0;
     }
+    if (std::holds_alternative<vqm::cli::DeviceListRequested>(result)) {
+        PrintDevices();
+        return 0;
+    }
     if (const auto* parse_error = std::get_if<vqm::cli::ParseError>(&result)) {
         std::fprintf(
             stderr, "%s\n%s", parse_error->message.c_str(),
@@ -486,6 +555,7 @@ int RunCliMain(int argc, char** argv) try {
     }
     const vqm::cli::Options& options = std::get<vqm::cli::Options>(result);
     const auto metric = options.metrics.front();
+    const auto device_uuid = SelectDevice(options.device_index);
 
     if (options.metrics.size() > 1 || options.start_frame ||
         options.frame_count || options.json || options.verbose ||
@@ -494,9 +564,9 @@ int RunCliMain(int argc, char** argv) try {
         metric == vqm::cli::Metric::VmafV0 ||
         metric == vqm::cli::Metric::VmafV1 || options.iterations != 1 ||
         options.warmup != 0)
-        return vqm::cli::RunSequences(options);
+        return vqm::cli::RunSequences(options, device_uuid);
 
-    if (vqm::cli::TryRunBestSourcePair(options)) return 0;
+    if (vqm::cli::TryRunBestSourcePair(options, device_uuid)) return 0;
 
     std::string error;
     std::optional<vqm::Image> original =
@@ -527,7 +597,8 @@ int RunCliMain(int argc, char** argv) try {
     options.input.ApplyTo(original->format);
     options.input.ApplyTo(distorted->format);
 
-    if (vqm::cli::HasY4mInput(options)) return vqm::cli::RunSequences(options);
+    if (vqm::cli::HasY4mInput(options))
+        return vqm::cli::RunSequences(options, device_uuid);
 
     if (metric == vqm::cli::Metric::Butteraugli) {
         return RunButteraugli(options, *original, *distorted);

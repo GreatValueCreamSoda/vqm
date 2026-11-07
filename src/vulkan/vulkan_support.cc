@@ -1,6 +1,7 @@
 // Derived from Cloudinary SSIMULACRA 2 (Copyright (c) Jon Sneyers, Cloudinary).
 // BSD-3-Clause; see LICENSE.
 
+#include <algorithm>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
@@ -20,7 +21,9 @@
 namespace vqm::internal {
 namespace {
 
-std::once_flag g_init;
+std::mutex g_context_mutex;
+bool g_context_initialized = false;
+std::optional<DeviceUuid> g_requested_device;
 std::shared_ptr<VulkanContext> g_context;
 
 struct DeviceChoice {
@@ -87,7 +90,9 @@ std::optional<DeviceChoice> Inspect(VkPhysicalDevice device) {
         device, &family_count, families.data()
     );
     for (std::uint32_t i = 0; i < family_count; ++i) {
-        if ((families[i].queueFlags & VK_QUEUE_COMPUTE_BIT) == 0) continue;
+        if (!(families[i].queueFlags & VK_QUEUE_COMPUTE_BIT) ||
+            families[i].queueCount == 0)
+            continue;
         choice.queue_family = i;
         choice.timestamp_valid_bits = families[i].timestampValidBits;
         return choice;
@@ -96,22 +101,26 @@ std::optional<DeviceChoice> Inspect(VkPhysicalDevice device) {
 }
 
 std::optional<DeviceChoice> PickDevice(
-    const std::vector<VkPhysicalDevice>& devices, bool discrete_only
+    const std::vector<VkPhysicalDevice>& devices,
+    const std::optional<DeviceUuid>& requested
 ) {
+    std::optional<DeviceChoice> fallback;
     for (VkPhysicalDevice device : devices) {
         const std::optional<DeviceChoice> choice = Inspect(device);
         if (!choice) continue;
-        const bool discrete = choice->properties.deviceType ==
-                              VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU;
-        if (discrete_only && !discrete) continue;
-        return choice;
+        if (requested) {
+            if (VulkanDeviceUuid(device) == *requested) return choice;
+            continue;
+        }
+        if (choice->properties.deviceType ==
+            VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)
+            return choice;
+        if (!fallback) fallback = choice;
     }
-    return std::nullopt;
+    return fallback;
 }
 
-std::shared_ptr<VulkanContext> CreateContext() {
-    auto context = std::make_shared<VulkanContext>();
-
+VkInstance CreateInstance() {
     VkApplicationInfo application{};
     application.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
     application.pApplicationName = "vqm";
@@ -121,27 +130,59 @@ std::shared_ptr<VulkanContext> CreateContext() {
     VkInstanceCreateInfo instance_info{};
     instance_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
     instance_info.pApplicationInfo = &application;
-    if (vkCreateInstance(&instance_info, nullptr, &context->instance) !=
-        VK_SUCCESS) {
-        return nullptr;
-    }
+    VkInstance instance = VK_NULL_HANDLE;
+    if (vkCreateInstance(&instance_info, nullptr, &instance) != VK_SUCCESS)
+        return VK_NULL_HANDLE;
+    return instance;
+}
 
-    std::uint32_t device_count = 0;
-    if (vkEnumeratePhysicalDevices(context->instance, &device_count, nullptr) !=
-            VK_SUCCESS ||
-        device_count == 0) {
-        return nullptr;
+std::vector<VkPhysicalDevice> PhysicalDevices(VkInstance instance) {
+    if (instance == VK_NULL_HANDLE) return {};
+    for (;;) {
+        std::uint32_t count = 0;
+        if (vkEnumeratePhysicalDevices(instance, &count, nullptr) !=
+                VK_SUCCESS ||
+            count == 0)
+            return {};
+        std::vector<VkPhysicalDevice> devices(count);
+        const auto result =
+            vkEnumeratePhysicalDevices(instance, &count, devices.data());
+        if (result == VK_INCOMPLETE) continue;
+        if (result != VK_SUCCESS) return {};
+        devices.resize(count);
+        return devices;
     }
-    std::vector<VkPhysicalDevice> devices(device_count);
-    if (vkEnumeratePhysicalDevices(
-            context->instance, &device_count, devices.data()
-        ) != VK_SUCCESS) {
-        return nullptr;
-    }
+}
 
-    std::optional<DeviceChoice> choice = PickDevice(devices, true);
-    if (!choice) choice = PickDevice(devices, false);
-    if (!choice) return nullptr;
+DeviceType PublicDeviceType(VkPhysicalDeviceType type) {
+    switch (type) {
+        case VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU:
+            return DeviceType::IntegratedGpu;
+        case VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU:
+            return DeviceType::DiscreteGpu;
+        case VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU:
+            return DeviceType::VirtualGpu;
+        case VK_PHYSICAL_DEVICE_TYPE_CPU:
+            return DeviceType::Cpu;
+        default:
+            return DeviceType::Other;
+    }
+}
+
+std::shared_ptr<VulkanContext> CreateContext(
+    const std::optional<DeviceUuid>& requested
+) {
+    auto context = std::make_shared<VulkanContext>();
+    context->instance = CreateInstance();
+    const auto choice =
+        PickDevice(PhysicalDevices(context->instance), requested);
+    if (!choice) {
+        if (requested)
+            throw std::runtime_error(
+                "vulkan: selected compute device is unavailable"
+            );
+        return nullptr;
+    }
 
     const float priority = 1.0f;
     VkDeviceQueueCreateInfo queue_info{};
@@ -175,6 +216,10 @@ std::shared_ptr<VulkanContext> CreateContext() {
     if (vkCreateDevice(
             choice->device, &device_info, nullptr, &context->device
         ) != VK_SUCCESS) {
+        if (requested)
+            throw std::runtime_error(
+                "vulkan: could not create selected compute device"
+            );
         return nullptr;
     }
 
@@ -206,9 +251,25 @@ std::shared_ptr<VulkanContext> CreateContext() {
 // the benchmark and test harness therefore release their contexts explicitly
 // before exit. A later instance can also leave validation-layer teardown ahead
 // of this fallback, even when every pipeline has already been destroyed.
-void DestroyContext() { g_context.reset(); }
+void DestroyContext() {
+    const std::scoped_lock lock(g_context_mutex);
+    g_context.reset();
+}
 
 }  // namespace
+
+DeviceUuid VulkanDeviceUuid(VkPhysicalDevice device) {
+    VkPhysicalDeviceIDProperties ids{};
+    ids.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ID_PROPERTIES;
+    VkPhysicalDeviceProperties2 properties{};
+    properties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
+    properties.pNext = &ids;
+    vkGetPhysicalDeviceProperties2(device, &properties);
+    DeviceUuid uuid{};
+    static_assert(uuid.size() == VK_UUID_SIZE);
+    std::copy_n(ids.deviceUUID, uuid.size(), uuid.begin());
+    return uuid;
+}
 
 VulkanContext::~VulkanContext() {
     if (owns_device) {
@@ -218,14 +279,17 @@ VulkanContext::~VulkanContext() {
 }
 
 std::shared_ptr<VulkanContext> AcquireVulkanContext() {
-    std::call_once(g_init, [] {
-        g_context = CreateContext();
+    const std::scoped_lock lock(g_context_mutex);
+    if (!g_context_initialized) {
+        g_context = CreateContext(g_requested_device);
+        g_context_initialized = true;
         if (g_context) std::atexit(DestroyContext);
-    });
+    }
     return g_context;
 }
 
 void ShutdownDefaultVulkanContext() {
+    const std::scoped_lock lock(g_context_mutex);
     if (g_context && g_context.use_count() != 1)
         throw std::logic_error(
             "vulkan: default context shutdown requires all pipelines to be gone"
@@ -350,3 +414,31 @@ std::shared_ptr<VulkanContext> RequireVulkanContext(
 }
 
 }  // namespace vqm::internal
+
+namespace vqm {
+
+std::vector<DeviceInfo> ListDevices() {
+    internal::VulkanContext probe;
+    probe.instance = internal::CreateInstance();
+    std::vector<DeviceInfo> result;
+    for (auto device : internal::PhysicalDevices(probe.instance)) {
+        const auto choice = internal::Inspect(device);
+        if (!choice) continue;
+        result.push_back(
+            {internal::VulkanDeviceUuid(device), choice->properties.deviceName,
+             internal::PublicDeviceType(choice->properties.deviceType)}
+        );
+    }
+    return result;
+}
+
+void SetDefaultDevice(const DeviceUuid& uuid) {
+    const std::scoped_lock lock(internal::g_context_mutex);
+    if (internal::g_context_initialized)
+        throw std::logic_error(
+            "vulkan: default compute device already initialized"
+        );
+    internal::g_requested_device = uuid;
+}
+
+}  // namespace vqm
