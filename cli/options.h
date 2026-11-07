@@ -11,6 +11,7 @@
 
 #include "cvvdp_options.h"
 #include "io.h"
+#include "vmaf.h"
 #include "vmaf_v1.h"
 
 namespace vqm::cli {
@@ -25,6 +26,9 @@ struct Options {
     bool nvdec = false;
     bool vmaf_scale = false;
     bool vmaf_pad = false;
+    std::optional<VmafModel> vmaf_v0_model;
+    bool vmaf_v0_neg = false;
+    bool vmaf_v0_transform = false;
     std::optional<VmafV1Model> vmaf_v1_model;
     bool vmaf_v1_hfr = false;
     std::vector<Metric> metrics{Metric::Ssimulacra2};

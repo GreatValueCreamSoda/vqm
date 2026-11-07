@@ -292,7 +292,11 @@ public:
             butter_ = MakePipeline<ButteraugliPipeline>(config, device);
         } else if (metric == Metric::VmafV0) {
             VmafConfig config{.size = key.size};
+            config.model =
+                options.vmaf_v0_model.value_or(VmafModel::Standard1080);
             config.fit = VmafFit(options);
+            config.neg = options.vmaf_v0_neg;
+            config.transform = options.vmaf_v0_transform;
             v0_ = MakePipeline<VmafPipeline>(config, device);
         } else if (metric == Metric::VmafV1) {
             VmafV1Config config{.size = key.size, .input_format = key.original};

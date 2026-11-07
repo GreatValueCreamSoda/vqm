@@ -113,6 +113,17 @@ class VideoCliArguments(unittest.TestCase):
             self.assertEqual(result.returncode, 2, result.stderr)
             self.assertIn("--vmaf-v1-model", result.stderr)
 
+    def test_rejects_invalid_vmaf_v0_options(self) -> None:
+        """Require VMAF v0 and a known predictor for v0 options."""
+        cases = (
+            ("vmaf-v0", "--vmaf-model", "unknown"), ("vmaf-v1", "--vmaf-model", "1080"),
+            ("vmaf-v1", "--vmaf-neg"), ("cvvdp", "--vmaf-transform"),
+        )
+        for metric, flag, *values in cases:
+            result = _run("--metric", metric, flag, *values, "a", "b")
+            self.assertEqual(result.returncode, 2, result.stderr)
+            self.assertIn(flag, result.stderr)
+
     def test_vmaf_v1_temporal_and_hdr_option_validation(self) -> None:
         """Require VMAF v1 and let its HDR model control geometry."""
         for flags, flag in ((("--metric", "vmaf-v0", "--vmaf-v1-hfr"), "--vmaf-v1-hfr"),
@@ -252,6 +263,33 @@ class VideoCliGpu(unittest.TestCase):
             self.assertEqual(
                 [frame["index"] for frame in clip["frame_results"]], [0, 1, 2]
             )
+
+    def test_vmaf_v0_options_only_change_v0(self) -> None:
+        """Apply the v0 predictor and options in a mixed VMAF run."""
+        _require_gpu()
+        root = Path(self.enterContext(tempfile.TemporaryDirectory()))
+        original, distorted = root / "a.y4m", root / "b.y4m"
+        _write_y4m(original, width=320, height=240)
+        _write_y4m(distorted, width=320, height=240, distorted=True)
+        command = ("--json", "--metric", "vmaf-v0,vmaf-v1", original, distorted)
+        baseline = _run(*command)
+        self.assertEqual(baseline.returncode, 0, baseline.stderr)
+        base_v0, base_v1 = map(json.loads, baseline.stdout.splitlines())
+        base_features = [frame["features"] for frame in base_v0["frame_results"]]
+        cases = (
+            (("--vmaf-model", "4k"), False), (("--vmaf-neg", ),
+                                              True), (("--vmaf-transform", ), False),
+            (("--vmaf-model", "4k", "--vmaf-neg", "--vmaf-transform"), True),
+        )
+        for flags, changes_features in cases:
+            with self.subTest(flags=flags):
+                result = _run(*flags, *command)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                v0, v1 = map(json.loads, result.stdout.splitlines())
+                features = [frame["features"] for frame in v0["frame_results"]]
+                self.assertNotEqual(v0["score"], base_v0["score"])
+                self.assertEqual(features != base_features, changes_features)
+                self.assertEqual(v1["frame_results"], base_v1["frame_results"])
 
     def test_vmaf_v1_4k_3h_can_score_above_100(self) -> None:
         """Pass the selected predictor through to clip scoring and reporting."""

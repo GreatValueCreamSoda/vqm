@@ -402,8 +402,9 @@ The CLI accepts `--metric vmaf-v0` and `--metric vmaf-v1` for independent images
 and complete progressive Y4M sequences:
 
 ```sh
-./build/vqm --metric vmaf-v0 original.y4m distorted.y4m
-./build/vqm --metric vmaf-v0,vmaf-v1 --vmaf-scale --vmaf-pad original.y4m distorted.y4m
+./build/vqm --metric vmaf-v0 --vmaf-transform original.y4m distorted.y4m
+./build/vqm --metric vmaf-v0,vmaf-v1 --vmaf-model 4k --vmaf-neg \
+  --vmaf-scale --vmaf-pad original.y4m distorted.y4m
 ./build/vqm --metric vmaf-v0 --json --pairs-file pairs.tsv \
   --iterations 5 --warmup 1
 ```
@@ -411,11 +412,19 @@ and complete progressive Y4M sequences:
 Each TSV row is `sample ID<TAB>original path<TAB>distorted path`. JSON contains the
 arithmetic-mean clip score and every emitted frame in index order, with its score
 and feature array. The v0 feature order is ADM2, motion2 and VIF scales
-0–3; v1 uses CAMBI, SpEED chroma UV, ADM3 and motion3. The CLI flushes the final
-pending frame before reporting a clip. `--vmaf-scale` scales content within
-1920×1080, and `--vmaf-pad` adds bars to make the frame 16:9. For a
-960×720 input, scaling gives 1440×1080, padding gives 1280×720, and both
-flags give 1920×1080. The shared `--input-*` color overrides apply in all modes.
+0–3. V1 uses CAMBI, SpEED chroma UV, ADM3 and motion3. The CLI drains pending
+frames before reporting a clip.
+
+For v0, `--vmaf-model 1080|4k` selects the predictor, `--vmaf-neg` disables
+enhancement gain, and `--vmaf-transform` applies the phone transform. The
+options compose and apply to the v0 results when both versions are selected.
+
+`--vmaf-scale` scales each selected SDR VMAF metric to fit its own model
+canvas. `--vmaf-pad` adds bars to make the frame 16:9. For a 960×720 input
+and a 1080p model, scaling gives 1440×1080, padding gives 1280×720, and both
+flags give 1920×1080. A 4K model with both flags uses 3840×2160. The HDR v1
+preset controls its own geometry. The shared `--input-*` color overrides
+apply in all modes.
 
 `--iterations` and `--warmup` repeat whole clips with reset history. Core timing
 includes the final flush and pooling; decode is reported separately. Hosted

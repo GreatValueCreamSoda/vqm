@@ -96,6 +96,7 @@ Usage: {} [--metric METRIC[,METRIC...]] [--raw|--json] [--verbose]
           [--half-planes] [--nvdec] [--iterations N] [--warmup N]
           [--chroma-filter KERNEL] [--intensity-target NITS]
           [--hf-asymmetry F] [--vmaf-scale] [--vmaf-pad]
+          [--vmaf-model 1080|4k] [--vmaf-neg] [--vmaf-transform]
           [--vmaf-v1-model 1080p-3h|4k-1.5h|4k-3h|phone-5h|hdr-4k-1.5h]
           [--vmaf-v1-hfr]
           [--cvvdp-display standard|compact] [--cvvdp-ppd N]
@@ -131,14 +132,18 @@ also prints its distance_p3 aggregate.
 --intensity-target and --hf-asymmetry configure Butteraugli's libjxl parameters
 (defaults 80 nits and 1.0).
 CVVDP prints JOD (10 for identical, higher is better; negative values are valid).
-VMAF v0.6.1 and v1 default to the original input dimensions.
+SDR VMAF v0.6.1 and v1 default to the original input dimensions.
+--vmaf-model selects the v0 predictor (1080p 3H by default, or 4K 1.5H).
+--vmaf-neg disables enhancement gain in v0's ADM2 and VIF features.
+--vmaf-transform applies the v0 phone score transform.
 --vmaf-v1-model selects the viewing preset (default SDR 1080p-3h).
 hdr-4k-1.5h accepts PQ BT.2020 and automatically scales the short side to 2160.
 --vmaf-v1-hfr selects five-frame motion for about 50/60 fps content.
 The 4k-3h preset has a 110-point score ceiling.
---vmaf-scale fits the content within the model canvas (1920x1080 or 3840x2160)
-without stretching or adding bars. --vmaf-pad adds black bars to reach 16:9 at
-the current scale. Together they fit and pad to the full model canvas.
+For each selected SDR VMAF metric, --vmaf-scale fits the content within that
+metric's model canvas (1920x1080 or 3840x2160) while preserving aspect ratio.
+--vmaf-pad adds black bars to reach 16:9 at the current scale.
+Together they fit and pad to the full model canvas.
 SSIMULACRA 2, Butteraugli and VMAF average their frame scores.
 CVVDP defaults to the standard viewing geometry (16:9, 30 inches, 0.7472 m).
 Use --cvvdp-peak to set display brightness in nits (default 200).
@@ -251,6 +256,20 @@ ParseResult ParseOptions(std::span<const std::string_view> args) {
             options.vmaf_scale = true;
         } else if (arg == "--vmaf-pad") {
             options.vmaf_pad = true;
+        } else if (arg == "--vmaf-model") {
+            if (i + 1 >= args.size())
+                return ParseError{"--vmaf-model needs a value"};
+            const auto model = args[++i];
+            if (model == "1080")
+                options.vmaf_v0_model = VmafModel::Standard1080;
+            else if (model == "4k")
+                options.vmaf_v0_model = VmafModel::Standard4K;
+            else
+                return ParseError{"--vmaf-model expects 1080|4k"};
+        } else if (arg == "--vmaf-neg") {
+            options.vmaf_v0_neg = true;
+        } else if (arg == "--vmaf-transform") {
+            options.vmaf_v0_transform = true;
         } else if (arg == "--vmaf-v1-hfr") {
             options.vmaf_v1_hfr = true;
         } else if (arg == "--vmaf-v1-model") {
@@ -324,6 +343,12 @@ ParseResult ParseOptions(std::span<const std::string_view> args) {
         !HasMetric(options.metrics, Metric::VmafV0) &&
         !HasMetric(options.metrics, Metric::VmafV1))
         return ParseError{"--vmaf-scale and --vmaf-pad require a VMAF metric"};
+    if ((options.vmaf_v0_model || options.vmaf_v0_neg ||
+         options.vmaf_v0_transform) &&
+        !HasMetric(options.metrics, Metric::VmafV0))
+        return ParseError{
+            "--vmaf-model, --vmaf-neg and --vmaf-transform require --metric "
+            "vmaf-v0"};
     if (options.vmaf_v1_hfr && !HasMetric(options.metrics, Metric::VmafV1))
         return ParseError{"--vmaf-v1-hfr requires --metric vmaf-v1"};
     if (options.vmaf_v1_model && !HasMetric(options.metrics, Metric::VmafV1))
