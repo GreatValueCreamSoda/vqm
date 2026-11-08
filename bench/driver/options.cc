@@ -64,6 +64,9 @@ Y4M benchmark inputs use their first frame; the CLI scores complete clips.
 pipelines in one process and prints one machine-readable line instead of
 the table; with one worker it also prints GPU stage time and its
 reciprocal rate. --threads is an alias for --workers.
+--throughput-iterations N uses the same workers for exactly N total calls,
+with decoding, pipeline setup and --warmup calls outside timing. Streaming
+includes per-call uploads; --resident 2 uploads before timing instead.
 --vmaf-no-temporal forces VMAF v0 motion2 to zero, skips the motion
 passes, and scores every frame immediately.
 --metric cvvdp measures independent still pairs and reports JOD (identity 10).
@@ -73,7 +76,8 @@ Use --cvvdp-peak to set display brightness in nits (default 200).
 --cvvdp-video instead reads whole progressive Y4M clips with matching rational
 frame rates. Each warmup/iteration resets and scores one complete clip; decode
 is outside core timing. It reports ms/clip and ms/frame separately. This mode
-uses one worker and streaming inputs; warmup counts clips, not frames.
+uses one worker; warmup counts clips, not frames. --vulkan-buffers preuploads
+the entire clip into external buffers before timing; --resident is still-only.
 --pool runs a fixed-count streaming benchmark through the public
 pool API; --workers controls its size. It accepts one pair.
 )help",
@@ -266,9 +270,9 @@ bool ParseArgs(
                                       : options.stages_csv_path);
             target = args[++i];
         } else if (arg == "--iterations" || arg == "--warmup" ||
-                   arg == "--resident" || arg == "--resident-ring" ||
-                   arg == "--workers" || arg == "--threads" ||
-                   arg == "--decode-threads") {
+                   arg == "--throughput-iterations" || arg == "--resident" ||
+                   arg == "--resident-ring" || arg == "--workers" ||
+                   arg == "--threads" || arg == "--decode-threads") {
             if (!has_value) {
                 error = std::format("{} needs a value", arg);
                 return false;
@@ -285,8 +289,14 @@ bool ParseArgs(
                     "2047";
                 return false;
             }
+            if (arg == "--throughput-iterations" && value < 1) {
+                error = "--throughput-iterations must be at least 1";
+                return false;
+            }
             if (arg == "--iterations")
                 options.iterations = value;
+            else if (arg == "--throughput-iterations")
+                options.throughput_iterations = value;
             else if (arg == "--warmup")
                 options.warmup = value;
             else if (arg == "--resident")
@@ -326,13 +336,17 @@ bool ParseArgs(
         error = "--iterations must be at least 1";
         return false;
     }
+    if (options.throughput_iterations > 0 && options.throughput_seconds > 0.0) {
+        error = "choose --throughput-iterations or --throughput-seconds";
+        return false;
+    }
     if (options.metric == Metric::PsnrHvs && options.workers < 1) {
         error = "PSNR-HVS --workers must be at least 1";
         return false;
     }
     if (options.metric == Metric::PsnrHvs &&
         (options.pool || options.resident_ring || options.half_planes ||
-         options.throughput_seconds != 0.0 || !options.metric_pair.empty())) {
+         options.IsThroughput() || !options.metric_pair.empty())) {
         error =
             "PSNR-HVS supports fixed-count streaming, resident, host-view or "
             "Vulkan-buffer inputs; pool, ring, half-plane, throughput-window "
@@ -358,14 +372,14 @@ bool ParseArgs(
     }
     if (options.metric == Metric::Cvvdp &&
         (options.pool || options.resident_ring || options.resident_reference ||
-         options.host_views || options.vulkan_buffers || options.half_planes ||
-         options.workers != 1 || options.throughput_seconds != 0.0 ||
-         !options.metric_pair.empty() ||
-         (options.cvvdp_video && options.resident))) {
+         options.host_views ||
+         (options.vulkan_buffers && !options.cvvdp_video) ||
+         (options.resident && options.cvvdp_video) || options.half_planes ||
+         options.workers != 1 || options.IsThroughput() ||
+         !options.metric_pair.empty())) {
         error =
-            "CVVDP supports one worker and streaming or still --resident "
-            "inputs; "
-            "--cvvdp-video requires streaming";
+            "CVVDP supports one worker, streaming, still --resident inputs or "
+            "video --vulkan-buffers inputs";
         return false;
     }
     if (options.metric == Metric::Cvvdp && options.score_only &&
@@ -410,8 +424,8 @@ bool ParseArgs(
         (options.IsVmaf() || (options.metric == Metric::Butteraugli) ||
          options.pool || options.resident || options.resident_ring ||
          options.resident_reference || options.host_views ||
-         options.score_only || options.workers != 1 ||
-         options.throughput_seconds != 0.0 || !options.csv_path.empty())) {
+         options.score_only || options.workers != 1 || options.IsThroughput() ||
+         !options.csv_path.empty())) {
         error =
             "--metric-pair requires one worker and streaming or "
             "--vulkan-buffers; other metric, input and output modes are "
@@ -421,7 +435,7 @@ bool ParseArgs(
     if (options.IsVmaf() &&
         (options.pool || options.resident_ring || options.resident_reference ||
          options.host_views || options.vulkan_buffers || options.half_planes ||
-         options.workers != 1 || options.throughput_seconds != 0.0)) {
+         options.workers != 1 || options.IsThroughput())) {
         error = "VMAF supports one worker and streaming or --resident inputs";
         return false;
     }
@@ -446,7 +460,7 @@ bool ParseArgs(
         ((options.metric == Metric::Butteraugli) || options.resident ||
          options.resident_reference || options.pool || options.score_only ||
          options.host_views || options.vulkan_buffers ||
-         options.throughput_seconds != 0.0 || options.workers != 1 ||
+         options.IsThroughput() || options.workers != 1 ||
          !options.csv_path.empty())) {
         error =
             "--resident-ring requires SSIMULACRA 2, one worker, and no "
@@ -457,10 +471,9 @@ bool ParseArgs(
         error = "--half-planes is available only for ssimulacra2";
         return false;
     }
-    if (options.pool &&
-        (options.resident != 0 || options.resident_reference ||
-         options.score_only || options.host_views || options.vulkan_buffers ||
-         options.throughput_seconds != 0.0)) {
+    if (options.pool && (options.resident != 0 || options.resident_reference ||
+                         options.score_only || options.host_views ||
+                         options.vulkan_buffers || options.IsThroughput())) {
         error =
             "--pool measures fixed-count streaming and cannot be combined "
             "with --resident, --resident-reference, --score-only, --host-views, "
@@ -470,7 +483,7 @@ bool ParseArgs(
     }
     if (options.resident_reference &&
         (options.resident != 0 || options.workers != 1 ||
-         options.throughput_seconds != 0.0)) {
+         options.IsThroughput())) {
         error =
             "--resident-reference requires one worker and no --resident or "
             "throughput mode";
@@ -478,14 +491,14 @@ bool ParseArgs(
     }
     if (options.host_views &&
         (options.resident != 0 || options.resident_reference ||
-         options.workers != 1 || options.throughput_seconds != 0.0)) {
+         options.workers != 1 || options.IsThroughput())) {
         error = "--host-views needs one worker and streaming latency mode";
         return false;
     }
     if (options.vulkan_buffers &&
         (options.host_views || options.resident != 0 ||
          options.resident_reference || options.workers != 1 ||
-         options.throughput_seconds != 0.0)) {
+         options.IsThroughput())) {
         error =
             "--vulkan-buffers needs one worker, no resident handles and latency "
             "mode";

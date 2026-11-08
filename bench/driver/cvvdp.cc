@@ -7,6 +7,7 @@
 #include <exception>
 #include <format>
 #include <fstream>
+#include <memory>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -15,6 +16,7 @@
 
 #include "bench.h"
 #include "cvvdp.h"
+#include "inmemory/vulkan_inputs.h"
 
 namespace bench_driver {
 namespace {
@@ -47,7 +49,7 @@ vqm::CvvdpConfig ConfigFor(
     config.display = options.cvvdp.ResolveDisplay(size);
     config.temporal = options.cvvdp_video;
     config.chroma_filter = options.input.chroma_filter;
-    config.streaming_inputs = options.resident == 0;
+    config.streaming_inputs = options.resident == 0 && !options.vulkan_buffers;
     config.gpu_resident_images = static_cast<std::size_t>(options.resident);
     if (options.cvvdp_video) {
         config.fps_numerator = fps.numerator;
@@ -168,6 +170,11 @@ int RunStill(const BenchOptions& options) {
     }
     if (rows.empty()) return 1;
     if (!options.score_only) {
+        std::printf(
+            "fixed-count wall clock: %.6f ms/image, %.3f images/s\n",
+            1000.0 * totals.seconds / totals.frames,
+            totals.frames / totals.seconds
+        );
         PrintStages(
             totals.stages, totals.frames, totals.seconds, kFirst, kLast, false
         );
@@ -189,6 +196,50 @@ struct ClipMeasurement {
     double core_seconds = 0.0;
     double decode_seconds = 0.0;
 };
+
+using ResidentClip = std::vector<std::unique_ptr<inmem::VulkanInputs>>;
+
+ResidentClip UploadClip(const BenchOptions& options, const Pair& pair) {
+    using vqm::image_io::SequenceReadResult;
+    vqm::image_io::SequenceReader original(pair.original);
+    vqm::image_io::SequenceReader distorted(pair.distorted);
+    ResidentClip frames;
+    vqm::Image ref, test;
+    std::string error;
+    for (;;) {
+        const auto first = original.Next(ref, error);
+        if (first == SequenceReadResult::Error)
+            throw std::runtime_error(pair.original + ": " + error);
+        const auto second = distorted.Next(test, error);
+        if (second == SequenceReadResult::Error)
+            throw std::runtime_error(pair.distorted + ": " + error);
+        if (first != second)
+            throw std::invalid_argument(
+                "CVVDP inputs have unequal frame counts"
+            );
+        if (first == SequenceReadResult::End) break;
+        ApplyOverrides(options, &ref, &test);
+        frames.push_back(std::make_unique<inmem::VulkanInputs>(ref, test));
+    }
+    if (frames.empty())
+        throw std::invalid_argument("CVVDP input sequence has no frames");
+    return frames;
+}
+
+ClipMeasurement MeasureResidentClip(
+    const ResidentClip& frames, vqm::CvvdpPipeline& pipeline
+) {
+    pipeline.Reset();
+    vqm::internal::ResetTimings();
+    const auto start = Clock::now();
+    for (const auto& frame : frames)
+        pipeline.Push(frame->original(), frame->distorted());
+    const auto result = pipeline.Finalize();
+    const double elapsed = Seconds(Clock::now() - start);
+    if (!result)
+        throw std::invalid_argument("CVVDP input sequence has no frames");
+    return {*result, elapsed, 0.0};
+}
 
 // Each call reopens and consumes a real clip. Only Push/Finalize are core time;
 // header parsing, file I/O, frame decoding and Reset are outside that interval.
@@ -264,16 +315,31 @@ int RunVideo(const BenchOptions& options) {
                 );
             const auto fps = original.frame_rate();
             const auto config = ConfigFor(options, original.size(), fps);
-            vqm::CvvdpPipeline pipeline(config);
+            const auto resident = options.vulkan_buffers
+                                      ? UploadClip(options, pair)
+                                      : ResidentClip{};
+            auto pipeline =
+                resident.empty()
+                    ? vqm::CvvdpPipeline(config)
+                    : vqm::CvvdpPipeline(config, resident.front()->device());
             if (!options.score_only)
                 PrintConfiguration(config, pipeline.GetMemoryUsage());
+            if (!options.score_only && options.vulkan_buffers)
+                std::printf(
+                    "preuploaded external inputs: %zu frame pairs "
+                    "(outside pipeline allocations)\n",
+                    resident.size()
+                );
             const int warmup = options.score_only ? 0 : options.warmup;
             const int iterations = options.score_only ? 1 : options.iterations;
             std::vector<double> cores, decodes;
             vqm::CvvdpScore result;
             for (int iteration = 0; iteration < warmup + iterations;
                  ++iteration) {
-                const auto measured = MeasureClip(options, pair, pipeline, fps);
+                const auto measured =
+                    options.vulkan_buffers
+                        ? MeasureResidentClip(resident, pipeline)
+                        : MeasureClip(options, pair, pipeline, fps);
                 result = measured.result;
                 totals.checksum += result.score;
                 if (iteration < warmup) continue;
@@ -313,6 +379,11 @@ int RunVideo(const BenchOptions& options) {
     }
     if (totals.frames == 0.0) return 1;
     if (!options.score_only) {
+        std::printf(
+            "fixed-count wall clock: %.6f ms/frame, %.3f frames/s\n",
+            1000.0 * totals.seconds / totals.frames,
+            totals.frames / totals.seconds
+        );
         std::puts(
             "stage timing per frame over complete reset clips (decode excluded):"
         );

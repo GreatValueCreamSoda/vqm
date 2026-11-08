@@ -6,6 +6,11 @@ This variant includes contrast masking and differs from the authors' original
 PSNR-HVS definition. The implementation follows the pinned libvmaf reference
 `4611e47a7330cd342498dcc130e1008efbeab6e4` and retains Xiph's license notice.
 
+PSNR-HVS scores each frame independently, with no temporal history. Independent
+frame pairs can run concurrently on separate GPU worker pipelines. Pool their
+weighted errors, not their dB scores, to obtain the clip score.
+[CLI usage](cli.md#psnr-hvs)
+
 ## Native input contract
 
 Inputs are opaque planar YUV420, YUV422 or YUV444. Eight-bit samples use

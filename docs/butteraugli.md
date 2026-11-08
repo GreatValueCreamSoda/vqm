@@ -1,5 +1,10 @@
 # Butteraugli
 
+Butteraugli scores each frame independently, with no temporal history.
+Independent frame pairs can run concurrently on separate GPU worker pipelines;
+each worker owns its prepared-reference cache and temporary workspace.
+The CLI averages frame diffmap maxima for a clip. [CLI usage](cli.md#butteraugli)
+
 ## Score scale
 
 The canonical score is the diffmap's maximum

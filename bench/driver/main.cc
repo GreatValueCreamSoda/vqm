@@ -57,8 +57,8 @@ static int RunBenchMain(int argc, char** argv) {
     // table. The stage timers are a process-wide accumulator, so they cannot
     // be attributed to one pair once several pipelines share the device; the
     // window reports the one-worker figure instead of a per-pair CSV.
-    const bool concurrent = options.throughput_seconds > 0.0 ||
-                            (options.score_only && options.workers > 1);
+    const bool concurrent =
+        options.IsThroughput() || (options.score_only && options.workers > 1);
     if (concurrent && !options.stages_csv_path.empty()) {
         std::fprintf(
             stderr,
@@ -68,7 +68,7 @@ static int RunBenchMain(int argc, char** argv) {
         );
         return 2;
     }
-    if (options.throughput_seconds > 0.0) {
+    if (options.IsThroughput()) {
         return RunWindowForMetric(options);
     }
     if (options.score_only && options.workers > 1) {

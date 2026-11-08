@@ -1,7 +1,14 @@
 # VQM documentation
 
-The project README covers CLI usage and score interpretation.
-[Project README](../README.md)
+Start with [supported metrics, performance and building](../README.md).
+
+## Usage and workflows
+
+- [Command line and score interpretation](cli.md)
+- [C++ library quick start](library.md)
+- [Build, test and contributing](../CONTRIBUTING.md)
+- [Benchmarking and profiling](../bench/README.md)
+- [Reference validation](../validation/README.md)
 
 ## Metrics
 

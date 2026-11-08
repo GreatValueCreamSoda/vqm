@@ -77,6 +77,7 @@ struct Options {
     int threads = 0;
     // Fixed-length throughput window; 0 runs the latency protocol.
     double throughput_seconds = 0.0;
+    int throughput_iterations = 0;
     float intensity = 80.0f;  // libjxl's Butteraugli intensity target
     bool help = false;
 };
@@ -87,7 +88,8 @@ std::string Usage(std::string_view program) {
         "          [--metric butteraugli|ssimu2|cvvdp] [--score-only]\n"
         "          [--iterations N] [--warmup N] [--gpu ID] [--qnorm N]\n"
         "          [--intensity NITS] [--csv PATH] [--decode-threads N]\n"
-        "          [--threads N] [--throughput-seconds S] [--help]\n"
+        "          [--threads N] [--throughput-seconds S | "
+        "--throughput-iterations N] [--help]\n"
         "          --device-info\n"
         "\n"
         "Times Vship's metric call on the decoded pair; decoding is measured\n"
@@ -107,7 +109,10 @@ std::string Usage(std::string_view program) {
         "--score-only and --throughput-seconds is every hardware thread, for\n"
         "the latency path one).\n"
         "--throughput-seconds S runs a fixed S-second window over decoded\n"
-        "pairs and prints one machine-readable throughput line.\n",
+        "pairs and prints one machine-readable throughput line.\n"
+        "--throughput-iterations N instead completes N total evaluations,\n"
+        "distributed across handlers after --warmup calls per handler. Setup,\n"
+        "decoding and warmups are excluded; per-call uploads are included.\n",
         program
     );
 }
@@ -259,6 +264,13 @@ bool ParseArgs(std::span<const std::string_view> args, Options& options) {
             } else {
                 options.decode_threads = value;
             }
+        } else if (arg == "--throughput-iterations") {
+            if (!has_value) return false;
+            if (!ParseInt(args[++i], options.throughput_iterations) ||
+                options.throughput_iterations < 1) {
+                std::fprintf(stderr, "invalid --throughput-iterations\n");
+                return false;
+            }
         } else if (arg == "--throughput-seconds") {
             if (!has_value) return false;
             const std::string_view text = args[++i];
@@ -303,6 +315,10 @@ bool ParseArgs(std::span<const std::string_view> args, Options& options) {
             );
             return false;
         }
+    }
+    if (options.throughput_iterations > 0 && options.throughput_seconds > 0.0) {
+        std::fprintf(stderr, "choose fixed count or throughput window\n");
+        return false;
     }
     if (options.iterations < 1 || options.warmup < 0 ||
         options.warmup > std::numeric_limits<int>::max() - options.iterations) {
@@ -800,7 +816,8 @@ int RunWindow(const Options& options, int threads, int decode_threads) {
     };
     if (!inmem::RunThroughput<Item>(
             options.pairs, threads, decode_threads, options.throughput_seconds,
-            LoadItem, score, &stats, &error
+            LoadItem, score, &stats, &error, options.throughput_iterations,
+            options.throughput_iterations > 0 ? options.warmup : 1
         )) {
         std::fprintf(stderr, "%s\n", error.c_str());
         return 1;
@@ -924,10 +941,12 @@ int main(int argc, char** argv) {
 
     // A throughput or batch run prints only its own lines: the device banner
     // belongs to the latency table, where a human reads it.
-    const bool batch = options.score_only || options.throughput_seconds > 0.0;
+    const bool throughput =
+        options.throughput_seconds > 0.0 || options.throughput_iterations > 0;
+    const bool batch = options.score_only || throughput;
     const int threads = inmem::ResolveThreads(options, batch);
     const int decode_threads = inmem::ResolveDecodeThreads(options, batch);
-    if (!options.score_only && options.throughput_seconds <= 0.0) {
+    if (!options.score_only && !throughput) {
         Vship_DeviceInfo info{};
         if (Vship_GetDeviceInfo(&info, options.gpu) == Vship_NoError) {
             const Vship_Version version = Vship_GetVersion();
@@ -937,7 +956,7 @@ int main(int argc, char** argv) {
             );
         }
     }
-    if (options.throughput_seconds > 0.0) {
+    if (throughput) {
         return RunWindow(options, threads, decode_threads);
     }
     if (options.score_only)

@@ -3,6 +3,7 @@
 """Check CVVDP command-line contracts and complete-clip benchmark behavior."""
 
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -100,10 +101,27 @@ class CvvdpToolTests(unittest.TestCase):
             ]
         )
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(len(result.stdout.splitlines()), 3)
+        self.assertEqual(len(result.stdout.splitlines()), 4)
         self.assertIn("ours-resident", result.stdout)
         self.assertIn("ours-streaming", result.stdout)
         self.assertIn("vship-vulkan", result.stdout)
+        self.assertIn("vship-fast-vulkan", result.stdout)
+
+    def test_comparison_runner_accepts_both_cvvdp_vulkan_peers(self) -> None:
+        """Accept the pinned Vulkan peers before validating warmup counts."""
+        root = Path(__file__).resolve().parent.parent
+        for references in ("vship-fast-vulkan",
+                           "vship-vulkan,vship-fast-vulkan"):
+            result = run(
+                [
+                    sys.executable,
+                    str(root / "bench/benchmark.py"), "--suite", "images",
+                    "--metric", "cvvdp", "--references", references, "--warmup",
+                    "-1"
+                ]
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("--warmup must be non-negative", result.stderr)
 
     def test_comparison_runner_rejects_unsupported_modes(self) -> None:
         """Reject throughput and unqualified references before any build/run."""
@@ -279,6 +297,45 @@ class CvvdpToolTests(unittest.TestCase):
             self.assertIn("ppd 4.189031,", result.stdout)
             self.assertIn("score 10.00000000", result.stdout)
             self.assertIn("checksum 30.00000000", result.stdout)
+
+    def test_benchmark_resident_video_matches_streaming(self) -> None:
+        """Preserve temporal scores and resets across both input paths."""
+        bench = binary("VQM_BENCH_BINARY")
+        require_gpu()
+        with tempfile.TemporaryDirectory() as directory:
+            original = Path(directory) / "original.y4m"
+            distorted = Path(directory) / "distorted.y4m"
+            write_late_distortion(original, distorted=False)
+            write_late_distortion(distorted, distorted=True)
+            checksums = []
+            for flags in ((), ("--vulkan-buffers", )):
+                result = run(
+                    [
+                        bench, "--metric", "cvvdp", "--cvvdp-video", "--pair",
+                        str(original),
+                        str(distorted), "--iterations", "2", "--warmup", "1",
+                        *flags
+                    ]
+                )
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertIn("4 frames", result.stdout)
+                self.assertIn("frames/s", result.stdout)
+                checksums.append(
+                    float(re.search(r"checksum ([\d.]+)", result.stdout)[1])
+                )
+            self.assertAlmostEqual(*checksums, delta=1e-6)
+            self.assertLess(checksums[0], 30.0)
+            distorted.write_bytes(distorted.read_bytes()[:-1])
+            truncated = run(
+                [
+                    bench, "--metric", "cvvdp", "--cvvdp-video",
+                    "--vulkan-buffers", "--pair",
+                    str(original),
+                    str(distorted)
+                ]
+            )
+            self.assertNotEqual(truncated.returncode, 0)
+            self.assertIn("truncated y4m frame", truncated.stderr)
 
     def test_physical_presets_resolve_ppd_at_each_input_size(self) -> None:
         """Resolve PPD by geometry and apply peak brightness independently."""

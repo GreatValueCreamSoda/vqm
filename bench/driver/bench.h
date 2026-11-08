@@ -93,10 +93,14 @@ struct BenchOptions {
     // Fixed-length throughput window. 0 runs the latency protocol; a positive
     // value runs the throughput arm instead and prints one machine line.
     double throughput_seconds = 0.0;
+    int throughput_iterations = 0;
     // One selected metric determines configuration, dispatch and timed stages.
     Metric metric = Metric::Ssimulacra2;
     [[nodiscard]] bool IsVmaf() const {
         return metric == Metric::VmafV0 || metric == Metric::VmafV1;
+    }
+    [[nodiscard]] bool IsThroughput() const {
+        return throughput_seconds > 0.0 || throughput_iterations > 0;
     }
     float hf_asymmetry = 1.0f;
     float intensity_target = 80.0f;

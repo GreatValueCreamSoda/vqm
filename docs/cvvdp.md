@@ -42,6 +42,11 @@ mixed-parity right-edge pyramid rule, including on odd rectangular inputs.
 
 ## Images and clips
 
+Video frames must be supplied in sequence order on the same worker to preserve
+temporal history. Parallelize independent clips with separate pipelines, not
+frames of one clip. Independent still images do not need temporal history.
+[CLI usage](cli.md#colorvideovdp)
+
 ```cpp
 #include <cvvdp.h>
 

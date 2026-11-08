@@ -28,6 +28,9 @@ coverage, numerical diagnostics and gate outcome. Its metric list and actual
 outcomes describe the completed run. The earlier 390-pair VMAF/CVVDP reports
 remain evidence for their original three-metric matrix.
 
+PSNR-HVS reference-correlation qualification is pending and is outside this
+five-metric matrix.
+
 These five metrics support progressive Y4M, JSON clip/frame results and batch
 input. Spatial metrics pool independently scored frames by arithmetic mean;
 VMAF and CVVDP retain their sequence contracts. The spatial and temporal

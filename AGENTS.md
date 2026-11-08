@@ -115,7 +115,7 @@ ctest --preset release
 Use `vqm`, `vqm_bench`, and `vqm_test` in current workflows. A core build needs
 no reference checkout or corpus. The default CLI build needs no BestSource
 or FFmpeg libraries. See
-[BestSource prerequisites](README.md#bestsource-indexed-hardware-decoding) for
+[BestSource prerequisites](docs/cli.md#bestsource-indexed-hardware-decoding) for
 the optional Linux backend. Use the [sanitizer preset](CONTRIBUTING.md#build-and-test)
 on supported toolchains for memory-sensitive changes.
 

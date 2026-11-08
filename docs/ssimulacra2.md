@@ -1,5 +1,10 @@
 # SSIMULACRA 2.1
 
+SSIMULACRA 2 scores each frame independently, with no temporal history.
+Independent frame pairs can run concurrently on separate GPU worker pipelines;
+do not submit overlapping work on one pipeline or its shared scratch workspace.
+The CLI averages frame scores for a clip. [CLI usage](cli.md#ssimulacra-2)
+
 ## Score scale
 
 The score is in `-inf..100` and higher is better. `100` means the inputs are

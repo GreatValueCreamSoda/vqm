@@ -109,6 +109,12 @@
       "driver": "build/vship-build-vulkan/vship_bench",
       "args": ["--metric", "cvvdp"],
       "throughput_threads": 1
+    },
+    {
+      "name": "vship-fast-vulkan",
+      "driver": "build/vship-fast-build-vulkan/vship_bench",
+      "args": ["--metric", "cvvdp"],
+      "throughput_threads": 1
     }
   ]
 }

@@ -7,6 +7,11 @@ banding sensitivity (CAMBI), and motion3. The selected model maps each
 frame's features to a score with a trained support-vector regressor.
 VQM's clip score averages the resulting frame scores.
 
+With temporal scoring enabled, supply frames in sequence order on the same
+worker so that motion history and lookahead remain intact. Independent clips
+can use separate worker pipelines. Only v0's `--vmaf-no-temporal` mode removes
+this dependency. [CLI usage](cli.md#vmaf-v0)
+
 VQM exposes two Vulkan sequence pipelines: the floating-point v0.6.1 model in
 `vmaf.h`, and the SDR and HDR v1 models in `vmaf_v1.h`. Both evaluate
 ordered frame pairs and return per-frame scores and features. They accept

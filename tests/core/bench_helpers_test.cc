@@ -5,6 +5,7 @@
 #include <atomic>
 #include <limits>
 #include <string>
+#include <tuple>
 #include <vector>
 
 #include "inmemory/driver.h"
@@ -50,6 +51,36 @@ int main() {
         ) ||
         error.find("same geometry") == std::string::npos || calls != 0) {
         return 1;
+    }
+    const auto fixed_score =
+        [&calls](Item&, std::size_t, int, double* value, double*, std::string&) {
+            ++calls;
+            *value = 2.0;
+            return true;
+        };
+    for (const int threads : {1, 3, 9}) {
+        calls = 0;
+        if (!inmem::RunThroughput<Item>(
+                {pairs.front()}, threads, 1, 0.0, load, fixed_score, &stats,
+                &error, 7, 2
+            ) ||
+            stats.calls != 7 || stats.threads != std::min(threads, 7) ||
+            stats.checksum != 14.0 || calls != 7 + 2 * std::min(threads, 7) ||
+            stats.seconds <= 0.0) {
+            return 1;
+        }
+    }
+    calls = 0;
+    for (const auto [seconds, iterations, warmup] :
+         {std::tuple{0.0, -1, 2}, std::tuple{0.0, 7, -1}, std::tuple{1.0, 7, 2},
+          std::tuple{std::numeric_limits<double>::infinity(), 7, 2}}) {
+        if (inmem::RunThroughput<Item>(
+                {pairs.front()}, 3, 1, seconds, load, fixed_score, &stats,
+                &error, iterations, warmup
+            ) ||
+            calls != 0) {
+            return 1;
+        }
     }
     return 0;
 }

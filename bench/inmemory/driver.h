@@ -446,20 +446,22 @@ template <typename Item, typename Loader, typename Scorer>
 bool RunThroughput(
     const std::vector<Pair>& pairs, int threads, int decode_threads,
     double seconds, Loader load, Scorer score, ThroughputStats* stats,
-    std::string* error
+    std::string* error, int iterations = 0, int warmup = 1
 ) {
     *stats = ThroughputStats{};
     if (pairs.empty()) {
         *error = "no pair to score";
         return false;
     }
-    if (!ValidWindowSeconds(seconds)) {
+    if (iterations < 0 || warmup < 0 ||
+        (iterations > 0 ? seconds != 0.0 : !ValidWindowSeconds(seconds))) {
         *error =
-            "the throughput window must be a positive, finite, "
-            "representable number of seconds";
+            "throughput needs nonnegative warmup and either a positive fixed "
+            "count or a positive, finite, representable window";
         return false;
     }
     threads = std::max(1, threads);
+    if (iterations > 0) threads = std::min(threads, iterations);
     decode_threads = std::max(1, decode_threads);
     const int distinct = std::min(threads, static_cast<int>(pairs.size()));
 
@@ -535,9 +537,11 @@ bool RunThroughput(
         std::string message;
         double warm_score = 0.0;
         double warm_ms = 0.0;
-        if (!attempt(item, slot, worker, &warm_score, &warm_ms, message)) {
-            warmed.fetch_add(1, std::memory_order_release);
-            return;
+        for (int index = 0; index < warmup; ++index) {
+            if (!attempt(item, slot, worker, &warm_score, &warm_ms, message)) {
+                warmed.fetch_add(1, std::memory_order_release);
+                return;
+            }
         }
         warmed.fetch_add(1, std::memory_order_release);
         // Sleep rather than spin: the wait is one metric call long, and a
@@ -551,12 +555,13 @@ bool RunThroughput(
             window_start + std::chrono::duration_cast<Clock::duration>(
                                std::chrono::duration<double>(seconds)
                            );
+        const int quota = iterations / threads + (worker < iterations % threads);
         long long count = 0;
         double busy_here = 0.0;
         double sum = 0.0;
         while (!stop.load(std::memory_order_relaxed)) {
             const Clock::time_point begin = Clock::now();
-            if (begin >= deadline) break;
+            if (iterations > 0 ? count >= quota : begin >= deadline) break;
             double value = 0.0;
             double core_ms = 0.0;
             if (!attempt(item, slot, worker, &value, &core_ms, message)) break;

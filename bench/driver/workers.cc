@@ -305,14 +305,19 @@ int RunBatchWorkers(const BenchOptions& options) {
     return failures == 0 ? 0 : 1;
 }
 
-// The throughput window: decode once outside the timer, then keep `--workers`
-// pipelines busy for `--throughput-seconds` and print one machine line. With a
+// Decode once outside the timer, then keep `--workers` pipelines busy for a
+// fixed count or `--throughput-seconds` and print one machine line. With a
 // single worker the stage timer is read across the window, which is what makes
 // the reciprocal GPU stage rate visible next to the achieved rate; it is a
 // process-wide accumulator, so it is only read when there is one worker.
 template <typename Ops>
 int RunWindow(const BenchOptions& options) {
-    const int threads = std::max(1, options.workers);
+    const int threads =
+        options.throughput_iterations > 0
+            ? std::min(
+                  std::max(1, options.workers), options.throughput_iterations
+              )
+            : std::max(1, options.workers);
     const int decode_threads = DecodeThreads(options, /*batch=*/true);
     const int distinct =
         std::min(threads, static_cast<int>(options.pairs.size()));
@@ -369,14 +374,18 @@ int RunWindow(const BenchOptions& options) {
             workers[static_cast<std::size_t>(worker)].Park(pipeline, item);
         }
     }
-    // One warmup call per pipeline, outside the window.
+    // Warmup calls per pipeline, outside the measured interval.
     for (int worker = 0; worker < threads; ++worker) {
         const DecodedPair& item =
             items[static_cast<std::size_t>(worker) % items.size()];
-        CallOnce(
-            workers[static_cast<std::size_t>(worker)], item,
-            (item.original.HasAlpha() || item.distorted.HasAlpha()) ? 0.1f : 0.5f
-        );
+        const int warmup =
+            options.throughput_iterations > 0 ? options.warmup : 1;
+        for (int iteration = 0; iteration < warmup; ++iteration)
+            CallOnce(
+                workers[static_cast<std::size_t>(worker)], item,
+                (item.original.HasAlpha() || item.distorted.HasAlpha()) ? 0.1f
+                                                                        : 0.5f
+            );
     }
 
     std::atomic<bool> started{false};
@@ -414,11 +423,15 @@ int RunWindow(const BenchOptions& options) {
                 std::chrono::duration<double>(options.throughput_seconds)
             );
         long long count = 0;
+        const int quota = options.throughput_iterations / threads +
+                          (worker < options.throughput_iterations % threads);
         double busy_here = 0.0;
         double sum = 0.0;
         while (!stop.load(std::memory_order_relaxed)) {
             const Clock::time_point begin = Clock::now();
-            if (begin >= deadline) break;
+            if (options.throughput_iterations > 0 ? count >= quota
+                                                  : begin >= deadline)
+                break;
             double value = 0.0;
             try {
                 value = ScoreWindowPair(state, item, background, has_alpha);

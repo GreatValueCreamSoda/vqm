@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # Derived from Cloudinary SSIMULACRA 2 (Copyright (c) Jon Sneyers, Cloudinary).
 # BSD-3-Clause; see LICENSE.
-"""Benchmark videos by default; select image peers with --suite images."""
+"""Benchmark videos, image latency or the complete GPU throughput matrix."""
 
 import argparse
 import os
@@ -99,9 +99,10 @@ def _references(parser: argparse.ArgumentParser,
             "--references must contain known implementations: " +
             ", ".join(CHECKOUTS)
         )
-    if args.metric == "cvvdp" and references != ["vship-vulkan"]:
+    if args.metric == "cvvdp" and not set(references) <= {"vship-vulkan",
+                                                          "vship-fast-vulkan"}:
         parser.error(
-            "CVVDP currently supports the vship-vulkan comparison arm only"
+            "CVVDP supports the vship-vulkan and vship-fast-vulkan arms only"
         )
     if args.metric == "butteraugli" and ({"cloudinary", "fssimu2"}
                                          & set(references)):
@@ -226,17 +227,22 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 
 def command_line(argv: Sequence[str] | None = None) -> int:
-    """Dispatch the default hosted-video suite or explicit still-image suite.
+    """Dispatch hosted video, image latency or full throughput comparisons.
 
     :param argv: Explicit options or the process command line.
     :returns: Selected suite's exit status.
     """
     parser = argparse.ArgumentParser(add_help=False)
-    parser.add_argument("--suite", choices=("video", "images"), default="video")
+    parser.add_argument(
+        "--suite", choices=("video", "images", "throughput"), default="video"
+    )
     selection, remaining = parser.parse_known_args(argv)
     if selection.suite == "images":
         return main(remaining)
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    if selection.suite == "throughput":
+        from bench import throughput
+        return throughput.main(remaining)
     from bench import video
     return video.main(remaining)
 

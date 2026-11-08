@@ -72,6 +72,27 @@ class BenchmarkArguments(unittest.TestCase):
         self.assertEqual(result.returncode, 2)
         self.assertIn("require VMAF v0", result.stderr)
 
+    def test_fixed_throughput_rejects_incompatible_options(self) -> None:
+        """Reject invalid fixed counts and incompatible benchmark modes."""
+        flags = (
+            ("--throughput-iterations", "0"), ("--throughput-iterations", "-1"),
+            ("--throughput-seconds", "1"), ("--resident-reference", ),
+            ("--host-views", ), ("--vulkan-buffers", ), ("--pool", ),
+            ("--resident-ring", "2"), ("--metric",
+                                       "cvvdp"), ("--metric", "vmaf-v0"),
+            ("--metric", "psnr-hvs"), ("--stages-csv", "unused.csv")
+        )
+        for options in flags:
+            with self.subTest(options=options):
+                result = subprocess.run(
+                    [
+                        str(self.bench), "--pair", "unused.png", "unused.png",
+                        "--throughput-iterations", "7", *options
+                    ], capture_output=True, text=True, timeout=5
+                )
+                self.assertEqual(result.returncode, 2)
+                self.assertFalse(result.stderr.startswith("Usage:"))
+
 
 class BenchmarkIntegration(unittest.TestCase):
     """Exercise benchmark scoring, timings and data paths on a Vulkan device."""
@@ -602,6 +623,33 @@ class BenchmarkIntegration(unittest.TestCase):
                 self.assertAlmostEqual(
                     float(fields["checksum"]) / int(fields["calls"]), score,
                     delta=1e-5
+                )
+
+    def test_fixed_resident_throughput_counts_completed_calls(self) -> None:
+        """Check aggregate counts and checksums independently of warmups."""
+        for metric, pair, workers in product(SPATIAL_METRICS, IMAGE_PAIRS,
+                                             (1, 3, 9)):
+            with self.subTest(metric=metric, pair=pair, workers=workers):
+                original, distorted = (self.fixtures / name for name in pair)
+                expected = float(
+                    self.run_bench(
+                        metric, original, distorted, "--score-only",
+                        "--iterations", "1", "--warmup", "0"
+                    ).strip()
+                )
+                output = self.run_bench(
+                    metric, original, distorted, "--resident", "2", "--workers",
+                    str(workers), "--warmup", "2", "--throughput-iterations",
+                    "7"
+                )
+                fields = dict(
+                    token.split("=", 1) for token in output.split()[1:]
+                )
+                self.assertEqual(int(fields["calls"]), 7)
+                self.assertEqual(int(fields["threads"]), min(workers, 7))
+                self.assertGreater(float(fields["seconds"]), 0)
+                self.assertAlmostEqual(
+                    float(fields["checksum"]), expected * 7, delta=1e-4
                 )
 
     def test_host_view_mode_matches_streaming_scores(self) -> None:

@@ -128,6 +128,7 @@ if(VQM_BUILD_CLI)
     ENV ${bench_environment} ${cli_environment})
 endif()
 vqm_add_python_test(profile_scripts test_profile_scripts.py)
+vqm_add_python_test(throughput_comparison test_throughput_comparison.py)
 execute_process(COMMAND "${Python3_EXECUTABLE}" -c "import numpy"
   RESULT_VARIABLE VQM_NUMPY_STATUS OUTPUT_QUIET ERROR_QUIET)
 if(VQM_NUMPY_STATUS EQUAL 0)
